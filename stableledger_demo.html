@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shepard</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#fff;color:#1e293b}
+  .mono{font-family:'Cascadia Code','Fira Code',Consolas,monospace}
+  .header{border-bottom:1px solid #e2e8f0;padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+  .logo-name{font-size:15px;font-weight:600;color:#0f172a}
+  .demo-badge{font-size:10px;color:#94a3b8;padding:2px 7px;border:1px solid #e2e8f0;border-radius:3px;margin-left:6px;text-transform:uppercase;letter-spacing:.05em}
+  .screen{display:none}.screen.active{display:block}
+  .container{max-width:1200px;margin:0 auto;padding:24px 28px}
+
+  /* ===== SCREEN 1: WALLET CONFIG ===== */
+  .wc-center{max-width:640px;margin:60px auto}
+  .wc-title{font-size:22px;font-weight:600;color:#0f172a;margin-bottom:4px}
+  .wc-sub{font-size:13px;color:#64748b;margin-bottom:32px}
+  .wc-field{margin-bottom:16px}
+  .wc-field label{display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+  .wc-field input{width:100%;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;outline:none;color:#1e293b;background:#fff;transition:border-color .15s}
+  .wc-field input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+  .wc-field input.mono{font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:12px}
+  .wc-row2{display:grid;grid-template-columns:1fr 120px;gap:12px}
+  .wc-actions{display:flex;gap:10px;margin-top:20px}
+  .btn{font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;transition:all .15s}
+  .btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
+  .btn-primary:disabled{background:#93c5fd;cursor:wait}
+  .btn-secondary{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}.btn-secondary:hover{background:#e2e8f0}
+  .btn-success{background:#16a34a;color:#fff}.btn-success:hover{background:#15803d}
+
+  .wc-progress{margin-top:20px;display:none}
+  .wc-progress.active{display:block}
+  .prog-track{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden}
+  .prog-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#7c3aed);border-radius:3px;transition:width .3s;width:0%}
+  .prog-text{font-size:12px;color:#64748b;margin-top:6px}
+
+  .wc-result{margin-top:24px;padding:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;display:none}
+  .wc-result.active{display:block}
+  .wc-result h4{font-size:14px;color:#166534;margin-bottom:8px}
+  .wc-result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .wc-result-item{font-size:12px;color:#475569}.wc-result-item strong{color:#166534;font-size:16px;display:block;margin-top:2px}
+
+  .wc-saved-section{margin-top:32px;border-top:1px solid #e2e8f0;padding-top:24px}
+  .wc-saved-title{font-size:13px;font-weight:600;color:#334155;margin-bottom:12px}
+  .wc-chips{display:flex;gap:8px;flex-wrap:wrap}
+  .wc-chip{font-size:12px;padding:8px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+  .wc-chip:hover{border-color:#3b82f6;background:#eff6ff}
+  .wc-chip .cn{color:#334155;font-weight:500}.wc-chip .ca{color:#94a3b8;font-size:11px}
+  .wc-chip .cx{color:#cbd5e1;font-size:14px;margin-left:4px;cursor:pointer}.wc-chip .cx:hover{color:#ef4444}
+  .wc-empty{font-size:12px;color:#94a3b8;font-style:italic}
+
+  /* ===== SCREEN 2: LEDGER ===== */
+  .back-btn{font-size:12px;color:#3b82f6;cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:16px;font-weight:500}
+  .back-btn:hover{color:#2563eb}
+
+  .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+  .sc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px}
+  .sc-label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .sc-value{font-size:18px;font-weight:600}.sc-sub{font-size:10px;color:#94a3b8;margin-top:2px}
+
+  .tx-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .tx-nav-controls{display:flex;align-items:center;gap:8px}
+  .nav-btn{width:32px;height:32px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .nav-btn:hover{background:#f1f5f9}.nav-btn:disabled{opacity:.3;cursor:default}
+  .tx-counter{font-size:12px;color:#64748b;min-width:70px;text-align:center}.tx-counter strong{color:#1e293b}
+  .gl-classify{display:flex;align-items:center;gap:8px}
+  .gl-classify label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .gl-select{font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#1e293b;cursor:pointer;outline:none;min-width:200px}
+  .gl-select:focus{border-color:#3b82f6}.gl-select.mapped{border-color:#86efac;background:#f0fdf4}
+
+  .tx-detail{display:flex;align-items:center;gap:14px;padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px;flex-wrap:wrap}
+  .tx-dir{font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px}
+  .tx-dir.in{background:#dcfce7;color:#166534}.tx-dir.out{background:#fff7ed;color:#9a3412}
+  .tx-amt{font-size:17px;font-weight:600}.tx-amt.in{color:#16a34a}.tx-amt.out{color:#ea580c}
+  .tx-cp{font-size:12px;color:#64748b;flex:1}.tx-cp strong{color:#334155;font-weight:500}
+  .tx-meta{font-size:11px;color:#94a3b8}
+
+  .main-grid{display:grid;grid-template-columns:360px 1fr;gap:0;position:relative}
+  .panel-title{font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+
+  .journal-panel{padding-right:24px}
+  .journal-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+  .j-hdr{display:grid;grid-template-columns:28px 1fr 76px 76px;padding:7px 12px;background:#f8fafc;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e2e8f0}
+  .j-hdr>div:nth-child(3),.j-hdr>div:nth-child(4){text-align:right}
+  .j-line{display:grid;grid-template-columns:28px 1fr 76px 76px;padding:9px 12px;font-size:11px;border-bottom:1px solid #f1f5f9;position:relative}
+  .j-line:last-child{border-bottom:none}
+  .j-line>div:nth-child(1){color:#94a3b8;font-size:10px}
+  .j-line>div:nth-child(2){color:#334155;line-height:1.4;font-size:10.5px}
+  .j-line>div:nth-child(3),.j-line>div:nth-child(4){text-align:right}
+  .j-line .dr{color:#1e293b;font-weight:500}.j-line .cr{color:#1e293b;font-weight:500}.j-line .zero{color:#cbd5e1}
+  .j-line .dot{position:absolute;right:-16px;top:50%;transform:translateY(-50%);width:9px;height:9px;border-radius:50%;border:2px solid}
+  .j-total{display:grid;grid-template-columns:28px 1fr 76px 76px;padding:8px 12px;font-size:11px;font-weight:600;border-top:2px solid #e2e8f0;background:#f8fafc}
+  .j-total>div:nth-child(3),.j-total>div:nth-child(4){text-align:right;color:#16a34a}
+  .j-balanced{font-size:10px;color:#16a34a;margin-top:6px}
+
+  .fs-panel{padding-left:24px;border-left:1px solid #e2e8f0}
+  .fs-stack{display:flex;flex-direction:column;gap:14px}
+  .fs-card{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+  .fs-card-title{font-size:11px;font-weight:600;padding:9px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0;color:#334155;display:flex;justify-content:space-between}
+  .fs-card-title .sub{font-weight:400;color:#94a3b8;font-size:10px}
+  .fs-hdr{display:grid;grid-template-columns:1fr 82px 82px;padding:5px 12px;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#fafbfc;border-bottom:1px solid #f1f5f9}
+  .fs-hdr>div:nth-child(2),.fs-hdr>div:nth-child(3){text-align:right}
+  .fs-line{display:grid;grid-template-columns:1fr 82px 82px;padding:6px 12px;font-size:11px;color:#475569;border-bottom:1px solid #f8fafc;position:relative;transition:background .3s}
+  .fs-line>div:nth-child(2),.fs-line>div:nth-child(3){text-align:right}
+  .fs-line.section{font-weight:600;color:#334155;background:#f8fafc;font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:7px 12px}
+  .fs-line.indent{padding-left:22px}
+  .fs-line.subtotal{font-weight:600;color:#1e293b;border-top:1px solid #e2e8f0}
+  .fs-line.total{font-weight:700;color:#0f172a;border-top:2px solid #cbd5e1;background:#f8fafc;padding:8px 12px}
+  .fs-line.hit{background:#eff6ff}
+  .fs-line.hit::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:0 2px 2px 0}
+  .fs-line .chg{font-weight:600}.fs-line .chg.pos{color:#16a34a}.fs-line .chg.neg{color:#ea580c}.fs-line .chg.zero{color:#cbd5e1}
+  .fs-check{padding:6px 12px;font-size:10px;border-top:1px solid #e2e8f0;color:#16a34a}
+
+  #arrowSvg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5}
+  #arrowSvg path{fill:none;stroke-width:1.5;opacity:.6}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAATuklEQVR42o1ae5RddXX+vn3OnTt5TMiDAAkJIiQxCGgVRPGByssAsoCgKCit9bGsiG+7dFVrbRXb1fpYbfEPleqyrcUHFV0uVEBQRBFBjUCIFKOiYgh5oJmZzMyde3776x+/xzkzCa13zUpm7j33nL3379vf/vb+/fj7n13rBpICCBNJ0GgigQokSUNNmKqKrEUhvgeSBAAYYU4CMFSK78X/SAKSRIACQEAuQCYXAiDEyxUkQYBccvPgaCQHJBfkhAcECHQBEBwQGjfE5wFEtIAGEwhYtJ4k00UEBMZfkK0HaMqXevQLlr+YvDCQsvInwBSg9kVlMwgKpCrS0vWEwGQroxkCADPz9MXy5fxr9owoz4NM2VZLn9IgqoorZiajWG6o/JPuKINMJIyixaVDcbLjppijlAJLEJRZtDC/q/L98jyIebmVo2UgYfFucTWKiQbVMEN6crEGILwiKqIijTC2gVGMB0ETekjfykFhDhGM6oS0ADJDID6o7kCZIpw0UBk/JXDJB6BAg6BoThCk55skH0mwAkRCSrevIAnuKXiATJAog7yspySY5IABboAnOIiCCBogqMCmjjZJisGO2ZwNzYgsYG7DT7FScj4lCS3eHyIFIiUtlDI6wt7kDrUYgEjUQlMWXA7GHAWIKmUEDAiAQS4yQllS3U0AzE8Ag0wWCYqQgVaYByKNUH7HIiQAmJB9VwyVgRBCXJGYw3JRACpRVCBN8uxzSQMm6mKhqw7c02PZWt/1AGBEaspJVhlR8XNTSTJF/JpI0UCTR8sJGmkkJXdHRKZoOQ1pYPJJ1nJQeos0zg3vgSGGoeWmLqeV3O8kbptRpkRElssAgxEwom4a7/dHRno9tFDkyEhvbPEiAE0gYpGhyTJtmIlVyWYw8UCMAWXM1seoRXqRCCbKBws3pLjAYITJykK14WdcN1piM7PMdxaCLzl02S9//dtde38/OrrAzEBYVe/Yuefmb93ehDC2dIk7YFXM9USPYDSmjbFFklXh5MSHpQCRIgTWLd0DoHVAAhEiUw1pcZeqVcKQmUefYaHxhWOLr//Kjddc87lHdz32liteddllF4YQ7r1n25ve8f79+6dOPunE5z/3mZe/4uLJifG6qiiALskUQx45Jz0FJJS4GzDQ2ZYUKv9as4P5TimMeGhpXXlpo5MpM4wFh+6+aGzRrr2PvetdV/18+y8A/O1Vv7/8lS+tRtded/1H7rzzR/3+yH33bRvONhdesGnhgoXTU1N1ZYQSFYEiKRZpwcTmDhgl0CMFRDLNURf3/vwLsVDJYviNVpE01bIIoQpWAzAaWIsGM1MFAJWJRpocvf7ovsmp8178yrt/fM9Ir+eSpIsuPG9syZKbb751x46dJKuqmp2dPelpJ9zw1f84/IiV+8f3GR3ucgcgBLoDwRUkJyAPQIALIciC5HKH3CSHO4KUHDCCTiMjUZqhImuvItrqCCEzA3vRYspglBlpkJFmvd5Zmy69/ft3AazrqmmaqqpCCB0EA0Bd18Ph8CknPvnfPvWRjeuPUhj2zOQuSXS4Uy407k5AcmgICcHFIAW5qAAIcofkbpmScn1lpx50n00DqqxRCuQieLRg8ZK7fvjT279/F8lnPOPpTdO88YpXb9p0RlVVo/2+mZXK2TRNXVf33rftlFPPvfKt7x8ZXeAdZZCfWaGD8gxpZinRls6UtVEUtBpYzJpISBoIEIVKBEkqahtCkb+JXu/+B7aTfPapz2ia4WWXXvzOt73he7f/QNJgdtbMDjlkibKmCMF7vR6An2zZOhg0tFqR95SsFBJBp8JcdE6bqFIKIozw7Dw7yWyFhhE1NCkIZEdMFclMgA/8z4MCjj/+uN279/z7p6++4k3v3jc+YWZRpKxefUQyQ4rrIOm+rT/7znfuWLB4SQgeZSZJZ0nTIjSleco0UYd1ClnHy2hsFq3pV2WxzTnSO6rgCu53333P+nXHPvDg9rdc+do777zrG9+8pa7rEAJJD2HlyhUAojNRw2xYf+xhK1c+8uhu1JViFUeMUDIksmiUKPO0hBLek7br6tVoq1SuLtza3oIsPEtKGO33d/72d3fc+aMTnrxhx8M7zj3vRe/7uw+zU9qD++JFi6qqiuGXtGDB6JlnnjY+Pn7ME5+ApiFNjM1geabixWzXGwe+UhXthDVdHotsyVcy92JZOYllfWlmE5OTL3/5xaeccjLJiYnJ2757B4BIQdGqhQsX1FUFoKpM0rOeefL27Q/NDAZrjlyFJiTtY60OSDqqFB/LtbdI6yz7kpSYK/SoDtqIDKhSv1iIy0gOZmfXrll97bWfu+XW7xx99BO2bLkvhFDXdZdZFixYONIfidkH4MQTj9vy03vXrFm9b3zKrUJEqjRHa8oKocQ6l23u8mTSM8x2F4XXdnWddCgsAUU2y98lGab33Hvftic9af22bQ/O14VA3estWrQYgLsf/YSjRkb6u3fv3bhh3dNOeurM1LRZlYR67Lgy7RV7cuMT+1W1aM/6Sa1IZecKsiNkObdR7gIPLll/9LCVK1etOuzB7dujod0yMjMzfeihyyO0zzrr+bd/7wdjY2NvvvK1lTwy85wK06ZcKU3tVKMzYUgDBWVL1a5ediPnkZK+L40xLEsj0iyEQOsdc8zRa9ceuWXL1mhopkAB2L1777p1x5rZ8uXL1m/YcPfdWyYmJtauXV33RyRvBTvbNGw7m7KS3fFD+kNGtB+UPM1IZ0ZgZ2XyZZlG2QyHi5ct23L3XWvXrpmZmd21a1dd1/Mc2Lp126nPPsXd/+L1r7nttu+7+yWXXLRz5+40MFIeYcQwCbFnREeaAgB9LgMVuBNSCxaJB+MsSpBir1uSGGE4XDS25HcP73znuz+w+aLzPvqxj0eaL19z97qudu589JEdO2++6RvLly+74YZvAhjtj2w69+zpyQmrcq8nA+eMngpW0/3Uycmo9oG6E10WyOgghJsArc6fTQgLF4/98lcPv+Ly1//D37//E5/8zAMPPFjXVQjelVLuTvLqqz/x8MOPfO1rN1RV5e7Xf+XrH/r1b45Ydejs9KBddB346Fx5VKocu3xlThSFzfY2uY8vqd0qktQPufvowkU7dz125Zvf9bGPXnXLrbdd+/kv93q9rvUZRUnGXXfdlweDwdq1a5aMjU1MTHz9plur0UXBvbSECZZqLdec5Cy/tOxu8fbqVDqpg7q8VGKnKEKSqrqampnddM5Lliw9hOQHPvjhuq6bpsHjvEj2ej2S/f7I4asOB3DLrbe3U6PueHHOpK0rCjgvKGgF0xyhoYQmzf+sEHsI6i855NPXfPberT/7wue/fOHmP+uq/7nhV0mJEIKk44570qUvu5jkT35y7/T4vrqu20aR861HWxGkFs0dCDEThUrlbX0UDp4M6d/H/jBuxpGRkZ07dxbiPwh+yzDDDMCKFcvPOOP0FSuWP/Tr3+7atWdkZKSD6U6YeZC5YmsRWwc6K9NdMs4VQkmEJFfNDMPZs896AcCmGUbL/t9XdPLGG2/5x3/66J49e5umeXjHTvYK585jP821JUuJuS/jAd+bH24Jc9RsHGdATbP6iJUjIyPuwh/3cveFCxc+59nPWr5saWTbhx76Daq2aJTiiQNyoVTSdmCRc2B+4rSCoV2QyLmKOBVg5MxgsHbtkSeesHHOXsH/+arrampq6tKXbT77rNOj0dse2A5UBzWfRTu2c38dkLFJt2kehg4W0vJR+tCbUC9cuH7dMWb2R0JIQr/fv+lb3943vi/6fNt370CYrdqKryLfDviqcmGf81leAaqjX5hjoXmDyA5QE1Od8YLnuHszHJpZVVVVVT2eM5GmXvjC01avPuLqj18DoNerf3Dnj2+56dsLxhaH4IBEQR0d1Rlwt/hRfnpZAZtDsVIZj/EASusQtVXVzPi+yy6/5JKXXrB0+bIQQtM0TdNErnw8Rlp6yNjLXr55+/ZfxlD+y8c+ePSxRw9mBq3XsR2jqzSYeUNJnYQuFtWle2Pav+E8Bpin7BNSBSNC8EVjI3/9nrftfHTv85576o4dj/RHR+++60f33LvV3Q90Q9Lk5NRDv/pNdGbYNBs3PPHYDcdN7vmdWZxaZuEYx0LyTo4qjUpFoFB2Z39AapXCwUfxc8hCgNdVPbVv/PjjN77ozNO+eN3XFi1ePD09Daiu68FgMC/2IYTVq1cdseqIz3zmc8PhMJbtmZmBwnQrdXOgnV2YqLv2OQs034Gi5/ImoJi0rVKTUODY+aAyG+yf+qv3vuOC8zfteWx81+49r3ntG2dmZuJApcWbWQjh9Bc87wWnnfq617+VZBQdKw9dweDpjrnln8c1RNsBp/Ia6RCeINR2Ay0RiDAlSk03z8PieE3cxEqbljP7xo8/fiPqGlz2X9d+6StfvSFa3F0BSSed9CeDwWB6errX6/X7I1VVrTlyVRjOphaSxYI8kkB2iYiDa80bTmcHIrSUnfTYULcxl2Rpu0RyiDQXnGmjV1ZXM9PTTdCCsTA5OXkg9N196bKl+6enrvn0f8bwn3rqKb3aDl912GBqmoQrcI7aKW2l0ujNDXBJzJQaL6hbnd0O7MqS5Oki1a4y2QGcx81qSQQXjI7MTE/dv+2Bbk9cfLjiDa+5556t99+/LfZr69cdffLTn1KN9n1y0qqMbbXoNhX1rDzT0zyVQcWGppvIqT91ydL8ATLRAQaPY2oCcFdeccVZsdhfsPCTH/7XRx55NLYsXfSvW3fMRRecc+bZm6uqappm8eLFmy849+SnnTCc2F9VlIKBkGfV6TkTkgaTvEgBqexip4bG51Vxpe2FbuX25H9MXU/pLikzmowY7p886qgjj3/yce5eylmsuGee8fyrPvTRffvG4zsb1h9zzoteuPSQsaYZ5md4R7igozw9PkJM6CkjnVbMxSuy8Ih7JaIc7Wgi7iMq/y3Q4+4Q4EgTT8mbizefPzscdPknhNDr9W686dtf+erXARyx6nBJl7zkfPb7g9kB6fEwR1E0yvurye7c5MZMYFRIqQ2S0uZmKzZ0YDfR/XeOaJLnLS1Jcqmuqt/++jePPrp77qVomuYXv/hlVdnY2OLTX3ja2NjYq/70kuH+iaqqMuN5m3UKzGP+Ypjm9EXKuh6CrKQ+89yiyBF1SNmEvIYueQQiIffkQDxHUPUs9o3ziKjfHwnBL77ovH6vet973n74mqMGMwOjInCISDDOEq/CAepqInX0ZNxck6V5CTx9oIB4U4+FooUNY9ST9ou6ywFJIYbQ3fu93qYXnb5ixfI4iYg29Op6MJhdvnzpO952xfnnnfXWK/985g9768okgQ44va2ulKD07GSlZCoA8WJ9/IolDdj2/pZddtBzpgrwro5Q/lZJZUIh+Gi//5dvf8Nhhx1a0reqbHY4XLFi2Rev/dQJJ2588TmnN00QHIkYxHgAKgJS5YhEV1lQ8KLRWMa4epyGJqNRLdIS0J3KD84XACGuP+DxgNVTT3r6kzeuI2lmJJsmvGTzi394xzfPOON5U+Pjg8FshIorgCFnakk/78p9pXMp3o4HyrAzEkluaDwvVgJKzhZPKTRH72VxK8GjTPGYxoTLJR+eu+n0uBnjrn/+2Ae/9N+ffeLa1VPjE2axg/V0rkOK8JVCUgxSpzGJWJqz35JmPFIpfNbxvpMwyf4sfMo1AqOhKRxxJhWo+I5XFZr9Execf86aNatnZ2f/5r1vf/Nb3zy5d8/MzIwxnguKRcpFp5zK4Mn7FtHeXAa8dLepTqSykFORrN71povznlGe1pJKQ+g4ibb2OFU+IKR8UCKfq4onG2jUcDg85LCVw5npbT/bfv11nx5MjqfNl4R7lxwUFSxFJiTpryLXYoBDAqrHr6QxeZ4RxvwsapSueLimM0Mou0mM6xs7DlQmuRqwBirJSSvDJxcr4+zEH1736kufdcrTqSAFs1KVPDIPM0tKoSN5WubJXROY03pebUH3xFZqMovCSCiPB0kktOIjTcGKLIURcHo6EsImnnlqhr5wdPS055w8PT1lVnQ+wFjd04GHXIMl5ZM3Ga5qAS0oZUZSXnBByt5ah60y/bc54HAWtkxW0FPLEzVfTNwgxgimSS3cZ/fv3x9Vn1K+e7x/3g6Qt5zm+f4eu0kmyIfUoMdaD0+nBZH5PUNIuQzkGq5OQ62g2AE5aFE5xyQLsiozEpUO+SQHQVrFduNNyNFxEZLiiY6sdpNWyDiMh+oS/3SmdqneA6L1FGbjqc85c5eWjxM9eUcOhZJeUhQwkTUckMuzKkvUKHe6Q+2Pcia4mqKjmOlSCqV65qEuy1SukwBO6/UWHknWEXulqHlyLr7Dru4IiszVmuiiqKbjnktBHiCPx3sslTaPZsUi6PGatt91eohrwlhWUtSD0hKVvirNmyVnvaAaXcZqVB5q5R2lOCnp4MfL3E4EEdodtHjg00ETFcQ6I84FyI2x4c4HYDzyvZehU+GAzDze5lgiCYUU0Gg0U+EDHGQzGAcf9uEkaHXbiDFnadqhQbIiHqZFaSqjaRGNBhPVgCaV8yUu5Ww62Nhb6WOPGS9FOdgZqMWU8rwYqafPGkyC1EzviZqyTkcwWs2qOMnO6eyExS2oGBsWSmIU1cwdD2MeloOTOIjMEsq4wT324JKTxdiUQszNTTQu9fLy7ngo1QEJxnYICcuLUHY7lE/JMN4uKqY0PZLnU4TyWCo9dg6ccyBdcZiRAiTm9iTZlCRpvDByvKephNAKSrYIK23M/wJj3Ap1aSRcZQAAAABJRU5ErkJggg==" width="32" height="32" style="border-radius:4px" alt="Shepard"></div>
+    <span class="logo-name">Shepard</span>
+    <span class="demo-badge">Demo</span>
+  </div>
+  <div style="font-size:12px;color:#94a3b8">Base &middot; Solana</div>
+</div>
+
+<!-- ===== SCREEN 1: WALLET CONFIG ===== -->
+<div class="screen active" id="screen-config">
+  <div class="wc-center">
+    <div class="wc-title">Wallet Scanner</div>
+    <div class="wc-sub">Scan any Base or Solana wallet for USDC transfers and generate journal entries.</div>
+
+    <div class="wc-field">
+      <label>Wallet Address</label>
+      <input class="mono" id="walletInput" placeholder="0x..." spellcheck="false">
+    </div>
+    <div class="wc-row2">
+      <div class="wc-field">
+        <label>Label</label>
+        <input id="nameInput" placeholder="e.g. Treasury, Payroll, Revenue">
+      </div>
+      <div class="wc-field">
+        <label>Lookback Blocks</label>
+        <input id="blocksInput" type="number" value="1000" min="100" max="100000">
+      </div>
+    </div>
+
+    <div class="wc-actions">
+      <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Scan Wallet</button>
+      <button class="btn btn-secondary" onclick="saveWallet()">Save Without Scanning</button>
+    </div>
+
+    <div class="wc-progress" id="progressBar">
+      <div class="prog-track"><div class="prog-fill" id="progressFill"></div></div>
+      <div class="prog-text" id="progressText">Connecting to Base...</div>
+    </div>
+
+    <div class="wc-result" id="scanResult">
+      <h4>Scan Complete</h4>
+      <div class="wc-result-grid" id="resultGrid"></div>
+      <button class="btn btn-success" onclick="openLedger()">Open Ledger &#8594;</button>
+    </div>
+
+    <div class="wc-saved-section">
+      <div class="wc-saved-title">Saved Wallets</div>
+      <div class="wc-chips" id="savedWallets"><div class="wc-empty">No wallets saved yet</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCREEN 2: LEDGER ===== -->
+<div class="screen" id="screen-ledger">
+  <div class="container">
+    <div class="back-btn" onclick="showConfig()">&#8592; Back to Wallets</div>
+    <div class="summary-cards" id="summaryCards"></div>
+    <div id="classifyNotice" style="display:none;font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 14px;margin-bottom:16px;font-weight:500"></div>
+    <div class="tx-nav">
+      <div class="tx-nav-controls">
+        <button class="nav-btn" id="prevBtn" onclick="nav(-1)">&#8592;</button>
+        <div class="tx-counter" id="txCounter"></div>
+        <button class="nav-btn" id="nextBtn" onclick="nav(1)">&#8594;</button>
+      </div>
+      <div class="gl-classify">
+        <label>Classify:</label>
+        <select class="gl-select" id="glSelect" onchange="classify(this.value)"></select>
+      </div>
+    </div>
+    <div class="tx-detail" id="txDetail"></div>
+    <div id="autoNote" style="display:none;font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 14px;margin-bottom:16px;font-weight:500"></div>
+    <div class="main-grid" id="mainGrid">
+      <div class="journal-panel">
+        <div class="panel-title">Journal Entry</div>
+        <div class="journal-card" id="journalCard"></div>
+        <div class="j-balanced" id="balCheck"></div>
+      </div>
+      <div class="fs-panel">
+        <div class="panel-title">Impact on Financial Statements</div>
+        <div class="fs-stack" id="fsStack"></div>
+      </div>
+      <svg id="arrowSvg"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const GL_OPTIONS=["Unclassified","6110 - Payroll","6200 - Software & SaaS","6300 - Cloud Infrastructure","6420 - Marketing & Ads","6500 - Professional Services","6600 - Office & Operations","7100 - Intercompany Transfer","4100 - Revenue - Services","4200 - Revenue - Product","4300 - Customer Refund","1200 - Treasury Rebalance"];
+const COLORS=["#3b82f6","#8b5cf6","#06b6d4","#f59e0b"];
+const GL_MAP={"6110":"pnl-payroll","6200":"pnl-software","6300":"pnl-cloud","6420":"pnl-marketing","6500":"pnl-profsvc","6600":"pnl-ops","4100":"pnl-revsvc","4200":"pnl-revprod","4300":"pnl-revsvc","7100":"bs-usdc","1200":"bs-usdc"};
+const OPENING={revSvc:1450000,revProd:380000,expPay:620000,expSw:85000,expCloud:142000,expMkt:215000,expProf:67000,expOps:38000,expGas:1.80,cash:2450000,usdc:1800000,eth:12500,ar:340000,ap:285000,accrued:125000,equity:3500000,re:692500};
+
+let wallets=[],scanData=null,txs=[],idx=0,mappings={};
+const fmt=n=>Math.abs(n)<.01&&n!==0?n.toFixed(4):n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtShort=n=>{if(Math.abs(n)>=1e6)return"$"+(n/1e6).toFixed(1)+"M";if(Math.abs(n)>=1e3)return"$"+(n/1e3).toFixed(1)+"K";return"$"+fmt(n)};
+const addr=a=>(a&&a.length>=10)?a.slice(0,6)+"..."+a.slice(-4):a;
+const glOf=h=>mappings[h]||"Unclassified";
+const pfx=g=>g.split(" - ")[0];
+
+// ============ SCREEN MANAGEMENT ============
+function showScreen(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));document.getElementById("screen-"+id).classList.add("active");}
+function showConfig(){showScreen("config");}
+function openLedger(){if(!txs.length)return;idx=0;showScreen("ledger");renderLedger();}
+
+// ============ WALLET MANAGEMENT ============
+function saveWallet(){
+  const a=document.getElementById("walletInput").value.trim();
+  const n=document.getElementById("nameInput").value.trim()||addr(a);
+  if(!a.startsWith("0x")&&a.length<32||a.startsWith("0x")&&a.length!==42)return alert("Enter a valid wallet address (0x... for Base, or Solana address)");
+  if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){wallets.push({addr:a,name:n});}
+  renderWallets();
+}
+function loadWallet(i){
+  document.getElementById("walletInput").value=wallets[i].addr;
+  document.getElementById("nameInput").value=wallets[i].name;
+  renderWallets();
+}
+function removeWallet(i,e){e.stopPropagation();wallets.splice(i,1);renderWallets();}
+function renderWallets(){
+  const el=document.getElementById("savedWallets");
+  if(!wallets.length){el.innerHTML='<div class="wc-empty">No wallets saved yet</div>';return;}
+  el.innerHTML=wallets.map((w,i)=>`<div class="wc-chip" onclick="loadWallet(${i})">
+    <span class="cn">${w.name}</span><span class="ca mono">${addr(w.addr)}</span>
+    <span class="cx" onclick="removeWallet(${i},event)">&times;</span></div>`).join("");
+}
+
+// ============ SCANNING ============
+async function startScan(){
+  const wallet=document.getElementById("walletInput").value.trim();
+  const blocks=parseInt(document.getElementById("blocksInput").value)||1000;
+  if(!wallet.startsWith("0x")&&wallet.length<32||wallet.startsWith("0x")&&wallet.length!==42)return alert("Enter a valid wallet address (0x... for Base, or Solana address)");
+
+  saveWallet();
+  const btn=document.getElementById("scanBtn");
+  btn.disabled=true;btn.textContent="Scanning...";
+  const pb=document.getElementById("progressBar");pb.classList.add("active");
+  document.getElementById("progressFill").style.width="5%";
+  document.getElementById("progressFill").style.background="";
+  document.getElementById("progressText").textContent="Connecting to Base...";
+  document.getElementById("scanResult").classList.remove("active");
+
+  try{
+    const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({wallet,lookback_blocks:blocks})});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+
+    const poll=setInterval(async()=>{
+      try{
+        const pr=await fetch("/api/progress");const p=await pr.json();
+        if(p.progress&&p.progress.phase){
+          document.getElementById("progressFill").style.width=p.progress.pct+"%";
+          document.getElementById("progressText").textContent=`${p.progress.phase}... ${p.progress.pct}% (${p.progress.found} transfers found)`;
+        }
+        if(!p.running){
+          clearInterval(poll);
+          const rr=await fetch("/api/result");const result=await rr.json();
+          if(result.error)throw new Error(result.error);
+          onScanComplete(result);
+        }
+      }catch(e){clearInterval(poll);onScanError(e.message);}
+    },500);
+  }catch(e){onScanError(e.message);}
+}
+
+function onScanComplete(report){
+  document.getElementById("scanBtn").disabled=false;
+  document.getElementById("scanBtn").textContent="Scan Wallet";
+  document.getElementById("progressBar").classList.remove("active");
+
+  scanData=report;
+  txs=report.journals.map(j=>({
+    hash:j.tx_hash,
+    block:j.block_number,
+    dir:j.direction,
+    amount:j.amount,
+    cp:j.counterparty,
+    gas:j.gas_usd||0
+  }));
+  mappings={};
+
+  const s=report.summary;
+  document.getElementById("resultGrid").innerHTML=`
+    <div class="wc-result-item">Transfers<strong>${s.transfer_count}</strong></div>
+    <div class="wc-result-item">Total In<strong>${fmtShort(s.total_usdc_in)}</strong></div>
+    <div class="wc-result-item">Total Out<strong>${fmtShort(s.total_usdc_out)}</strong></div>`;
+  document.getElementById("scanResult").classList.add("active");
+}
+
+function onScanError(msg){
+  document.getElementById("scanBtn").disabled=false;
+  document.getElementById("scanBtn").textContent="Scan Wallet";
+  document.getElementById("progressText").textContent="Error: "+msg;
+  document.getElementById("progressFill").style.width="100%";
+  document.getElementById("progressFill").style.background="#ef4444";
+  setTimeout(()=>{document.getElementById("progressBar").classList.remove("active");
+    document.getElementById("progressFill").style.background="";},5000);
+}
+
+// ============ LEDGER SCREEN ============
+function uncIdxs(){return txs.map((t,i)=>({i,t})).filter(x=>glOf(x.t.hash)==="Unclassified").map(x=>x.i);}
+function nav(d){
+  const unc=uncIdxs();
+  if(!unc.length)return;
+  const curPos=unc.indexOf(idx);
+  if(curPos===-1){idx=unc[0];} // current is classified, jump to first unclassified
+  else{const next=curPos+d;idx=unc[Math.max(0,Math.min(unc.length-1,next))];}
+  renderTx();
+}
+let cpMappings={};
+function classify(v){
+  const tx=txs[idx];
+  mappings[tx.hash]=v;
+  if(v!=="Unclassified"){
+    cpMappings[tx.cp]=v;
+    let autoCount=0;
+    txs.forEach(t=>{if(t.cp===tx.cp&&t.hash!==tx.hash){mappings[t.hash]=v;autoCount++;}});
+    if(autoCount>0){
+      const note=document.getElementById("classifyNotice");
+      if(note){note.textContent="Auto-classified "+autoCount+" more transaction"+(autoCount>1?"s":"")+" from this counterparty";note.style.display="block";
+        setTimeout(()=>{note.style.display="none";},4000);}
+    }
+    // Advance to next unclassified
+    const unc=uncIdxs();
+    if(unc.length>0){const nextAfter=unc.find(i=>i>idx);idx=nextAfter!==undefined?nextAfter:unc[0];}
+  } else {
+    const oldCp=tx.cp;delete cpMappings[oldCp];
+    txs.forEach(t=>{if(t.cp===oldCp)delete mappings[t.hash];});
+  }
+  renderLedger();
+}
+
+function getTarget(g,fallback){
+  if(g==="Unclassified")return fallback==="expense"?"pnl-unclass-out":"pnl-unclass-in";
+  const p=pfx(g);return GL_MAP[p]||(fallback==="expense"?"pnl-unclass-out":"pnl-unclass-in");
+}
+
+function getJournal(tx){
+  const g=glOf(tx.hash),label=g==="Unclassified"?(tx.dir==="outflow"?"AP / Expense (unclassified)":"AR / Revenue (unclassified)"):g;
+  if(tx.dir==="outflow"){
+    const l=[{n:1,acct:label,dr:tx.amount,cr:0,t:getTarget(g,"expense")},{n:2,acct:"Digital Asset - USDC",dr:0,cr:tx.amount,t:"bs-usdc"}];
+    if(tx.gas>0){l.push({n:3,acct:"Expense - Network Fees",dr:tx.gas,cr:0,t:"pnl-gas"});l.push({n:4,acct:"Digital Asset - ETH",dr:0,cr:tx.gas,t:"bs-eth"});}
+    return l;
+  }
+  return[{n:1,acct:"Digital Asset - USDC",dr:tx.amount,cr:0,t:"bs-usdc"},{n:2,acct:label,dr:0,cr:tx.amount,t:getTarget(g,"revenue")}];
+}
+
+function computeTotals(){
+  const o=OPENING;let im={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,usdcChg:0,ethChg:0,uncIn:0,uncOut:0,classified:0};
+  txs.forEach(tx=>{const g=glOf(tx.hash),p=pfx(g);im.expGas+=tx.gas;
+    if(g==="Unclassified"){if(tx.dir==="inflow")im.uncIn+=tx.amount;else im.uncOut+=tx.amount;}
+    else{im.classified++;if(p==="4100")im.revSvc+=tx.amount;else if(p==="4200")im.revProd+=tx.amount;
+      else if(p==="6110")im.expPay+=tx.amount;else if(p==="6200")im.expSw+=tx.amount;else if(p==="6300")im.expCloud+=tx.amount;
+      else if(p==="6420")im.expMkt+=tx.amount;else if(p==="6500")im.expProf+=tx.amount;else if(p==="6600")im.expOps+=tx.amount;}
+    if(tx.dir==="inflow")im.usdcChg+=tx.amount;else{im.usdcChg-=tx.amount;im.ethChg-=tx.gas;}
+  });
+  const totRev=(o.revSvc+im.revSvc)+(o.revProd+im.revProd)+im.uncIn;
+  const totExp=(o.expPay+im.expPay)+(o.expSw+im.expSw)+(o.expCloud+im.expCloud)+(o.expMkt+im.expMkt)+(o.expProf+im.expProf)+(o.expOps+im.expOps)+(o.expGas+im.expGas)+im.uncOut;
+  return{im,totRev,totExp,ni:totRev-totExp,cUsdc:o.usdc+im.usdcChg,cEth:o.eth+im.ethChg};
+}
+
+function renderLedger(){
+  // Summary cards
+  const s=scanData.summary,t=computeTotals();
+  document.getElementById("summaryCards").innerHTML=[
+    {l:"Total In",v:fmtShort(s.total_usdc_in),s:s.inflow_count+" transfers",c:"#16a34a"},
+    {l:"Total Out",v:fmtShort(s.total_usdc_out),s:s.outflow_count+" transfers",c:"#ea580c"},
+    {l:"Net",v:fmtShort(s.net_usdc),s:s.transfer_count+" total",c:s.net_usdc>=0?"#16a34a":"#ea580c"},
+    {l:"Classified",v:t.im.classified+"/"+txs.length,s:(txs.length-t.im.classified)+" remaining",c:t.im.classified===txs.length?"#16a34a":"#d97706"},
+  ].map(c=>`<div class="sc"><div class="sc-label">${c.l}</div><div class="sc-value" style="color:${c.c}">${c.v}</div><div class="sc-sub">${c.s}</div></div>`).join("");
+  renderTx();
+}
+
+function renderTx(){
+  if(!txs.length)return;
+
+  // Check if ALL classified — show reconciled summary
+  const unc=uncIdxs();
+  if(unc.length===0){renderReconciled();return;}
+
+  const tx=txs[idx],g=glOf(tx.hash),isMapped=g!=="Unclassified",journal=getJournal(tx);
+  const hitTargets=journal.map(l=>l.t);
+
+  // Restore normal layout if coming back from reconciled view
+  document.querySelector(".tx-nav").style.display="";
+  document.getElementById("txDetail").style.display="";
+  document.getElementById("autoNote").style.display="none";
+  document.getElementById("mainGrid").style.display="";
+
+  // Update summary classified count
+  if(scanData){const t=computeTotals();
+    document.querySelectorAll(".sc")[3].querySelector(".sc-value").textContent=t.im.classified+"/"+txs.length;
+    document.querySelectorAll(".sc")[3].querySelector(".sc-value").style.color=t.im.classified===txs.length?"#16a34a":"#d97706";
+    document.querySelectorAll(".sc")[3].querySelector(".sc-sub").textContent=(txs.length-t.im.classified)+" remaining";}
+
+  document.getElementById("txCounter").innerHTML=(()=>{
+    const unc=uncIdxs();
+    if(!unc.length)return'<span style="color:#16a34a">All classified!</span>';
+    const pos=unc.indexOf(idx);
+    return`<strong>${pos+1}</strong> / ${unc.length} unclassified`;
+  })();
+  document.getElementById("prevBtn").disabled=uncIdxs().indexOf(idx)<=0;
+  document.getElementById("nextBtn").disabled=(()=>{const unc=uncIdxs();return unc.indexOf(idx)>=unc.length-1;})();
+
+  const sel=document.getElementById("glSelect");
+  sel.innerHTML=GL_OPTIONS.map(o=>`<option value="${o}" ${g===o?"selected":""}>${o}</option>`).join("");
+  sel.className="gl-select"+(isMapped?" mapped":"");
+
+  document.getElementById("txDetail").innerHTML=`
+    <span class="tx-dir ${tx.dir==='inflow'?'in':'out'}">${tx.dir==='inflow'?'INFLOW':'OUTFLOW'}</span>
+    <span class="tx-amt mono ${tx.dir==='inflow'?'in':'out'}">${tx.dir==='inflow'?'+':'-'}$${fmt(tx.amount)}</span>
+    <span class="tx-cp">Counterparty: <strong class="mono">${addr(tx.cp)}</strong></span>
+    <span class="tx-meta mono">${addr(tx.hash)} &middot; Block ${(tx.block||0).toLocaleString()}</span>`;
+
+  // Journal
+  const tDr=journal.reduce((s,l)=>s+l.dr,0),tCr=journal.reduce((s,l)=>s+l.cr,0);
+  document.getElementById("journalCard").innerHTML=`
+    <div class="j-hdr"><div>#</div><div>Account</div><div>Debit</div><div>Credit</div></div>
+    ${journal.map((l,i)=>`<div class="j-line" id="jl-${i}"><div>${l.n}</div><div>${l.acct}</div>
+      <div class="${l.dr>0?'dr':'zero'} mono">${l.dr>0?'$'+fmt(l.dr):'-'}</div>
+      <div class="${l.cr>0?'cr':'zero'} mono">${l.cr>0?'$'+fmt(l.cr):'-'}</div>
+      <div class="dot" style="border-color:${COLORS[i%4]};background:${COLORS[i%4]}20"></div></div>`).join("")}
+    <div class="j-total"><div></div><div>Total</div><div class="mono">$${fmt(tDr)}</div><div class="mono">$${fmt(tCr)}</div></div>`;
+  document.getElementById("balCheck").innerHTML=`<span style="color:#16a34a">&#10003;</span> Debits = Credits`;
+
+  // Financial statements — per-transaction impact only
+  const o=OPENING;
+  // Compute what THIS transaction impacts
+  const ti={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,usdcChg:0,ethChg:0,uncIn:0,uncOut:0};
+  const p=pfx(g);
+  if(g==="Unclassified"){if(tx.dir==="inflow")ti.uncIn=tx.amount;else ti.uncOut=tx.amount;}
+  else{if(p==="4100")ti.revSvc=tx.amount;else if(p==="4200")ti.revProd=tx.amount;
+    else if(p==="6110")ti.expPay=tx.amount;else if(p==="6200")ti.expSw=tx.amount;else if(p==="6300")ti.expCloud=tx.amount;
+    else if(p==="6420")ti.expMkt=tx.amount;else if(p==="6500")ti.expProf=tx.amount;else if(p==="6600")ti.expOps=tx.amount;}
+  ti.expGas=tx.gas;
+  if(tx.dir==="inflow")ti.usdcChg=tx.amount;else{ti.usdcChg=-tx.amount;ti.ethChg=-tx.gas;}
+  const txRev=ti.revSvc+ti.revProd+ti.uncIn;
+  const txExp=ti.expPay+ti.expSw+ti.expCloud+ti.expMkt+ti.expProf+ti.expOps+ti.expGas+ti.uncOut;
+  const txNi=txRev-txExp;
+
+  const chg=(v,isExp)=>{if(Math.abs(v)<.001)return'<span class="chg zero">-</span>';return`<span class="chg ${isExp?(v>0?'neg':'pos'):(v>0?'pos':'neg')}">${v>0?'+':''}$${fmt(v)}</span>`};
+  const hc=id=>hitTargets.includes(id)?'hit':'';
+  const hb=id=>{const j=journal.findIndex(l=>l.t===id);return j>=0?`border-left-color:${COLORS[j%4]}`:'border-left-color:transparent'};
+
+  document.getElementById("fsStack").innerHTML=`
+    <div class="fs-card">
+      <div class="fs-card-title">Income Statement<span class="sub">This Transaction</span></div>
+      <div class="fs-hdr"><div>Account</div><div>Prior Balance</div><div>This Tx</div></div>
+      <div class="fs-line section"><div>Revenue</div><div></div><div></div></div>
+      <div class="fs-line indent ${hc('pnl-revsvc')}" id="fs-pnl-revsvc" style="${hb('pnl-revsvc')}"><div>4100 Services</div><div>$${fmt(o.revSvc)}</div><div>${chg(ti.revSvc,false)}</div></div>
+      <div class="fs-line indent ${hc('pnl-revprod')}" id="fs-pnl-revprod" style="${hb('pnl-revprod')}"><div>4200 Product</div><div>$${fmt(o.revProd)}</div><div>${chg(ti.revProd,false)}</div></div>
+      ${ti.uncIn>0?`<div class="fs-line indent ${hc('pnl-unclass-in')}" id="fs-pnl-unclass-in" style="color:#b45309;${hb('pnl-unclass-in')}"><div>Unclassified In</div><div>-</div><div>${chg(ti.uncIn,false)}</div></div>`:`<div id="fs-pnl-unclass-in"></div>`}
+      <div class="fs-line subtotal"><div>Revenue Impact</div><div></div><div>${chg(txRev,false)}</div></div>
+      <div class="fs-line section"><div>Expenses</div><div></div><div></div></div>
+      <div class="fs-line indent ${hc('pnl-payroll')}" id="fs-pnl-payroll" style="${hb('pnl-payroll')}"><div>6110 Payroll</div><div>$${fmt(o.expPay)}</div><div>${chg(ti.expPay,true)}</div></div>
+      <div class="fs-line indent ${hc('pnl-software')}" id="fs-pnl-software" style="${hb('pnl-software')}"><div>6200 Software</div><div>$${fmt(o.expSw)}</div><div>${chg(ti.expSw,true)}</div></div>
+      <div class="fs-line indent ${hc('pnl-cloud')}" id="fs-pnl-cloud" style="${hb('pnl-cloud')}"><div>6300 Cloud</div><div>$${fmt(o.expCloud)}</div><div>${chg(ti.expCloud,true)}</div></div>
+      <div class="fs-line indent ${hc('pnl-marketing')}" id="fs-pnl-marketing" style="${hb('pnl-marketing')}"><div>6420 Marketing</div><div>$${fmt(o.expMkt)}</div><div>${chg(ti.expMkt,true)}</div></div>
+      <div class="fs-line indent ${hc('pnl-profsvc')}" id="fs-pnl-profsvc" style="${hb('pnl-profsvc')}"><div>6500 Prof. Svc</div><div>$${fmt(o.expProf)}</div><div>${chg(ti.expProf,true)}</div></div>
+      <div class="fs-line indent ${hc('pnl-ops')}" id="fs-pnl-ops" style="${hb('pnl-ops')}"><div>6600 Operations</div><div>$${fmt(o.expOps)}</div><div>${chg(ti.expOps,true)}</div></div>
+      <div class="fs-line indent ${hc('pnl-gas')}" id="fs-pnl-gas" style="${hb('pnl-gas')}"><div>Network Fees</div><div>$${fmt(o.expGas)}</div><div>${chg(ti.expGas,true)}</div></div>
+      ${ti.uncOut>0?`<div class="fs-line indent ${hc('pnl-unclass-out')}" id="fs-pnl-unclass-out" style="color:#b45309;${hb('pnl-unclass-out')}"><div>Unclassified Out</div><div>-</div><div>${chg(ti.uncOut,true)}</div></div>`:`<div id="fs-pnl-unclass-out"></div>`}
+      <div class="fs-line subtotal"><div>Expense Impact</div><div></div><div>${chg(txExp,true)}</div></div>
+      <div class="fs-line total"><div>Net Income Impact</div><div></div><div style="color:${txNi>=0?'#16a34a':'#ea580c'}">${txNi>=0?'+':''}$${fmt(txNi)}</div></div>
+    </div>
+    <div class="fs-card">
+      <div class="fs-card-title">Balance Sheet<span class="sub">This Transaction</span></div>
+      <div class="fs-hdr"><div>Account</div><div>Prior Balance</div><div>This Tx</div></div>
+      <div class="fs-line section"><div>Assets</div><div></div><div></div></div>
+      <div class="fs-line indent"><div>Cash (USD)</div><div>$${fmt(o.cash)}</div><div><span class="chg zero">-</span></div></div>
+      <div class="fs-line indent ${hc('bs-usdc')}" id="fs-bs-usdc" style="${hb('bs-usdc')}"><div>USDC</div><div>$${fmt(o.usdc)}</div><div>${chg(ti.usdcChg,false)}</div></div>
+      <div class="fs-line indent ${hc('bs-eth')}" id="fs-bs-eth" style="${hb('bs-eth')}"><div>ETH / SOL (gas)</div><div>$${fmt(o.eth)}</div><div>${chg(ti.ethChg,false)}</div></div>
+      <div class="fs-line indent"><div>Accounts Receivable</div><div>$${fmt(o.ar)}</div><div><span class="chg zero">-</span></div></div>
+      <div class="fs-line subtotal"><div>Asset Impact</div><div></div><div>${chg(ti.usdcChg+ti.ethChg,false)}</div></div>
+      <div class="fs-line section"><div>Liabilities & Equity</div><div></div><div></div></div>
+      <div class="fs-line indent"><div>Accounts Payable</div><div>$${fmt(o.ap)}</div><div><span class="chg zero">-</span></div></div>
+      <div class="fs-line indent"><div>Retained Earnings</div><div>$${fmt(o.re)}</div><div>${chg(txNi,false)}</div></div>
+      <div class="fs-line indent"><div>Common Stock</div><div>$${fmt(o.equity)}</div><div><span class="chg zero">-</span></div></div>
+      <div class="fs-line total"><div>L + E Impact</div><div></div><div>${chg(txNi,false)}</div></div>
+      <div class="fs-check">Assets ${txNi<0?'decrease':'increase'} = Equity ${txNi<0?'decreases':'increases'}: Balanced</div>
+    </div>`;
+
+  requestAnimationFrame(drawArrows);
+}
+
+function renderReconciled(){
+  const ct=computeTotals(),o=OPENING,im=ct.im;
+  const s=scanData.summary;
+
+  // Update summary cards
+  if(scanData){
+    document.querySelectorAll(".sc")[3].querySelector(".sc-value").textContent=txs.length+"/"+txs.length;
+    document.querySelectorAll(".sc")[3].querySelector(".sc-value").style.color="#16a34a";
+    document.querySelectorAll(".sc")[3].querySelector(".sc-sub").textContent="Fully classified";}
+
+  // Hide transaction-level UI
+  document.querySelector(".tx-nav").style.display="none";
+  document.getElementById("txDetail").style.display="none";
+  document.getElementById("mainGrid").style.display="none";
+  document.getElementById("autoNote").style.display="none";
+
+  const fmtR=(v)=>"$"+fmt(Math.abs(v));
+  const fmtChg=(v,isExp)=>{if(Math.abs(v)<.001)return'<span style="color:#94a3b8">-</span>';
+    const c=isExp?(v>0?"#ea580c":"#16a34a"):(v>0?"#16a34a":"#ea580c");
+    return`<span style="color:${c};font-weight:600">${v>0?"+":"-"}$${fmt(Math.abs(v))}</span>`};
+
+  // Build the reconciled view in the autoNote area (repurpose it)
+  const target=document.getElementById("autoNote");
+  target.style.display="block";
+  target.style.background="none";target.style.border="none";target.style.padding="0";target.style.color="inherit";target.style.fontWeight="normal";
+
+  const totRev=ct.totRev-im.uncIn;
+  const totExp=ct.totExp-im.uncOut;
+  const closingUsdc=o.usdc+im.usdcChg;
+  const closingEth=o.eth+im.ethChg;
+  const totalAssets=o.cash+closingUsdc+closingEth+o.ar;
+  const totalLiab=o.ap+o.accrued;
+  const closingRE=totalAssets-totalLiab-o.equity;
+  const ni=closingRE-o.re;
+  const totalEquity=o.equity+closingRE;
+  const totalLE=totalLiab+totalEquity;
+  const balanced=Math.abs(totalAssets-totalLE)<0.02;
+
+  target.innerHTML=`
+    <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:center">
+      <div style="font-size:20px;font-weight:600;color:#166534;margin-bottom:4px">All Transactions Classified & Reconciled</div>
+      <div style="font-size:13px;color:#16a34a">${txs.length} transactions across ${Object.keys(cpMappings).length} unique counterparties &middot; ${s.inflow_count} inflows, ${s.outflow_count} outflows</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between">
+          <span>Income Statement</span><span style="font-size:11px;color:#94a3b8;font-weight:400">Period</span>
+        </div>
+        <div style="padding:0">
+          <div style="padding:8px 18px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:grid;grid-template-columns:1fr 90px 90px;background:#fafbfc;border-bottom:1px solid #f1f5f9">
+            <div>Account</div><div style="text-align:right">Prior</div><div style="text-align:right">Change</div>
+          </div>
+          <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Revenue</div>
+          ${im.revSvc>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>4100 Services</div><div style="text-align:right">$${fmt(o.revSvc)}</div><div style="text-align:right">${fmtChg(im.revSvc,false)}</div></div>`:''}
+          ${im.revProd>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>4200 Product</div><div style="text-align:right">$${fmt(o.revProd)}</div><div style="text-align:right">${fmtChg(im.revProd,false)}</div></div>`:''}
+          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
+            <div>Total Revenue</div><div style="text-align:right">$${fmt(o.revSvc+o.revProd)}</div><div style="text-align:right">${fmtChg(totRev-(o.revSvc+o.revProd),false)}</div>
+          </div>
+
+          <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Expenses</div>
+          ${im.expPay>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6110 Payroll</div><div style="text-align:right">$${fmt(o.expPay)}</div><div style="text-align:right">${fmtChg(im.expPay,true)}</div></div>`:''}
+          ${im.expSw>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6200 Software & SaaS</div><div style="text-align:right">$${fmt(o.expSw)}</div><div style="text-align:right">${fmtChg(im.expSw,true)}</div></div>`:''}
+          ${im.expCloud>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6300 Cloud Infrastructure</div><div style="text-align:right">$${fmt(o.expCloud)}</div><div style="text-align:right">${fmtChg(im.expCloud,true)}</div></div>`:''}
+          ${im.expMkt>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6420 Marketing & Ads</div><div style="text-align:right">$${fmt(o.expMkt)}</div><div style="text-align:right">${fmtChg(im.expMkt,true)}</div></div>`:''}
+          ${im.expProf>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6500 Professional Services</div><div style="text-align:right">$${fmt(o.expProf)}</div><div style="text-align:right">${fmtChg(im.expProf,true)}</div></div>`:''}
+          ${im.expOps>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6600 Operations</div><div style="text-align:right">$${fmt(o.expOps)}</div><div style="text-align:right">${fmtChg(im.expOps,true)}</div></div>`:''}
+          ${im.expGas>0.001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Network Fees</div><div style="text-align:right">$${fmt(o.expGas)}</div><div style="text-align:right">${fmtChg(im.expGas,true)}</div></div>`:''}
+          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
+            <div>Total Expenses</div><div style="text-align:right">($${fmt(o.expPay+o.expSw+o.expCloud+o.expMkt+o.expProf+o.expOps+o.expGas)})</div><div style="text-align:right">${fmtChg(totExp-(o.expPay+o.expSw+o.expCloud+o.expMkt+o.expProf+o.expOps+o.expGas),true)}</div>
+          </div>
+
+          <div style="padding:10px 18px;font-size:13px;font-weight:700;color:${ni>=0?'#16a34a':'#ea580c'};display:grid;grid-template-columns:1fr 180px;border-top:2px solid #cbd5e1;background:#f8fafc">
+            <div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between">
+          <span>Balance Sheet</span><span style="font-size:11px;color:#94a3b8;font-weight:400">Closing</span>
+        </div>
+        <div style="padding:0">
+          <div style="padding:8px 18px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:grid;grid-template-columns:1fr 90px 90px;background:#fafbfc;border-bottom:1px solid #f1f5f9">
+            <div>Account</div><div style="text-align:right">Opening</div><div style="text-align:right">Closing</div>
+          </div>
+          <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Assets</div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Cash (USD)</div><div style="text-align:right">$${fmt(o.cash)}</div><div style="text-align:right">$${fmt(o.cash)}</div></div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>USDC</div><div style="text-align:right">$${fmt(o.usdc)}</div><div style="text-align:right;font-weight:600;color:${im.usdcChg>=0?'#16a34a':'#ea580c'}">$${fmt(closingUsdc)}</div></div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>ETH / SOL (gas)</div><div style="text-align:right">$${fmt(o.eth)}</div><div style="text-align:right">$${fmt(closingEth)}</div></div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Accounts Receivable</div><div style="text-align:right">$${fmt(o.ar)}</div><div style="text-align:right">$${fmt(o.ar)}</div></div>
+          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
+            <div>Total Assets</div><div style="text-align:right">$${fmt(o.cash+o.usdc+o.eth+o.ar)}</div><div style="text-align:right;font-weight:700">$${fmt(totalAssets)}</div>
+          </div>
+
+          <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Liabilities & Equity</div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Accounts Payable</div><div style="text-align:right">$${fmt(o.ap)}</div><div style="text-align:right">$${fmt(o.ap)}</div></div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Accrued Liabilities</div><div style="text-align:right">$${fmt(o.accrued)}</div><div style="text-align:right">$${fmt(o.accrued)}</div></div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Common Stock</div><div style="text-align:right">$${fmt(o.equity)}</div><div style="text-align:right">$${fmt(o.equity)}</div></div>
+          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Retained Earnings</div><div style="text-align:right">$${fmt(o.re)}</div><div style="text-align:right;font-weight:600;color:${ni>=0?'#16a34a':'#ea580c'}">$${fmt(closingRE)}</div></div>
+          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
+            <div>Total L + E</div><div style="text-align:right">$${fmt(o.ap+o.accrued+o.equity+o.re)}</div><div style="text-align:right;font-weight:700">$${fmt(totalLE)}</div>
+          </div>
+
+          <div style="padding:10px 18px;font-size:12px;border-top:2px solid #cbd5e1;background:${balanced?'#f0fdf4':'#fef2f2'};color:${balanced?'#166534':'#991b1b'};font-weight:600">
+            ${balanced?'A = L + E: Balanced':'A ≠ L + E: Out of balance by $'+fmt(Math.abs(totalAssets-totalLE))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+      <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Wallet Reconciliation</div>
+      <div style="padding:12px 18px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 140px;gap:4px">
+        <div>Opening USDC Balance</div><div style="text-align:right">$${fmt(o.usdc)}</div>
+        <div>USDC Inflows (${s.inflow_count} transfers)</div><div style="text-align:right;color:#16a34a">+$${fmt(s.total_usdc_in)}</div>
+        <div>USDC Outflows (${s.outflow_count} transfers)</div><div style="text-align:right;color:#ea580c">-$${fmt(s.total_usdc_out)}</div>
+        <div style="border-top:1px solid #e2e8f0;padding-top:6px;font-weight:600;color:#1e293b">Closing USDC Balance</div><div style="text-align:right;border-top:1px solid #e2e8f0;padding-top:6px;font-weight:700;color:#1e293b">$${fmt(closingUsdc)}</div>
+        <div style="padding-top:4px">Net Change</div><div style="text-align:right;padding-top:4px;font-weight:600;color:${im.usdcChg>=0?'#16a34a':'#ea580c'}">${im.usdcChg>=0?'+':''}$${fmt(im.usdcChg)}</div>
+        <div>Gas Consumed (ETH/SOL)</div><div style="text-align:right;color:#ea580c">-$${fmt(Math.abs(im.ethChg))}</div>
+      </div>
+      <div style="padding:10px 18px;font-size:12px;border-top:1px solid #e2e8f0;background:#f0fdf4;color:#166534;font-weight:600">
+        On-chain activity fully reconciled to general ledger
+      </div>
+    </div>
+  `;
+}
+
+function drawArrows(){
+  const svg=document.getElementById("arrowSvg"),grid=document.getElementById("mainGrid");
+  if(!svg||!grid||!txs.length)return;
+  const gr=grid.getBoundingClientRect();
+  svg.setAttribute("width",gr.width);svg.setAttribute("height",gr.height);svg.innerHTML="";
+  const journal=getJournal(txs[idx]);
+  journal.forEach((line,i)=>{
+    const src=document.getElementById("jl-"+i),tgt=document.getElementById("fs-"+line.t);
+    if(!src||!tgt||!tgt.offsetHeight)return;
+    const sr=src.getBoundingClientRect(),tr=tgt.getBoundingClientRect();
+    const x1=sr.right-gr.left+4,y1=sr.top-gr.top+sr.height/2;
+    const x2=tr.left-gr.left-2,y2=tr.top-gr.top+tr.height/2;
+    const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d",`M${x1},${y1} C${x1+(x2-x1)*.4},${y1} ${x1+(x2-x1)*.6},${y2} ${x2},${y2}`);
+    path.setAttribute("stroke",COLORS[i%4]);svg.appendChild(path);
+    const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("cx",x2);c.setAttribute("cy",y2);c.setAttribute("r","3");
+    c.setAttribute("fill",COLORS[i%4]);c.setAttribute("opacity",".6");svg.appendChild(c);
+  });
+}
+window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
+</script>
+</body>
+</html>
