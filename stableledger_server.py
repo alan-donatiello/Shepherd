@@ -1,5 +1,5 @@
 """
-Stableledger Backend Server
+Shepherd Backend Server
 Wraps the on-chain scanner in an HTTP API the browser UI calls.
 
 Usage:
@@ -9,6 +9,7 @@ Then open http://localhost:8090 in your browser.
 """
 
 import json
+import os
 import sys
 import time
 import threading
@@ -431,6 +432,144 @@ class SolanaStablecoinLedger:
 
 # ======================== HTTP SERVER ========================
 
+# Configure AI provider: "claude" or "gemini"
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "claude")  # toggle here
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+def classify_transaction(tx_data, chart_of_accounts, prior_classifications, client_profile=None):
+    """Use AI to suggest a GL classification for an unknown transaction."""
+    # Build the prompt (same for both providers)
+    prior_summary = ""
+    if prior_classifications:
+        for p in prior_classifications[:30]:
+            prior_summary += f"- {p['counterparty'][:12]}...: {p['count']}x classified as \"{p['gl_code']}\" "
+            prior_summary += f"({p['direction']}, avg ${p['avg_amount']:.2f}"
+            if p.get('pattern'):
+                prior_summary += f", {p['pattern']}"
+            prior_summary += ")\n"
+
+    coa_text = "\n".join(f"- {code}" for code in chart_of_accounts if code != "Unclassified")
+
+    # Build client context
+    biz_context = ""
+    if client_profile:
+        parts = []
+        if client_profile.get('business_type'):
+            parts.append(f"Business type: {', '.join(client_profile['business_type'])}")
+        if client_profile.get('typical_transactions'):
+            parts.append(f"Typical transactions: {', '.join(client_profile['typical_transactions'])}")
+        if client_profile.get('notes'):
+            parts.append(f"Additional context: {client_profile['notes']}")
+        if parts:
+            biz_context = "\n".join(parts)
+
+    prompt = f"""You are a crypto accounting transaction classifier for Shepherd, a stablecoin accounting product.
+
+Given a blockchain transaction and the customer's context, suggest the most likely GL code from their chart of accounts.
+
+CHART OF ACCOUNTS:
+{coa_text}
+
+CLIENT CONTEXT:
+{biz_context if biz_context else "No client context provided."}
+
+PRIOR CLASSIFICATIONS BY THIS CUSTOMER:
+{prior_summary if prior_summary else "No prior classifications yet."}
+
+TRANSACTION TO CLASSIFY:
+- Direction: {tx_data.get('direction', 'unknown')}
+- Amount: ${tx_data.get('amount', 0):,.2f}
+- Counterparty address: {tx_data.get('counterparty', 'unknown')}
+- Chain: {tx_data.get('chain', 'unknown')}
+- Block/Slot: {tx_data.get('block', 'unknown')}
+
+Consider:
+1. Does the amount/timing match patterns in prior classifications?
+2. Is the counterparty similar to previously classified addresses?
+3. Based on amount size and direction, what category is most likely?
+4. Round amounts ($5000, $10000) often suggest payroll or planned payments
+5. Small irregular amounts often suggest SaaS or operational costs
+6. Inflows are typically revenue, outflows are typically expenses
+
+Respond with ONLY valid JSON, no markdown, no backticks:
+{{"gl_code": "the full GL code string from the chart of accounts", "confidence": 0.0 to 1.0, "reasoning": "one sentence explanation"}}"""
+
+    if AI_PROVIDER == "gemini":
+        return _classify_gemini(prompt)
+    else:
+        return _classify_claude(prompt)
+
+
+def _classify_claude(prompt):
+    if not ANTHROPIC_API_KEY:
+        return {"gl_code": None, "confidence": 0, "reasoning": "No ANTHROPIC_API_KEY set."}
+    for attempt in range(3):
+        try:
+            payload = {
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 200,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                }
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+            text = result.get("content", [{}])[0].get("text", "")
+            text = text.strip().replace("```json", "").replace("```", "").strip()
+            return json.loads(text)
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            if attempt < 2:
+                wait = (attempt + 1) * 2
+                print(f"  [Claude] Timeout, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            print(f"  [Claude] Error: {e}")
+            return {"gl_code": None, "confidence": 0, "reasoning": f"Connection error: {str(e)[:80]}"}
+        except Exception as e:
+            print(f"  [Claude] Error: {e}")
+            return {"gl_code": None, "confidence": 0, "reasoning": f"Claude error: {str(e)[:100]}"}
+
+
+def _classify_gemini(prompt):
+    if not GEMINI_API_KEY:
+        return {"gl_code": None, "confidence": 0, "reasoning": "No GEMINI_API_KEY set."}
+    for attempt in range(3):
+        try:
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"maxOutputTokens": 200, "temperature": 0.1}
+            }
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read().decode())
+            text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            text = text.strip().replace("```json", "").replace("```", "").strip()
+            return json.loads(text)
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 2:
+                wait = (attempt + 1) * 2
+                print(f"  [Gemini] Rate limited, waiting {wait}s...")
+                time.sleep(wait)
+                continue
+            print(f"  [Gemini] Error: {e}")
+            return {"gl_code": None, "confidence": 0, "reasoning": f"Gemini error: {str(e)[:100]}"}
+        except Exception as e:
+            print(f"  [Gemini] Error: {e}")
+            return {"gl_code": None, "confidence": 0, "reasoning": f"Gemini error: {str(e)[:100]}"}
+
 def detect_chain(wallet):
     """0x + 42 chars = EVM/Base. Otherwise assume Solana (base58)."""
     if wallet.startswith("0x") and len(wallet) == 42:
@@ -440,7 +579,7 @@ def detect_chain(wallet):
 # Global state for active scan
 active_scan = {"running": False, "engine": None, "result": None, "error": None}
 
-def run_scan(wallet, lookback):
+def run_scan(wallet, lookback, from_block=None):
     global active_scan
     try:
         chain = detect_chain(wallet)
@@ -448,9 +587,12 @@ def run_scan(wallet, lookback):
             engine = BaseStablecoinLedger(wallet)
             active_scan["engine"] = engine
             to_block = engine.latest_block()
-            from_block = to_block - lookback
-            print(f"  [Base] Scanning {wallet}, blocks {from_block:,} -> {to_block:,}")
-            report = engine.build_report(from_block, to_block)
+            if from_block is not None:
+                scan_from = from_block
+            else:
+                scan_from = to_block - lookback
+            print(f"  [Base] Scanning {wallet}, blocks {scan_from:,} -> {to_block:,}")
+            report = engine.build_report(scan_from, to_block)
         else:
             engine = SolanaStablecoinLedger(wallet, tx_limit=lookback)
             active_scan["engine"] = engine
@@ -512,6 +654,26 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/classify":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode()) if length else {}
+
+            tx_data = body.get("transaction", {})
+            coa = body.get("chart_of_accounts", [])
+            prior = body.get("prior_classifications", [])
+            profile = body.get("client_profile", None)
+
+            print(f"  [{AI_PROVIDER.title()}] Classifying: ${tx_data.get('amount',0):,.2f} {tx_data.get('direction','?')} to {tx_data.get('counterparty','?')[:16]}...")
+            suggestion = classify_transaction(tx_data, coa, prior, profile)
+            print(f"  [{AI_PROVIDER.title()}] Suggested: {suggestion.get('gl_code','?')} ({suggestion.get('confidence',0):.0%})")
+
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(suggestion, ensure_ascii=True).encode())
+            return
+
         if self.path == "/api/scan":
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode()) if length else {}
@@ -539,8 +701,9 @@ class Handler(SimpleHTTPRequestHandler):
             active_scan["running"] = True
             active_scan["result"] = None
             active_scan["error"] = None
-            print(f"\n[SCAN] Starting for {wallet}, lookback={lookback}")
-            threading.Thread(target=run_scan, args=(wallet, lookback), daemon=True).start()
+            from_block = body.get("from_block")
+            print(f"\n[SCAN] Starting for {wallet}, lookback={lookback}" + (f", from_block={from_block}" if from_block else ""))
+            threading.Thread(target=run_scan, args=(wallet, lookback, from_block), daemon=True).start()
 
             self.send_response(200)
             self._cors()
@@ -568,8 +731,16 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = 8090
-    print(f"Stableledger server starting on http://localhost:{port}")
-    print(f"Open that URL in your browser.\n")
+    print(f"Shepherd server starting on http://localhost:{port}")
+    print(f"Open that URL in your browser.")
+    if AI_PROVIDER == "gemini" and GEMINI_API_KEY:
+        print(f"AI classification: Gemini Flash (enabled)")
+    elif AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
+        print(f"AI classification: Claude Haiku (enabled)")
+    else:
+        print(f"AI classification: disabled (set ANTHROPIC_API_KEY or GEMINI_API_KEY)")
+        print(f"  Current provider: {AI_PROVIDER}")
+    print()
     server = HTTPServer(("", port), Handler)
     try:
         server.serve_forever()

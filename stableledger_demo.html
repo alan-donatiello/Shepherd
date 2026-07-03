@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Shepard</title>
+<title>Shepherd</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#fff;color:#1e293b}
@@ -118,20 +118,366 @@
 
   #arrowSvg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5}
   #arrowSvg path{fill:none;stroke-width:1.5;opacity:.6}
+
+  /* App shell with sidebar */
+  .app-shell{display:flex;min-height:100vh}
+  .sidebar{width:220px;background:#f8fafc;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+  .sidebar-logo{padding:20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #e2e8f0}
+  .sidebar-nav{flex:1;padding:12px 0}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;color:#64748b;cursor:pointer;transition:all .15s;border-left:3px solid transparent;margin:2px 0}
+  .nav-item:hover{background:#f1f5f9;color:#334155}
+  .nav-item.active{background:#eff6ff;color:#3b82f6;border-left-color:#3b82f6;font-weight:600}
+  .nav-item svg{width:18px;height:18px;flex-shrink:0}
+  .nav-item .nav-badge{margin-left:auto;font-size:10px;background:#e2e8f0;color:#64748b;padding:1px 7px;border-radius:10px}
+  .nav-item.active .nav-badge{background:#dbeafe;color:#3b82f6}
+  .sidebar-footer{padding:16px 20px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8}
+
+  /* Audit trail modal */
+  .audit-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:50;align-items:center;justify-content:center}
+  .audit-overlay.open{display:flex}
+  .audit-modal{background:#fff;border-radius:10px;width:720px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+  .audit-header{padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center}
+  .audit-header h3{font-size:15px;font-weight:600;color:#0f172a}
+  .audit-header .close-btn{width:28px;height:28px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#94a3b8}
+  .audit-header .close-btn:hover{background:#f1f5f9;color:#334155}
+  .audit-summary{padding:12px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;gap:24px;font-size:12px;color:#64748b}
+  .audit-summary .as-val{font-size:16px;font-weight:600;color:#1e293b;display:block;margin-top:2px}
+  .audit-body{overflow-y:auto;flex:1}
+  .audit-table-hdr{display:grid;grid-template-columns:60px 1fr 120px 90px 90px;padding:8px 20px;font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;background:#fafbfc;border-bottom:1px solid #e2e8f0;position:sticky;top:0}
+  .audit-table-hdr>div:nth-child(4),.audit-table-hdr>div:nth-child(5){text-align:right}
+  .audit-row{display:grid;grid-template-columns:60px 1fr 120px 90px 90px;padding:9px 20px;font-size:12px;color:#475569;border-bottom:1px solid #f8fafc;align-items:center}
+  .audit-row:hover{background:#f8fafc}
+  .audit-row>div:nth-child(4),.audit-row>div:nth-child(5){text-align:right}
+  .audit-row .tx-link{color:#3b82f6;text-decoration:none;font-size:11px}.audit-row .tx-link:hover{text-decoration:underline}
+  .audit-row .dir-badge{font-size:10px;font-weight:500;padding:1px 6px;border-radius:3px;display:inline-block}
+  .audit-row .dir-badge.in{background:#dcfce7;color:#166534}.audit-row .dir-badge.out{background:#fff7ed;color:#9a3412}
+  .fs-line.clickable{cursor:pointer}.fs-line.clickable:hover{background:#f1f5f9}
+
+  /* Export dropdown */
+  .export-wrap{position:relative}
+  .export-btn{font-size:11px;font-weight:500;padding:5px 12px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:4px}
+  .export-btn:hover{background:#f8fafc}
+  .export-menu{display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.08);z-index:20;min-width:180px;overflow:hidden}
+  .export-menu.open{display:block}
+  .export-opt{padding:9px 14px;font-size:12px;color:#334155;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f8fafc}
+  .export-opt:hover{background:#f8fafc}
+  .export-opt:last-child{border-bottom:none}
+  .export-opt .eo-sub{font-size:10px;color:#94a3b8;margin-left:auto}
+
+  /* AI suggestion */
+  .ai-suggest{padding:10px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;margin-bottom:14px;display:none}
+  .ai-suggest.visible{display:block}
+  .ai-suggest-header{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:#7c3aed;font-weight:600}
+  .ai-suggest-header svg{width:14px;height:14px}
+  .ai-suggest-body{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ai-suggest .ai-gl{font-size:13px;font-weight:600;color:#1e293b}
+  .ai-suggest .ai-conf{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .ai-suggest .ai-conf.high{background:#dcfce7;color:#166534}
+  .ai-suggest .ai-conf.med{background:#fef9c3;color:#854d0e}
+  .ai-suggest .ai-conf.low{background:#fee2e2;color:#991b1b}
+  .ai-suggest .ai-reason{font-size:11px;color:#64748b;flex:1;min-width:200px}
+  .ai-suggest .ai-accept{font-size:11px;font-weight:600;padding:5px 14px;border-radius:5px;border:none;background:#7c3aed;color:#fff;cursor:pointer}
+  .ai-suggest .ai-accept:hover{background:#6d28d9}
+  .ai-suggest.loading .ai-suggest-body{color:#94a3b8;font-size:12px}
+
+  /* Filters */
+  .filter-bar{display:flex;gap:8px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+  .filter-bar label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+  .filter-bar select,.filter-bar input{font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;color:#334155;background:#fff;outline:none}
+  .filter-bar select:focus,.filter-bar input:focus{border-color:#3b82f6}
+  .filter-bar input[type="text"]{width:120px}
+  .filter-bar .filter-group{display:flex;flex-direction:column;gap:2px}
+  .filter-bar .filter-clear{font-size:10px;color:#3b82f6;cursor:pointer;padding:4px 8px;border:none;background:none}
+  .filter-bar .filter-clear:hover{text-decoration:underline}
+
+  /* Onboarding */
+  .onboard-screen{display:none;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e293b 40%,#334155 100%);align-items:center;justify-content:center;padding:40px}
+  .onboard-screen.active{display:flex}
+  .onboard-wrap{max-width:600px;width:100%}
+  .onboard-brand{text-align:center;margin-bottom:32px}
+  .onboard-brand .ob-logo{font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.02em}
+  .onboard-brand .ob-tagline{font-size:13px;color:#94a3b8;margin-top:4px}
+  .onboard-card{background:#ffffff;min-height:200px;border-radius:16px;border:1px solid rgba(255,255,255,0.1);max-width:600px;width:100%;padding:36px 40px;box-shadow:0 24px 48px rgba(0,0,0,.2),0 0 120px rgba(59,130,246,.06)}
+  .onboard-card h2{font-size:20px;font-weight:700;margin-bottom:4px;color:#0f172a}
+  .onboard-card .ob-sub{font-size:13px;color:#64748b;margin-bottom:28px}
+  .onboard-card .ob-section{margin-bottom:22px}
+  .onboard-card .ob-label{font-size:11px;font-weight:600;color:#334155;margin-bottom:8px;display:block;text-transform:uppercase;letter-spacing:.04em}
+  .onboard-card .ob-hint{font-size:11px;color:#94a3b8;margin-top:6px}
+  .ob-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .ob-chip{font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;transition:all .15s}
+  .ob-chip:hover{border-color:#93c5fd;background:#f0f7ff}
+  .ob-chip.selected{border-color:#3b82f6;background:#eff6ff;color:#3b82f6;font-weight:500}
+  .ob-chip.disabled{opacity:.5;cursor:default;border-style:dashed}
+  .ob-textarea{width:100%;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;resize:vertical;min-height:60px;color:#1e293b;outline:none;font-family:inherit}
+  .ob-textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+  .ob-input{width:100%;font-size:13px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;color:#1e293b;outline:none;font-family:inherit;margin-bottom:8px;box-sizing:border-box}
+  .ob-input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+  .ob-nav{display:flex;justify-content:space-between;margin-top:28px}
+  .ob-nav button{font-size:13px;font-weight:500;padding:10px 24px;border-radius:8px;border:none;cursor:pointer;transition:all .15s}
+  .ob-nav button:hover{transform:translateY(-1px)}
+  .ob-progress{display:flex;gap:4px;justify-content:center;margin-top:20px}
+  .ob-progress-bar{height:3px;flex:1;border-radius:2px;background:#e2e8f0;transition:background .3s}
+  .ob-progress-bar.done{background:#3b82f6}
+  .ob-progress-bar.active{background:linear-gradient(90deg,#3b82f6,#8b5cf6)}
+  @keyframes obSpin{to{transform:rotate(360deg)}}
+  .ob-ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#7c3aed;background:#f5f3ff;padding:3px 8px;border-radius:4px;font-weight:500;margin-left:6px}
+
+  /* Transactions table */
+  .tx-table-wrap{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;max-height:600px;overflow-y:auto}
+  .tx-table{width:100%;border-collapse:collapse;font-size:12px}
+  .tx-table th{position:sticky;top:0;background:#f8fafc;padding:8px 12px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:500;cursor:pointer}
+  .tx-table th:hover{color:#334155}
+  .tx-table td{padding:8px 12px;border-bottom:1px solid #f8fafc;color:#475569;vertical-align:middle}
+  .tx-table tr:hover{background:#f8fafc}
+  .tx-table .dir-pill{font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;display:inline-block}
+  .tx-table .dir-pill.in{background:#dcfce7;color:#166534}
+  .tx-table .dir-pill.out{background:#fff7ed;color:#9a3412}
+  .tx-table .status-pill{font-size:10px;padding:2px 8px;border-radius:10px}
+  .tx-table .status-pill.classified{background:#dbeafe;color:#1d4ed8}
+  .tx-table .status-pill.unclassified{background:#fef3c7;color:#92400e}
+  .tx-table-empty{padding:40px;text-align:center;color:#94a3b8;font-size:13px}
+  .tx-table-count{font-size:11px;color:#94a3b8;margin-top:8px}
+
+  /* Custom account modal */
+  .custom-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:60;align-items:center;justify-content:center}
+  .custom-overlay.open{display:flex}
+  .custom-modal{background:#fff;border-radius:10px;width:420px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+  .custom-modal h3{font-size:15px;font-weight:600;margin-bottom:4px}
+  .custom-modal .cm-sub{font-size:12px;color:#64748b;margin-bottom:20px}
+  .custom-modal .cm-field{margin-bottom:14px}
+  .custom-modal .cm-field label{display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .custom-modal .cm-field input,.custom-modal .cm-field select{width:100%;font-size:13px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;outline:none;color:#1e293b}
+  .custom-modal .cm-field input:focus,.custom-modal .cm-field select:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.1)}
+  .custom-modal .cm-row{display:grid;grid-template-columns:100px 1fr;gap:10px}
+  .custom-modal .cm-actions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+  .custom-modal .cm-actions button{font-size:13px;font-weight:500;padding:8px 16px;border-radius:6px;border:none;cursor:pointer}
+  .main-content{margin-left:220px;flex:1;min-height:100vh}
+  .screen{display:none}.screen.active{display:block}
+  .wc-center{max-width:640px;margin:80px auto 40px}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="logo">
-    <div class="logo-icon"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAATuklEQVR42o1ae5RddXX+vn3OnTt5TMiDAAkJIiQxCGgVRPGByssAsoCgKCit9bGsiG+7dFVrbRXb1fpYbfEPleqyrcUHFV0uVEBQRBFBjUCIFKOiYgh5oJmZzMyde3776x+/xzkzCa13zUpm7j33nL3379vf/vb+/fj7n13rBpICCBNJ0GgigQokSUNNmKqKrEUhvgeSBAAYYU4CMFSK78X/SAKSRIACQEAuQCYXAiDEyxUkQYBccvPgaCQHJBfkhAcECHQBEBwQGjfE5wFEtIAGEwhYtJ4k00UEBMZfkK0HaMqXevQLlr+YvDCQsvInwBSg9kVlMwgKpCrS0vWEwGQroxkCADPz9MXy5fxr9owoz4NM2VZLn9IgqoorZiajWG6o/JPuKINMJIyixaVDcbLjppijlAJLEJRZtDC/q/L98jyIebmVo2UgYfFucTWKiQbVMEN6crEGILwiKqIijTC2gVGMB0ETekjfykFhDhGM6oS0ADJDID6o7kCZIpw0UBk/JXDJB6BAg6BoThCk55skH0mwAkRCSrevIAnuKXiATJAog7yspySY5IABboAnOIiCCBogqMCmjjZJisGO2ZwNzYgsYG7DT7FScj4lCS3eHyIFIiUtlDI6wt7kDrUYgEjUQlMWXA7GHAWIKmUEDAiAQS4yQllS3U0AzE8Ag0wWCYqQgVaYByKNUH7HIiQAmJB9VwyVgRBCXJGYw3JRACpRVCBN8uxzSQMm6mKhqw7c02PZWt/1AGBEaspJVhlR8XNTSTJF/JpI0UCTR8sJGmkkJXdHRKZoOQ1pYPJJ1nJQeos0zg3vgSGGoeWmLqeV3O8kbptRpkRElssAgxEwom4a7/dHRno9tFDkyEhvbPEiAE0gYpGhyTJtmIlVyWYw8UCMAWXM1seoRXqRCCbKBws3pLjAYITJykK14WdcN1piM7PMdxaCLzl02S9//dtde38/OrrAzEBYVe/Yuefmb93ehDC2dIk7YFXM9USPYDSmjbFFklXh5MSHpQCRIgTWLd0DoHVAAhEiUw1pcZeqVcKQmUefYaHxhWOLr//Kjddc87lHdz32liteddllF4YQ7r1n25ve8f79+6dOPunE5z/3mZe/4uLJifG6qiiALskUQx45Jz0FJJS4GzDQ2ZYUKv9as4P5TimMeGhpXXlpo5MpM4wFh+6+aGzRrr2PvetdV/18+y8A/O1Vv7/8lS+tRtded/1H7rzzR/3+yH33bRvONhdesGnhgoXTU1N1ZYQSFYEiKRZpwcTmDhgl0CMFRDLNURf3/vwLsVDJYviNVpE01bIIoQpWAzAaWIsGM1MFAJWJRpocvf7ovsmp8178yrt/fM9Ir+eSpIsuPG9syZKbb751x46dJKuqmp2dPelpJ9zw1f84/IiV+8f3GR3ucgcgBLoDwRUkJyAPQIALIciC5HKH3CSHO4KUHDCCTiMjUZqhImuvItrqCCEzA3vRYspglBlpkJFmvd5Zmy69/ft3AazrqmmaqqpCCB0EA0Bd18Ph8CknPvnfPvWRjeuPUhj2zOQuSXS4Uy407k5AcmgICcHFIAW5qAAIcofkbpmScn1lpx50n00DqqxRCuQieLRg8ZK7fvjT279/F8lnPOPpTdO88YpXb9p0RlVVo/2+mZXK2TRNXVf33rftlFPPvfKt7x8ZXeAdZZCfWaGD8gxpZinRls6UtVEUtBpYzJpISBoIEIVKBEkqahtCkb+JXu/+B7aTfPapz2ia4WWXXvzOt73he7f/QNJgdtbMDjlkibKmCMF7vR6An2zZOhg0tFqR95SsFBJBp8JcdE6bqFIKIozw7Dw7yWyFhhE1NCkIZEdMFclMgA/8z4MCjj/+uN279/z7p6++4k3v3jc+YWZRpKxefUQyQ4rrIOm+rT/7znfuWLB4SQgeZSZJZ0nTIjSleco0UYd1ClnHy2hsFq3pV2WxzTnSO6rgCu53333P+nXHPvDg9rdc+do777zrG9+8pa7rEAJJD2HlyhUAojNRw2xYf+xhK1c+8uhu1JViFUeMUDIksmiUKPO0hBLek7br6tVoq1SuLtza3oIsPEtKGO33d/72d3fc+aMTnrxhx8M7zj3vRe/7uw+zU9qD++JFi6qqiuGXtGDB6JlnnjY+Pn7ME5+ApiFNjM1geabixWzXGwe+UhXthDVdHotsyVcy92JZOYllfWlmE5OTL3/5xaeccjLJiYnJ2757B4BIQdGqhQsX1FUFoKpM0rOeefL27Q/NDAZrjlyFJiTtY60OSDqqFB/LtbdI6yz7kpSYK/SoDtqIDKhSv1iIy0gOZmfXrll97bWfu+XW7xx99BO2bLkvhFDXdZdZFixYONIfidkH4MQTj9vy03vXrFm9b3zKrUJEqjRHa8oKocQ6l23u8mTSM8x2F4XXdnWddCgsAUU2y98lGab33Hvftic9af22bQ/O14VA3estWrQYgLsf/YSjRkb6u3fv3bhh3dNOeurM1LRZlYR67Lgy7RV7cuMT+1W1aM/6Sa1IZecKsiNkObdR7gIPLll/9LCVK1etOuzB7dujod0yMjMzfeihyyO0zzrr+bd/7wdjY2NvvvK1lTwy85wK06ZcKU3tVKMzYUgDBWVL1a5ediPnkZK+L40xLEsj0iyEQOsdc8zRa9ceuWXL1mhopkAB2L1777p1x5rZ8uXL1m/YcPfdWyYmJtauXV33RyRvBTvbNGw7m7KS3fFD+kNGtB+UPM1IZ0ZgZ2XyZZlG2QyHi5ct23L3XWvXrpmZmd21a1dd1/Mc2Lp126nPPsXd/+L1r7nttu+7+yWXXLRz5+40MFIeYcQwCbFnREeaAgB9LgMVuBNSCxaJB+MsSpBir1uSGGE4XDS25HcP73znuz+w+aLzPvqxj0eaL19z97qudu589JEdO2++6RvLly+74YZvAhjtj2w69+zpyQmrcq8nA+eMngpW0/3Uycmo9oG6E10WyOgghJsArc6fTQgLF4/98lcPv+Ly1//D37//E5/8zAMPPFjXVQjelVLuTvLqqz/x8MOPfO1rN1RV5e7Xf+XrH/r1b45Ydejs9KBddB346Fx5VKocu3xlThSFzfY2uY8vqd0qktQPufvowkU7dz125Zvf9bGPXnXLrbdd+/kv93q9rvUZRUnGXXfdlweDwdq1a5aMjU1MTHz9plur0UXBvbSECZZqLdec5Cy/tOxu8fbqVDqpg7q8VGKnKEKSqrqampnddM5Lliw9hOQHPvjhuq6bpsHjvEj2ej2S/f7I4asOB3DLrbe3U6PueHHOpK0rCjgvKGgF0xyhoYQmzf+sEHsI6i855NPXfPberT/7wue/fOHmP+uq/7nhV0mJEIKk44570qUvu5jkT35y7/T4vrqu20aR861HWxGkFs0dCDEThUrlbX0UDp4M6d/H/jBuxpGRkZ07dxbiPwh+yzDDDMCKFcvPOOP0FSuWP/Tr3+7atWdkZKSD6U6YeZC5YmsRWwc6K9NdMs4VQkmEJFfNDMPZs896AcCmGUbL/t9XdPLGG2/5x3/66J49e5umeXjHTvYK585jP821JUuJuS/jAd+bH24Jc9RsHGdATbP6iJUjIyPuwh/3cveFCxc+59nPWr5saWTbhx76Daq2aJTiiQNyoVTSdmCRc2B+4rSCoV2QyLmKOBVg5MxgsHbtkSeesHHOXsH/+arrampq6tKXbT77rNOj0dse2A5UBzWfRTu2c38dkLFJt2kehg4W0vJR+tCbUC9cuH7dMWb2R0JIQr/fv+lb3943vi/6fNt370CYrdqKryLfDviqcmGf81leAaqjX5hjoXmDyA5QE1Od8YLnuHszHJpZVVVVVT2eM5GmXvjC01avPuLqj18DoNerf3Dnj2+56dsLxhaH4IBEQR0d1Rlwt/hRfnpZAZtDsVIZj/EASusQtVXVzPi+yy6/5JKXXrB0+bIQQtM0TdNErnw8Rlp6yNjLXr55+/ZfxlD+y8c+ePSxRw9mBq3XsR2jqzSYeUNJnYQuFtWle2Pav+E8Bpin7BNSBSNC8EVjI3/9nrftfHTv85576o4dj/RHR+++60f33LvV3Q90Q9Lk5NRDv/pNdGbYNBs3PPHYDcdN7vmdWZxaZuEYx0LyTo4qjUpFoFB2Z39AapXCwUfxc8hCgNdVPbVv/PjjN77ozNO+eN3XFi1ePD09Daiu68FgMC/2IYTVq1cdseqIz3zmc8PhMJbtmZmBwnQrdXOgnV2YqLv2OQs034Gi5/ImoJi0rVKTUODY+aAyG+yf+qv3vuOC8zfteWx81+49r3ntG2dmZuJApcWbWQjh9Bc87wWnnfq617+VZBQdKw9dweDpjrnln8c1RNsBp/Ia6RCeINR2Ay0RiDAlSk03z8PieE3cxEqbljP7xo8/fiPqGlz2X9d+6StfvSFa3F0BSSed9CeDwWB6errX6/X7I1VVrTlyVRjOphaSxYI8kkB2iYiDa80bTmcHIrSUnfTYULcxl2Rpu0RyiDQXnGmjV1ZXM9PTTdCCsTA5OXkg9N196bKl+6enrvn0f8bwn3rqKb3aDl912GBqmoQrcI7aKW2l0ujNDXBJzJQaL6hbnd0O7MqS5Oki1a4y2QGcx81qSQQXjI7MTE/dv+2Bbk9cfLjiDa+5556t99+/LfZr69cdffLTn1KN9n1y0qqMbbXoNhX1rDzT0zyVQcWGppvIqT91ydL8ATLRAQaPY2oCcFdeccVZsdhfsPCTH/7XRx55NLYsXfSvW3fMRRecc+bZm6uqappm8eLFmy849+SnnTCc2F9VlIKBkGfV6TkTkgaTvEgBqexip4bG51Vxpe2FbuX25H9MXU/pLikzmowY7p886qgjj3/yce5eylmsuGee8fyrPvTRffvG4zsb1h9zzoteuPSQsaYZ5md4R7igozw9PkJM6CkjnVbMxSuy8Ih7JaIc7Wgi7iMq/y3Q4+4Q4EgTT8mbizefPzscdPknhNDr9W686dtf+erXARyx6nBJl7zkfPb7g9kB6fEwR1E0yvurye7c5MZMYFRIqQ2S0uZmKzZ0YDfR/XeOaJLnLS1Jcqmuqt/++jePPrp77qVomuYXv/hlVdnY2OLTX3ja2NjYq/70kuH+iaqqMuN5m3UKzGP+Ypjm9EXKuh6CrKQ+89yiyBF1SNmEvIYueQQiIffkQDxHUPUs9o3ziKjfHwnBL77ovH6vet973n74mqMGMwOjInCISDDOEq/CAepqInX0ZNxck6V5CTx9oIB4U4+FooUNY9ST9ou6ywFJIYbQ3fu93qYXnb5ixfI4iYg29Op6MJhdvnzpO952xfnnnfXWK/985g9768okgQ44va2ulKD07GSlZCoA8WJ9/IolDdj2/pZddtBzpgrwro5Q/lZJZUIh+Gi//5dvf8Nhhx1a0reqbHY4XLFi2Rev/dQJJ2588TmnN00QHIkYxHgAKgJS5YhEV1lQ8KLRWMa4epyGJqNRLdIS0J3KD84XACGuP+DxgNVTT3r6kzeuI2lmJJsmvGTzi394xzfPOON5U+Pjg8FshIorgCFnakk/78p9pXMp3o4HyrAzEkluaDwvVgJKzhZPKTRH72VxK8GjTPGYxoTLJR+eu+n0uBnjrn/+2Ae/9N+ffeLa1VPjE2axg/V0rkOK8JVCUgxSpzGJWJqz35JmPFIpfNbxvpMwyf4sfMo1AqOhKRxxJhWo+I5XFZr9Execf86aNatnZ2f/5r1vf/Nb3zy5d8/MzIwxnguKRcpFp5zK4Mn7FtHeXAa8dLepTqSykFORrN71povznlGe1pJKQ+g4ibb2OFU+IKR8UCKfq4onG2jUcDg85LCVw5npbT/bfv11nx5MjqfNl4R7lxwUFSxFJiTpryLXYoBDAqrHr6QxeZ4RxvwsapSueLimM0Mou0mM6xs7DlQmuRqwBirJSSvDJxcr4+zEH1736kufdcrTqSAFs1KVPDIPM0tKoSN5WubJXROY03pebUH3xFZqMovCSCiPB0kktOIjTcGKLIURcHo6EsImnnlqhr5wdPS055w8PT1lVnQ+wFjd04GHXIMl5ZM3Ga5qAS0oZUZSXnBByt5ah60y/bc54HAWtkxW0FPLEzVfTNwgxgimSS3cZ/fv3x9Vn1K+e7x/3g6Qt5zm+f4eu0kmyIfUoMdaD0+nBZH5PUNIuQzkGq5OQ62g2AE5aFE5xyQLsiozEpUO+SQHQVrFduNNyNFxEZLiiY6sdpNWyDiMh+oS/3SmdqneA6L1FGbjqc85c5eWjxM9eUcOhZJeUhQwkTUckMuzKkvUKHe6Q+2Pcia4mqKjmOlSCqV65qEuy1SukwBO6/UWHknWEXulqHlyLr7Dru4IiszVmuiiqKbjnktBHiCPx3sslTaPZsUi6PGatt91eohrwlhWUtSD0hKVvirNmyVnvaAaXcZqVB5q5R2lOCnp4MfL3E4EEdodtHjg00ETFcQ6I84FyI2x4c4HYDzyvZehU+GAzDze5lgiCYUU0Gg0U+EDHGQzGAcf9uEkaHXbiDFnadqhQbIiHqZFaSqjaRGNBhPVgCaV8yUu5Ww62Nhb6WOPGS9FOdgZqMWU8rwYqafPGkyC1EzviZqyTkcwWs2qOMnO6eyExS2oGBsWSmIU1cwdD2MeloOTOIjMEsq4wT324JKTxdiUQszNTTQu9fLy7ngo1QEJxnYICcuLUHY7lE/JMN4uKqY0PZLnU4TyWCo9dg6ccyBdcZiRAiTm9iTZlCRpvDByvKephNAKSrYIK23M/wJj3Ap1aSRcZQAAAABJRU5ErkJggg==" width="32" height="32" style="border-radius:4px" alt="Shepard"></div>
-    <span class="logo-name">Shepard</span>
-    <span class="demo-badge">Demo</span>
+<!-- ONBOARDING -->
+<div class="onboard-screen active" id="onboardScreen">
+  <div class="onboard-wrap">
+    <div class="onboard-brand">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px">
+        <img src="data:image/png;base64,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" width="44" height="32" style="border-radius:4px;object-fit:cover" alt="">
+        <span class="ob-logo">Shepherd</span>
+      </div>
+      <div class="ob-tagline">Continuous Close Accounting</div>
+    </div>
+    <div class="onboard-card">
+      <!-- Step 1: Business -->
+      <div class="ob-step" id="obStep1" style="display:block;color:#000">
+        <h2>About your business</h2>
+        <div class="ob-sub">This helps Shepherd classify your transactions accurately from the first scan.</div>
+        <div class="ob-section">
+          <span class="ob-label">Business type</span>
+          <div class="ob-chips" id="obBizType">
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">SaaS / Software</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">DeFi Protocol</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Payment Processor</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">DAO / Treasury</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">E-Commerce</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Crypto Exchange</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Services / Agency</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Payroll / HR</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Digital Bank</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Other</div>
+          </div>
+        </div>
+        <div class="ob-section">
+          <span class="ob-label">How many transactions per month?</span>
+          <div class="ob-chips" id="obVolume">
+            <div class="ob-chip" onclick="obSelect(this,'volume')">Under 100</div>
+            <div class="ob-chip" onclick="obSelect(this,'volume')">100 &ndash; 500</div>
+            <div class="ob-chip" onclick="obSelect(this,'volume')">500 &ndash; 2K</div>
+            <div class="ob-chip" onclick="obSelect(this,'volume')">2K &ndash; 10K</div>
+            <div class="ob-chip" onclick="obSelect(this,'volume')">10K+</div>
+          </div>
+        </div>
+        <div class="ob-nav">
+          <div></div>
+          <button style="background:#3b82f6;color:#fff" onclick="obNext(2)">Continue &rarr;</button>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+      </div>
+
+      <!-- Step 2: Chains & Tokens -->
+      <div class="ob-step" id="obStep2" style="display:none">
+        <h2>Chains & Tokens</h2>
+        <div class="ob-sub">Which networks and assets do you transact with?</div>
+        <div class="ob-section">
+          <span class="ob-label">Which chains are you on?</span>
+          <div class="ob-chips" id="obChains">
+            <div class="ob-chip" onclick="obToggle(this,'chains')">Base</div>
+            <div class="ob-chip" onclick="obToggle(this,'chains')">Solana</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Ethereum</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Polygon</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Arbitrum</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Optimism</div>
+          </div>
+          <div class="ob-hint">Base and Solana live. Other chains coming soon.</div>
+        </div>
+        <div class="ob-section">
+          <span class="ob-label">Which tokens do you use?</span>
+          <div class="ob-chips" id="obTokens">
+            <div class="ob-chip" onclick="obToggle(this,'tokens')">USDC</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">USDT</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">DAI</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">PYUSD</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">WETH</div>
+            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">SOL</div>
+          </div>
+          <div class="ob-hint">USDC scanning live. Multi-token support coming soon.</div>
+        </div>
+        <div class="ob-nav">
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
+          <button style="background:#3b82f6;color:#fff" onclick="obNext(3)">Continue &rarr;</button>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+      </div>
+
+      <!-- Step 3: AI Context -->
+      <div class="ob-step" id="obStep3" style="display:none">
+        <h2>Train the AI<span class="ob-ai-badge">&bull; Powered by AI</span></h2>
+        <div class="ob-sub">Help Shepherd understand your transaction patterns for higher classification accuracy.</div>
+        <div class="ob-section">
+          <span class="ob-label">What are your typical transactions?</span>
+          <div class="ob-chips" id="obTxTypes">
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Payroll</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Vendor payments</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Client revenue</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Treasury mgmt</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">DeFi activity</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Intercompany transfers</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">SaaS subscriptions</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Contractor payments</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Grants / distributions</div>
+          </div>
+        </div>
+        <div class="ob-section">
+          <span class="ob-label">Anything else Shepherd should know?</span>
+          <textarea class="ob-textarea" id="obNotes" placeholder="e.g. &quot;Biweekly payroll in round amounts&quot; or &quot;Most inflows are from 3 enterprise clients&quot;"></textarea>
+        </div>
+        <div class="ob-nav">
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(2)">&larr; Back</button>
+          <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
+      </div>
+
+      <!-- Step 4: Connect Wallets -->
+      <div class="ob-step" id="obStep4" style="display:none">
+        <h2>Connect your wallets</h2>
+        <div class="ob-sub">Add your wallet addresses and we'll start scanning immediately.</div>
+        <div class="ob-section">
+          <span class="ob-label">Wallet address</span>
+          <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base) or Solana address">
+          <div style="display:flex;gap:8px">
+            <input class="ob-input" id="obWalletLabel" placeholder="Label (e.g. Treasury, Payroll)" style="flex:1">
+            <input class="ob-input" id="obLookback" type="number" placeholder="Blocks" style="width:80px;text-align:center" title="Lookback blocks">
+            <button style="font-size:12px;padding:8px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap;height:38px" onclick="obAddWallet()">Add</button>
+          </div>
+          
+          <div id="obWalletList" style="margin-top:12px"></div>
+        </div>
+        <div class="ob-nav">
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(3)">&larr; Back</button>
+          <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obComplete()">Scan & Launch &rarr;</button>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
+      </div>
+
+      <!-- Step 5: Scanning -->
+      <div class="ob-step" id="obStep5" style="display:none">
+        <div style="text-align:center;padding:30px 0;color:#0f172a">
+          <div style="margin-bottom:24px">
+            <svg width="48" height="48" viewBox="0 0 48 48" id="obSpinner" style="animation:obSpin 1.2s linear infinite">
+              <circle cx="24" cy="24" r="20" fill="none" stroke="#e2e8f0" stroke-width="3"/>
+              <circle cx="24" cy="24" r="20" fill="none" stroke="#3b82f6" stroke-width="3" stroke-dasharray="40 86" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 style="font-size:18px;font-weight:600;margin-bottom:8px;color:#0f172a" id="obScanTitle">Scanning your wallets</h2>
+          <div style="font-size:13px;color:#64748b;margin-bottom:16px" id="obScanStatus">Connecting to blockchain...</div>
+          <div style="max-width:300px;margin:0 auto 16px">
+            <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden">
+              <div id="obScanBar" style="background:linear-gradient(90deg,#3b82f6,#7c3aed);height:100%;width:0%;border-radius:4px;transition:width 0.5s ease"></div>
+            </div>
+          </div>
+          <div id="obScanProgress" style="margin-bottom:8px"></div>
+          <div style="font-size:11px;color:#94a3b8" id="obScanDetail"></div>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
+      </div>
+
+    </div>
   </div>
-  <div style="font-size:12px;color:#94a3b8">Base &middot; Solana</div>
 </div>
 
-<!-- ===== SCREEN 1: WALLET CONFIG ===== -->
+<div class="app-shell" id="appShell" style="display:none">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <img src="data:image/png;base64,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" width="72" height="48" style="border-radius:4px;object-fit:cover" alt="Shepherd">
+    <div style="font-size:24px;font-weight:700;color:#0f172a;letter-spacing:-0.02em">Shepherd</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" onclick="navTo('config')" id="nav-config">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
+      Connections
+    </div>
+    <div class="nav-item" onclick="navTo('ledger')" id="nav-ledger">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
+      Ledger
+      <span class="nav-badge" id="ledgerBadge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="navTo('transactions')" id="nav-transactions">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z"/></svg>
+      Transactions
+    </div>
+    <div class="nav-item" onclick="navTo('coa')" id="nav-coa">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z"/></svg>
+      Chart of Accounts
+    </div>
+    <div class="nav-item" onclick="navTo('auditlog')" id="nav-auditlog">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      Audit Log
+      <span class="nav-badge" id="auditLogBadge" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="navTo('settings')" id="nav-settings">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+      Settings
+    </div>
+    <div class="nav-item" onclick="navTo('help')" id="nav-help">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z"/></svg>
+      Help
+    </div>
+  </div>
+  <div class="sidebar-footer">Shepherd v0.1 &middot; Demo</div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+<!-- AUDIT TRAIL MODAL -->
+<div class="audit-overlay" id="auditOverlay" onclick="if(event.target===this)closeAudit()">
+
+
+  <div class="audit-modal">
+    <div class="audit-header">
+      <h3 id="auditTitle">Audit Trail</h3>
+      <button class="close-btn" onclick="closeAudit()">&times;</button>
+    </div>
+    <div class="audit-summary" id="auditSummary"></div>
+    <div class="audit-body" id="auditBody"></div>
+  </div>
+</div>
+
+<!-- SCREEN: CONNECTIONS -->
 <div class="screen active" id="screen-config">
   <div class="wc-center">
     <div class="wc-title">Wallet Scanner</div>
@@ -154,7 +500,7 @@
 
     <div class="wc-actions">
       <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Scan Wallet</button>
-      <button class="btn btn-secondary" onclick="saveWallet()">Save Without Scanning</button>
+      
     </div>
 
     <div class="wc-progress" id="progressBar">
@@ -169,8 +515,8 @@
     </div>
 
     <div class="wc-saved-section">
-      <div class="wc-saved-title">Saved Wallets</div>
-      <div class="wc-chips" id="savedWallets"><div class="wc-empty">No wallets saved yet</div></div>
+      <div class="wc-saved-title">Connected Wallets</div>
+      <div id="walletCards"></div>
     </div>
   </div>
 </div>
@@ -178,9 +524,35 @@
 <!-- ===== SCREEN 2: LEDGER ===== -->
 <div class="screen" id="screen-ledger">
   <div class="container">
-    <div class="back-btn" onclick="showConfig()">&#8592; Back to Wallets</div>
+    
     <div class="summary-cards" id="summaryCards"></div>
     <div id="classifyNotice" style="display:none;font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 14px;margin-bottom:16px;font-weight:500"></div>
+    <div id="walletBar" style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:16px;flex-wrap:wrap">
+      <span style="font-size:11px;color:#94a3b8;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-right:4px">View:</span>
+      <div id="walletChips" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></div>
+      <div class="export-wrap">
+        <button class="export-btn" onclick="toggleExportMenu(event)">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+          Export
+          <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+        <div class="export-menu" id="exportMenu">
+          <div class="export-opt" onclick="exportJournalsCSV()">
+            <span>CSV</span><span class="eo-sub">.csv</span>
+          </div>
+          <div class="export-opt" onclick="exportJournalsXLSX()">
+            <span>Excel</span><span class="eo-sub">.xlsx</span>
+          </div>
+          <div class="export-opt" onclick="exportGoogleSheets()">
+            <span>Google Sheets</span><span class="eo-sub">Coming soon</span>
+          </div>
+        </div>
+      </div>
+      <button style="font-size:11px;font-weight:500;padding:5px 12px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:4px" onclick="refreshScan()" id="refreshBtn">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+        Refresh
+      </button>
+    </div>
     <div class="tx-nav">
       <div class="tx-nav-controls">
         <button class="nav-btn" id="prevBtn" onclick="nav(-1)">&#8592;</button>
@@ -193,6 +565,13 @@
       </div>
     </div>
     <div class="tx-detail" id="txDetail"></div>
+    <div class="ai-suggest" id="aiSuggest">
+      <div class="ai-suggest-header">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
+        AI Suggestion
+      </div>
+      <div class="ai-suggest-body" id="aiSuggestBody">Analyzing...</div>
+    </div>
     <div id="autoNote" style="display:none;font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 14px;margin-bottom:16px;font-weight:500"></div>
     <div class="main-grid" id="mainGrid">
       <div class="journal-panel">
@@ -209,14 +588,495 @@
   </div>
 </div>
 
+<!-- SCREEN: TRANSACTIONS -->
+<div class="screen" id="screen-transactions">
+  <div class="container">
+    <div style="max-width:1000px;margin:30px auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Transactions</h2>
+          <p style="color:#64748b;font-size:13px" id="txTableCount">All on-chain transactions across connected wallets.</p>
+        </div>
+      </div>
+      <div class="filter-bar" id="txFilterBar">
+        <div class="filter-group">
+          <label>Direction</label>
+          <select id="txfDir" onchange="renderTxTable()">
+            <option value="all">All</option>
+            <option value="inflow">Inflows</option>
+            <option value="outflow">Outflows</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Chain</label>
+          <select id="txfChain" onchange="renderTxTable()">
+            <option value="all">All</option>
+            <option value="base">Base</option>
+            <option value="solana">Solana</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Status</label>
+          <select id="txfStatus" onchange="renderTxTable()">
+            <option value="all">All</option>
+            <option value="unclassified">Unclassified</option>
+            <option value="classified">Classified</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Counterparty</label>
+          <input type="text" id="txfCp" placeholder="Search..." oninput="renderTxTable()">
+        </div>
+        <div class="filter-group">
+          <label>Amount</label>
+          <div style="display:flex;gap:4px">
+            <input type="number" id="txfAmtMin" placeholder="Min" style="width:60px" oninput="renderTxTable()">
+            <input type="number" id="txfAmtMax" placeholder="Max" style="width:60px" oninput="renderTxTable()">
+          </div>
+        </div>
+        <div class="filter-group">
+          <label>Wallet</label>
+          <select id="txfWallet" onchange="renderTxTable()">
+            <option value="all">All wallets</option>
+          </select>
+        </div>
+        <button class="filter-clear" onclick="clearTxFilters()">Clear</button>
+      </div>
+      <div id="txTableWrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: CHART OF ACCOUNTS -->
+<div class="screen" id="screen-coa">
+  <div class="container">
+    <div style="max-width:700px;margin:40px auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div>
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Chart of Accounts</h2>
+          <p style="color:#64748b;font-size:13px">Manage GL codes used for transaction classification.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCustom()" style="font-size:12px;padding:8px 14px">+ Add Account</button>
+      </div>
+      <div id="coaTable"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: AUDIT LOG -->
+<div class="screen" id="screen-auditlog">
+  <div class="container">
+    <div style="max-width:800px;margin:40px auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+        <div>
+          <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Audit Log</h2>
+          <p style="color:#64748b;font-size:13px">Complete history of all actions taken in Shepherd.</p>
+        </div>
+        <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer" onclick="exportAuditLog()">Export CSV</button>
+      </div>
+      <div id="auditLogFilters" style="display:flex;gap:6px;margin-bottom:16px">
+        <button class="filter-btn active" data-afilter="all" onclick="setAuditFilter('all')">All</button>
+        <button class="filter-btn" data-afilter="classification" onclick="setAuditFilter('classification')">Classifications</button>
+        <button class="filter-btn" data-afilter="scan" onclick="setAuditFilter('scan')">Scans</button>
+        <button class="filter-btn" data-afilter="account" onclick="setAuditFilter('account')">Account Changes</button>
+      </div>
+      <div id="auditLogTable"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: SETTINGS -->
+<div class="screen" id="screen-settings">
+  <div class="container">
+    <div style="max-width:640px;margin:40px auto">
+      <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Settings</h2>
+      <p style="color:#64748b;font-size:13px;margin-bottom:32px">Manage your account, team access, and integrations.</p>
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Chart of Accounts</div><div style="font-size:11px;color:#94a3b8">Customize GL codes and account mappings</div></div>
+          <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
+        </div>
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">ERP Integration</div><div style="font-size:11px;color:#94a3b8">Connect to QuickBooks, Xero, or NetSuite</div></div>
+          <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
+        </div>
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Team Access</div><div style="font-size:11px;color:#94a3b8">Invite team members and manage permissions</div></div>
+          <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
+        </div>
+        <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Audit Log</div><div style="font-size:11px;color:#94a3b8">View all classification changes and exports</div></div>
+          <span style="font-size:11px;color:#3b82f6;cursor:pointer" onclick="navTo('auditlog')">View log &rarr;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: HELP -->
+<div class="screen" id="screen-help">
+  <div class="container">
+    <div style="max-width:640px;margin:40px auto">
+      <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Help</h2>
+      <p style="color:#64748b;font-size:13px;margin-bottom:32px">Getting started with Shepherd.</p>
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px">1. Connect a wallet</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.6">Go to Connections and paste any Base (0x...) or Solana wallet address. Set the lookback window and click Scan. Shepherd reads USDC transfer events directly from the blockchain.</div>
+        </div>
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px">2. Classify transactions</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.6">In the Ledger, step through unclassified transactions and assign each to a GL code. When you classify one counterparty, all other transactions from that address auto-classify.</div>
+        </div>
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px">3. Review financial statements</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.6">As you classify, the Income Statement, Balance Sheet, and Cash Flow Statement build in real time from on-chain data. When all transactions are classified, you get a fully reconciled close.</div>
+        </div>
+        <div style="padding:16px 20px">
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px">Supported chains</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.6">Base (EVM) and Solana mainnet. USDC transfers only. Ethereum mainnet and additional stablecoins coming soon.</div>
+        </div>
+      </div>
+      <div style="margin-top:24px;font-size:12px;color:#94a3b8">Questions? Contact <a href="mailto:alan@shepard.finance" style="color:#3b82f6">alan@shepard.finance</a></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end main-content -->
+</div><!-- end app-shell -->
+
 <script>
+// ============ ONBOARDING ============
+const clientProfile={bizType:[],volume:'',chains:[],tokens:[],txTypes:[],notes:''};
+
+function obToggle(el,field){
+  el.classList.toggle('selected');
+  clientProfile[field]=Array.from(el.parentElement.querySelectorAll('.selected')).map(c=>c.textContent);
+}
+function obSelect(el,field){
+  el.parentElement.querySelectorAll('.ob-chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  clientProfile[field]=el.textContent;
+}
+function obNext(step){
+  document.querySelectorAll('.ob-step').forEach(s=>s.style.display='none');
+  document.getElementById('obStep'+step).style.display='block';
+}
+function obComplete(){
+  clientProfile.notes=(document.getElementById('obNotes')||{}).value||'';
+  // Auto-add wallet if there's one in the input field
+  const pendingAddr=(document.getElementById('obWalletAddr')||{}).value||'';
+  if(pendingAddr.trim())obAddWallet();
+  if(!obWallets.length){
+    document.getElementById('onboardScreen').style.display='none';
+    document.getElementById('appShell').style.display='flex';
+    return;
+  }
+  obNext(5);
+  setTimeout(()=>obScanAll(),300);
+}
+
+async function obScanAll(){
+  const statusEl=document.getElementById('obScanStatus');
+  const progressEl=document.getElementById('obScanProgress');
+  const detailEl=document.getElementById('obScanDetail');
+  const barEl=document.getElementById('obScanBar');
+  const titleEl=document.getElementById('obScanTitle');
+  const spinnerEl=document.getElementById('obSpinner');
+  let totalTxFound=0;
+
+  for(let wi=0;wi<obWallets.length;wi++){
+    const w=obWallets[wi];
+    const pct=Math.round((wi/obWallets.length)*100);
+    if(barEl)barEl.style.width=pct+'%';
+    if(statusEl)statusEl.textContent='Scanning '+w.name+'...';
+    if(detailEl)detailEl.textContent=w.chain+' \u00b7 '+(w.lookback||100)+' blocks \u00b7 '+w.addr.slice(0,20)+'...';
+    if(progressEl)progressEl.innerHTML=obWallets.map(function(_,i){return'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(i<wi?'#16a34a':i===wi?'#3b82f6':'#e2e8f0')+';margin:0 3px"></span>';}).join('');
+
+    try{
+      var scanRes=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wallet:w.addr,lookback_blocks:w.lookback||100})});
+      var sd=await scanRes.json();
+      if(sd.error){console.log('Scan start error:',sd.error);continue;}
+
+      var scanDone=false;
+      while(!scanDone){
+        await new Promise(function(r){setTimeout(r,600)});
+        var pRes=await fetch('/api/progress');
+        var pData=await pRes.json();
+        if(!pData.running)scanDone=true;
+      }
+
+      var rRes=await fetch('/api/result');
+      var result=await rRes.json();
+      if(result&&!result.error&&result.journals){
+        var store=getStore(w.addr);
+        store.txs=result.journals.map(function(j){return{hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0}});
+        store.scanData=result;store.mappings={};store.cpMappings={};
+        store.scanTime=new Date().toLocaleString();
+        if(result.scan_range)store.lastBlock=result.scan_range.to_block;
+        totalTxFound+=store.txs.length;
+        if(statusEl)statusEl.textContent=w.name+': '+store.txs.length+' transactions found';
+      }
+    }catch(e){console.log('Scan error for',w.name,e);}
+  }
+
+  if(barEl){barEl.style.width='100%';barEl.style.background='#16a34a';}
+  if(spinnerEl){spinnerEl.style.animation='none';spinnerEl.innerHTML='<circle cx="24" cy="24" r="20" fill="none" stroke="#16a34a" stroke-width="3"/><path d="M16 24l4 4 8-8" stroke="#16a34a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';}
+  if(titleEl)titleEl.textContent='Scan complete';
+  if(statusEl)statusEl.innerHTML='<span style="color:#16a34a">'+totalTxFound+' transactions found across '+obWallets.length+' wallet'+(obWallets.length>1?'s':'')+'</span>';
+  if(detailEl)detailEl.textContent='Loading ledger...';
+  if(progressEl)progressEl.innerHTML=obWallets.map(function(){return'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin:0 3px"></span>'}).join('');
+
+  logAction('account','Onboarding completed',obWallets.length+' wallets scanned, '+totalTxFound+' transactions');
+
+  setTimeout(function(){
+    document.getElementById('onboardScreen').style.display='none';
+    document.getElementById('appShell').style.display='flex';
+    var firstWithData=wallets.find(function(w){return getStore(w.addr).txs.length>0});
+    if(firstWithData){
+      selectedWallets.clear();
+      selectedWallets.add(firstWithData.addr.toLowerCase());
+      loadSelected();
+      var badge=document.getElementById('ledgerBadge');
+      if(badge){badge.style.display='inline';badge.textContent=txs.length;}
+      navTo('ledger');
+    }
+  },1500);
+}
+function skipOnboarding(){
+  document.getElementById('onboardScreen').style.display='none';
+  document.getElementById('appShell').style.display='flex';
+}
+let obWallets=[];
+function obAddWallet(){
+  const a=document.getElementById('obWalletAddr').value.trim();
+  const n=document.getElementById('obWalletLabel').value.trim()||addr(a);
+  const lb=parseInt(document.getElementById('obLookback').value)||100;
+  if(!a)return;
+  obWallets.push({addr:a,name:n,chain:a.startsWith('0x')?'Base':'Solana',lookback:lb});
+  document.getElementById('obWalletAddr').value='';
+  document.getElementById('obWalletLabel').value='';
+  obRenderWallets();
+  // Also add to main wallet list
+  if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){
+    wallets.push({addr:a,name:n,chain:a.startsWith('0x')?'Base':'Solana'});
+  }
+}
+function obRemoveWallet(i){obWallets.splice(i,1);obRenderWallets();}
+function obRenderWallets(){
+  const el=document.getElementById('obWalletList');
+  if(!obWallets.length){el.innerHTML='<div style="color:#94a3b8;font-size:12px">No wallets added yet.</div>';return;}
+  el.innerHTML=obWallets.map((w,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;margin-bottom:4px">
+    <span style="font-size:12px;font-weight:500;color:#1e293b">${w.name}</span>
+    <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${w.chain==='Base'?'#dbeafe':'#e0e7ff'};color:${w.chain==='Base'?'#1d4ed8':'#4338ca'}">${w.chain}</span>
+    <span class="mono" style="font-size:10px;color:#94a3b8;flex:1">${w.addr.slice(0,12)}...${w.addr.slice(-6)}</span>
+    <span style="font-size:10px;color:#94a3b8">${w.lookback} blocks</span>
+    <span style="color:#cbd5e1;cursor:pointer" onclick="obRemoveWallet(${i})">&times;</span>
+  </div>`).join('');
+}
+
+// ============ TRANSACTIONS TABLE ============
+function renderTxTable(){
+  const wrap=document.getElementById('txTableWrap');
+  if(!wrap)return;
+
+  // Populate wallet filter dropdown
+  const wSel=document.getElementById('txfWallet');
+  if(wSel){
+    const curVal=wSel.value;
+    wSel.innerHTML='<option value="all">All wallets</option>'+
+      wallets.filter(w=>getStore(w.addr).txs.length>0).map(w=>`<option value="${w.addr}">${w.name}</option>`).join('');
+    wSel.value=curVal;
+  }
+
+  // Build full tx list from all scanned wallets
+  let allTx=[];
+  wallets.forEach(w=>{
+    const s=getStore(w.addr);
+    s.txs.forEach(t=>{
+      const chain=w.chain||'Unknown';
+      const gl=s.mappings[t.hash]||'Unclassified';
+      allTx.push({...t,wallet:w.name,walletAddr:w.addr,chain,gl});
+    });
+  });
+
+  // Apply filters
+  const dir=document.getElementById('txfDir')?.value||'all';
+  const chain=document.getElementById('txfChain')?.value||'all';
+  const status=document.getElementById('txfStatus')?.value||'all';
+  const cp=(document.getElementById('txfCp')?.value||'').toLowerCase().trim();
+  const amtMin=parseFloat(document.getElementById('txfAmtMin')?.value)||0;
+  const amtMax=parseFloat(document.getElementById('txfAmtMax')?.value)||Infinity;
+  const wallet=document.getElementById('txfWallet')?.value||'all';
+
+  let filtered=allTx.filter(t=>{
+    if(dir!=='all'&&t.dir!==dir)return false;
+    if(chain==='base'&&t.chain!=='Base')return false;
+    if(chain==='solana'&&t.chain!=='Solana')return false;
+    if(status==='unclassified'&&t.gl!=='Unclassified')return false;
+    if(status==='classified'&&t.gl==='Unclassified')return false;
+    if(cp&&!t.cp.toLowerCase().includes(cp)&&!t.wallet.toLowerCase().includes(cp))return false;
+    if(t.amount<amtMin||t.amount>amtMax)return false;
+    if(wallet!=='all'&&t.walletAddr.toLowerCase()!==wallet.toLowerCase())return false;
+    return true;
+  });
+
+  document.getElementById('txTableCount').textContent=`Showing ${filtered.length} of ${allTx.length} transactions`;
+
+  if(!filtered.length){
+    wrap.innerHTML='<div class="tx-table-empty">'+(allTx.length?'No transactions match filters.':'Connect and scan wallets to see transactions.')+'</div>';
+    return;
+  }
+
+  wrap.innerHTML=`<div class="tx-table-wrap"><table class="tx-table">
+    <thead><tr>
+      <th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain</th><th>Block</th><th>Status</th><th>GL Code</th>
+    </tr></thead>
+    <tbody>${filtered.map(t=>`<tr>
+      <td><span class="dir-pill ${t.dir==='inflow'?'in':'out'}">${t.dir==='inflow'?'IN':'OUT'}</span></td>
+      <td class="mono" style="font-weight:500;color:${t.dir==='inflow'?'#16a34a':'#ea580c'}">${t.dir==='inflow'?'+':'-'}$${fmt(t.amount)}</td>
+      <td class="mono" style="font-size:11px">${addr(t.cp)}</td>
+      <td style="font-size:11px">${t.wallet}</td>
+      <td><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${t.chain==='Base'?'#dbeafe':'#e0e7ff'};color:${t.chain==='Base'?'#1d4ed8':'#4338ca'}">${t.chain}</span></td>
+      <td style="font-size:11px;color:#94a3b8">${(t.block||0).toLocaleString()}</td>
+      <td><span class="status-pill ${t.gl==='Unclassified'?'unclassified':'classified'}">${t.gl==='Unclassified'?'Pending':'Classified'}</span></td>
+      <td style="font-size:11px;color:${t.gl==='Unclassified'?'#d97706':'#334155'}">${t.gl==='Unclassified'?'—':t.gl}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function clearTxFilters(){
+  ['txfDir','txfChain','txfStatus','txfWallet'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='all';});
+  ['txfCp','txfAmtMin','txfAmtMax'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderTxTable();
+}
 // ============ CONFIG ============
-const GL_OPTIONS=["Unclassified","6110 - Payroll","6200 - Software & SaaS","6300 - Cloud Infrastructure","6420 - Marketing & Ads","6500 - Professional Services","6600 - Office & Operations","7100 - Intercompany Transfer","4100 - Revenue - Services","4200 - Revenue - Product","4300 - Customer Refund","1200 - Treasury Rebalance"];
+let GL_OPTIONS=["Unclassified","6110 - Payroll","6200 - Software & SaaS","6300 - Cloud Infrastructure","6420 - Marketing & Ads","6500 - Professional Services","6600 - Office & Operations","7100 - Intercompany Transfer","4100 - Revenue - Services","4200 - Revenue - Product","4300 - Customer Refund","1200 - Treasury Rebalance"];
+const GL_TYPE={"6110":"expense","6200":"expense","6300":"expense","6420":"expense","6500":"expense","6600":"expense","7100":"transfer","4100":"revenue","4200":"revenue","4300":"revenue","1200":"transfer"};
 const COLORS=["#3b82f6","#8b5cf6","#06b6d4","#f59e0b"];
 const GL_MAP={"6110":"pnl-payroll","6200":"pnl-software","6300":"pnl-cloud","6420":"pnl-marketing","6500":"pnl-profsvc","6600":"pnl-ops","4100":"pnl-revsvc","4200":"pnl-revprod","4300":"pnl-revsvc","7100":"bs-usdc","1200":"bs-usdc"};
 const OPENING={revSvc:1450000,revProd:380000,expPay:620000,expSw:85000,expCloud:142000,expMkt:215000,expProf:67000,expOps:38000,expGas:1.80,cash:2450000,usdc:1800000,eth:12500,ar:340000,ap:285000,accrued:125000,equity:3500000,re:692500};
 
-let wallets=[],scanData=null,txs=[],idx=0,mappings={};
+let wallets=[],activeWalletAddr=null,scanData=null,txs=[],idx=0,mappings={};
+let ledgerView='single'; // 'single' or 'all'
+let selectedWallets=new Set();
+let auditLog=[]; // {timestamp, type, action, detail, user}
+let auditFilter='all';
+function logAction(type,action,detail){
+  auditLog.unshift({timestamp:new Date().toLocaleString(),type,action,detail,user:'admin'});
+  const badge=document.getElementById('auditLogBadge');
+  if(badge){badge.style.display='inline';badge.textContent=auditLog.length;}
+}
+function renderAuditLog(){
+  const el=document.getElementById('auditLogTable');if(!el)return;
+  const filtered=auditFilter==='all'?auditLog:auditLog.filter(e=>e.type===auditFilter);
+  if(!filtered.length){el.innerHTML='<div style="padding:40px;text-align:center;color:#94a3b8;font-size:13px">No audit events yet</div>';return;}
+  const typeColor=t=>t==='classification'?'#3b82f6':t==='scan'?'#16a34a':t==='account'?'#8b5cf6':'#64748b';
+  const typeLabel=t=>t==='classification'?'Classification':t==='scan'?'Scan':t==='account'?'Account':t;
+  el.innerHTML=`
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:150px 90px 200px 1fr;padding:8px 16px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+        <div>Timestamp</div><div>Type</div><div>Action</div><div>Detail</div>
+      </div>
+      ${filtered.slice(0,100).map(e=>`<div style="display:grid;grid-template-columns:150px 90px 200px 1fr;padding:9px 16px;font-size:12px;border-bottom:1px solid #f8fafc;align-items:center">
+        <div style="color:#94a3b8;font-size:11px">${e.timestamp}</div>
+        <div><span style="font-size:10px;padding:2px 7px;border-radius:3px;background:${typeColor(e.type)}15;color:${typeColor(e.type)};font-weight:500">${typeLabel(e.type)}</span></div>
+        <div style="color:#334155">${e.action}</div>
+        <div style="color:#64748b;font-size:11px">${e.detail}</div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#94a3b8">${filtered.length} event${filtered.length!==1?'s':''}</div>`;
+}
+function setAuditFilter(f){
+  auditFilter=f;
+  document.querySelectorAll('[data-afilter]').forEach(b=>b.classList.toggle('active',b.dataset.afilter===f));
+  renderAuditLog();
+}
+function exportAuditLog(){
+  let csv="timestamp,type,action,detail,user\n";
+  auditLog.forEach(e=>{csv+=`"${e.timestamp}","${e.type}","${e.action}","${e.detail}","${e.user}"\n`;});
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='shepherd_audit_log.csv';a.click();
+}
+// Per-wallet persistent storage
+const walletStore={};
+function getStore(addr){const k=addr.toLowerCase();if(!walletStore[k])walletStore[k]={scanData:null,txs:[],mappings:{},cpMappings:{},lastBlock:null,scanTime:null};return walletStore[k];}
+function saveToStore(){
+  if(selectedWallets.size===1){
+    const addr=[...selectedWallets][0];
+    const s=getStore(addr);s.scanData=scanData;s.txs=txs.map(t=>({...t,hash:t.origHash||t.hash}));
+    // Save mappings using original hashes
+    s.mappings={};s.cpMappings={...cpMappings};
+    txs.forEach(t=>{const key=t.origHash||t.hash;if(mappings[t.hash])s.mappings[key]=mappings[t.hash];});
+    s.scanTime=new Date().toLocaleString();
+  } else if(selectedWallets.size>1){
+    // Save classifications back to each wallet's store
+    txs.forEach(t=>{if(t.walletAddr&&mappings[t.hash]){
+      const s=getStore(t.walletAddr);
+      s.mappings[t.origHash||t.hash]=mappings[t.hash];
+    }});
+    selectedWallets.forEach(addr=>{const s=getStore(addr);s.cpMappings={...s.cpMappings,...cpMappings};});
+  }
+}
+function loadFromStore(addr){const s=getStore(addr);activeWalletAddr=addr;scanData=s.scanData;txs=[...s.txs];mappings={...s.mappings};cpMappings={...s.cpMappings};}
+function loadSelected(){
+  filteredIdxs=null; // reset filters on wallet switch
+  txs=[];mappings={};cpMappings={};
+  let totalIn=0,totalOut=0,inCount=0,outCount=0;
+  selectedWallets.forEach(addr=>{
+    const w=wallets.find(x=>x.addr.toLowerCase()===addr.toLowerCase());
+    const s=getStore(addr);
+    s.txs.forEach(t=>{
+      const key=addr.toLowerCase()+'::'+t.hash;
+      txs.push({...t,hash:key,origHash:t.hash,walletAddr:addr,walletName:w?w.name:addr(addr)});
+      if(s.mappings[t.hash])mappings[key]=s.mappings[t.hash];
+      if(t.dir==='inflow'){totalIn+=t.amount;inCount++;}else{totalOut+=t.amount;outCount++;}
+    });
+    Object.entries(s.cpMappings).forEach(([cp,gl])=>{if(!cpMappings[cp])cpMappings[cp]=gl;});
+  });
+  scanData={summary:{transfer_count:txs.length,inflow_count:inCount,outflow_count:outCount,total_usdc_in:totalIn,total_usdc_out:totalOut,net_usdc:totalIn-totalOut,all_balanced:true}};
+  // If single wallet selected, also set activeWalletAddr for refresh
+  if(selectedWallets.size===1){activeWalletAddr=[...selectedWallets][0];ledgerView='single';}
+  else{activeWalletAddr=null;ledgerView='all';}
+  idx=0;
+}
+function toggleWallet(addr){
+  if(selectedWallets.has(addr.toLowerCase())){selectedWallets.delete(addr.toLowerCase());}
+  else{selectedWallets.add(addr.toLowerCase());}
+  if(selectedWallets.size===0)return renderWalletChips();
+  loadSelected();renderLedger();
+}
+function selectAllWallets(){
+  const scanned=wallets.filter(w=>getStore(w.addr).txs.length>0);
+  if(selectedWallets.size===scanned.length){selectedWallets.clear();}
+  else{scanned.forEach(w=>selectedWallets.add(w.addr.toLowerCase()));}
+  if(selectedWallets.size===0){renderWalletChips();return;}
+  loadSelected();renderLedger();
+}
+function switchLedgerView(mode,addr){
+  if(mode==='all'){selectAllWallets();}
+  else{selectedWallets.clear();selectedWallets.add(addr.toLowerCase());loadSelected();renderLedger();}
+}
+function renderWalletChips(){
+  const el=document.getElementById('walletChips');if(!el)return;
+  if(!wallets.length){el.innerHTML='';return;}
+  const scannedWallets=wallets.filter(w=>getStore(w.addr).txs.length>0);
+  let chips='';
+  if(scannedWallets.length>1){
+    const allSelected=scannedWallets.every(w=>selectedWallets.has(w.addr.toLowerCase()));
+    chips+=`<div style="font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid ${allSelected?'#3b82f6':'#e2e8f0'};background:${allSelected?'#eff6ff':'#fff'};color:${allSelected?'#3b82f6':'#64748b'};font-weight:${allSelected?'600':'400'}" onclick="selectAllWallets()">All Wallets</div>`;
+  }
+  wallets.forEach(w=>{
+    const hasData=getStore(w.addr).txs.length>0;
+    const isSelected=selectedWallets.has(w.addr.toLowerCase());
+    if(hasData){
+      chips+=`<div title="${w.addr}" style="font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid ${isSelected?'#3b82f6':'#e2e8f0'};background:${isSelected?'#eff6ff':'#fff'};color:${isSelected?'#3b82f6':'#64748b'};font-weight:${isSelected?'600':'400'}" onclick="toggleWallet('${w.addr}')">${w.name}</div>`;
+    } else {
+      chips+=`<div title="${w.addr} (not scanned)" style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px dashed #e2e8f0;color:#cbd5e1;cursor:default">${w.name}</div>`;
+    }
+  });
+  el.innerHTML=chips;
+}
 const fmt=n=>Math.abs(n)<.01&&n!==0?n.toFixed(4):n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtShort=n=>{if(Math.abs(n)>=1e6)return"$"+(n/1e6).toFixed(1)+"M";if(Math.abs(n)>=1e3)return"$"+(n/1e3).toFixed(1)+"K";return"$"+fmt(n)};
 const addr=a=>(a&&a.length>=10)?a.slice(0,6)+"..."+a.slice(-4):a;
@@ -225,15 +1085,110 @@ const pfx=g=>g.split(" - ")[0];
 
 // ============ SCREEN MANAGEMENT ============
 function showScreen(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));document.getElementById("screen-"+id).classList.add("active");}
-function showConfig(){showScreen("config");}
-function openLedger(){if(!txs.length)return;idx=0;showScreen("ledger");renderLedger();}
+function navTo(id){
+  saveToStore();// save current state before switching
+  showScreen(id);
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
+  document.getElementById("nav-"+id).classList.add("active");
+  if(id==='ledger'&&txs.length)renderLedger();
+  if(id==='config')renderWallets();
+  if(id==='coa')renderCOA();
+  if(id==='transactions')renderTxTable();
+  if(id==='auditlog')renderAuditLog();
+}
+function showConfig(){navTo('config');}
+function openLedger(){if(!txs.length)return;idx=0;ledgerView='single';if(activeWalletAddr)selectedWallets.add(activeWalletAddr.toLowerCase());navTo('ledger');}
+
+async function refreshScan(){
+  if(selectedWallets.size!==1){alert('Select a single wallet to scan for new activity.');return;}
+  const walletAddr=[...selectedWallets][0];
+  activeWalletAddr=walletAddr;
+  const store=getStore(activeWalletAddr);
+  const isBase=activeWalletAddr.startsWith("0x");
+  const btn=document.getElementById("refreshBtn");
+  btn.disabled=true;btn.innerHTML='Scanning...';
+
+  try{
+    // For Base: scan from last block. For Solana: scan recent and dedupe
+    const body={wallet:activeWalletAddr,lookback_blocks:isBase?2000:200};
+    if(isBase&&store.lastBlock){body.from_block=store.lastBlock+1;}
+
+    const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+
+    // Poll for completion
+    const poll=setInterval(async()=>{
+      const pr=await fetch("/api/progress");const p=await pr.json();
+      if(!p.running){
+        clearInterval(poll);
+        const rr=await fetch("/api/result");const result=await rr.json();
+        if(result.error){btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';return;}
+        onRefreshComplete(result);
+      }
+    },500);
+  }catch(e){
+    btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';
+    alert("Scan error: "+e.message);
+  }
+}
+
+function onRefreshComplete(report){
+  const btn=document.getElementById("refreshBtn");
+  btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';
+
+  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0}));
+  
+  // Deduplicate: only add txs we don't already have
+  const existingHashes=new Set(txs.map(t=>t.hash));
+  let addedCount=0;
+  newTxs.forEach(t=>{
+    if(!existingHashes.has(t.hash)){
+      txs.push(t);addedCount++;
+      // Auto-classify if counterparty is known
+      if(cpMappings[t.cp]){mappings[t.hash]=cpMappings[t.cp];}
+    }
+  });
+
+  // Update last block
+  const store=getStore(activeWalletAddr);
+  if(report.scan_range)store.lastBlock=report.scan_range.to_block;
+  store.scanTime=new Date().toLocaleString();
+
+  // Update scan data summary
+  if(scanData&&scanData.summary){
+    scanData.summary.transfer_count=txs.length;
+    scanData.summary.inflow_count=txs.filter(t=>t.dir==="inflow").length;
+    scanData.summary.outflow_count=txs.filter(t=>t.dir==="outflow").length;
+    scanData.summary.total_usdc_in=txs.filter(t=>t.dir==="inflow").reduce((s,t)=>s+t.amount,0);
+    scanData.summary.total_usdc_out=txs.filter(t=>t.dir==="outflow").reduce((s,t)=>s+t.amount,0);
+    scanData.summary.net_usdc=scanData.summary.total_usdc_in-scanData.summary.total_usdc_out;
+  }
+
+  saveToStore();
+  
+  // Show notification
+  const notice=document.getElementById("classifyNotice");
+  if(addedCount>0){
+    logAction('scan','Refresh scan',`${addr(activeWalletAddr)} - ${addedCount} new transaction${addedCount>1?'s':''} found`);
+    notice.textContent=`Found ${addedCount} new transaction${addedCount>1?'s':''}. ${Object.keys(cpMappings).length>0?'Known counterparties auto-classified.':''}`;
+    notice.style.display="block";setTimeout(()=>{notice.style.display="none";},5000);
+  } else {
+    notice.textContent="No new transactions found since last scan.";
+    notice.style.display="block";setTimeout(()=>{notice.style.display="none";},3000);
+  }
+  
+  const badge=document.getElementById("ledgerBadge");
+  if(badge){badge.textContent=txs.length;}
+  renderLedger();
+}
 
 // ============ WALLET MANAGEMENT ============
 function saveWallet(){
   const a=document.getElementById("walletInput").value.trim();
   const n=document.getElementById("nameInput").value.trim()||addr(a);
   if(!a.startsWith("0x")&&a.length<32||a.startsWith("0x")&&a.length!==42)return alert("Enter a valid wallet address (0x... for Base, or Solana address)");
-  if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){wallets.push({addr:a,name:n});}
+  if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){wallets.push({addr:a,name:n,chain:a.startsWith("0x")?"Base":"Solana"});}
   renderWallets();
 }
 function loadWallet(i){
@@ -241,13 +1196,38 @@ function loadWallet(i){
   document.getElementById("nameInput").value=wallets[i].name;
   renderWallets();
 }
-function removeWallet(i,e){e.stopPropagation();wallets.splice(i,1);renderWallets();}
+function removeWallet(i,e){e.stopPropagation();delete walletStore[wallets[i].addr.toLowerCase()];wallets.splice(i,1);renderWallets();}
+function viewWalletLedger(i){
+  const w=wallets[i];
+  selectedWallets.clear();selectedWallets.add(w.addr.toLowerCase());
+  loadSelected();
+  if(txs.length){navTo("ledger");}
+  else{document.getElementById("walletInput").value=w.addr;document.getElementById("nameInput").value=w.name;startScan();}
+}
 function renderWallets(){
-  const el=document.getElementById("savedWallets");
-  if(!wallets.length){el.innerHTML='<div class="wc-empty">No wallets saved yet</div>';return;}
-  el.innerHTML=wallets.map((w,i)=>`<div class="wc-chip" onclick="loadWallet(${i})">
-    <span class="cn">${w.name}</span><span class="ca mono">${addr(w.addr)}</span>
-    <span class="cx" onclick="removeWallet(${i},event)">&times;</span></div>`).join("");
+  const el=document.getElementById("walletCards");
+  if(!wallets.length){el.innerHTML='<div class="wc-empty" style="padding:20px 0">No wallets connected yet. Add a wallet above to get started.</div>';return;}
+  el.innerHTML=wallets.map((w,i)=>{
+    const s=getStore(w.addr);
+    const hasData=s.txs.length>0;
+    const classified=hasData?s.txs.filter(t=>s.mappings[t.hash]&&s.mappings[t.hash]!=="Unclassified").length:0;
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;transition:background .15s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:600;color:#0f172a">${w.name}</span>
+          <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:${w.chain==="Base"?"#dbeafe":"#e0e7ff"};color:${w.chain==="Base"?"#1d4ed8":"#4338ca"}">${w.chain}</span>
+        </div>
+        <div class="mono" style="font-size:11px;color:#94a3b8">${w.addr}</div>
+        ${hasData?`<div style="font-size:11px;color:#64748b;margin-top:4px">${s.txs.length} transactions &middot; ${classified} classified &middot; Last scan: ${s.scanTime||"—"}</div>`
+        :`<div style="font-size:11px;color:#94a3b8;margin-top:4px">Not scanned yet</div>`}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${hasData?`<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger(${i})">Open Ledger</button>`:""}
+        <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="document.getElementById('walletInput').value='${w.addr}';document.getElementById('nameInput').value='${w.name}';startScan()">${hasData?"Rescan":"Scan"}</button>
+        <button style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer" onclick="removeWallet(${i},event)">&times;</button>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 // ============ SCANNING ============
@@ -303,7 +1283,21 @@ function onScanComplete(report){
     cp:j.counterparty,
     gas:j.gas_usd||0
   }));
-  mappings={};
+  mappings={};cpMappings={};
+  activeWalletAddr=report.wallet;
+
+  // Save to persistent store
+  const store=getStore(report.wallet);
+  store.lastBlock=report.scan_range?report.scan_range.to_block:null;
+
+  // Update ledger badge
+  const badge=document.getElementById("ledgerBadge");
+  if(badge){badge.style.display="inline";badge.textContent=txs.length;}
+
+  // Save state
+  saveToStore();
+  renderWallets();
+  logAction('scan','Wallet scanned',`${addr(report.wallet)} - ${report.summary.transfer_count} transfers found (${report.summary.inflow_count} in, ${report.summary.outflow_count} out)`);
 
   const s=report.summary;
   document.getElementById("resultGrid").innerHTML=`
@@ -324,36 +1318,91 @@ function onScanError(msg){
 }
 
 // ============ LEDGER SCREEN ============
-function uncIdxs(){return txs.map((t,i)=>({i,t})).filter(x=>glOf(x.t.hash)==="Unclassified").map(x=>x.i);}
+function uncIdxs(){const pool=getFilteredIdxs();return pool.filter(i=>glOf(txs[i].hash)==="Unclassified");}
 function nav(d){
   const unc=uncIdxs();
-  if(!unc.length)return;
-  const curPos=unc.indexOf(idx);
-  if(curPos===-1){idx=unc[0];} // current is classified, jump to first unclassified
-  else{const next=curPos+d;idx=unc[Math.max(0,Math.min(unc.length-1,next))];}
+  if(!unc.length){renderTx();return;} // all classified, show reconciled
+  if(glOf(txs[idx].hash)!=="Unclassified"){
+    // Current is classified (just classified it) — jump to next unclassified
+    const nextAfter=d>0?unc.find(i=>i>idx):unc.slice().reverse().find(i=>i<idx);
+    idx=nextAfter!==undefined?nextAfter:unc[0];
+  } else {
+    const curPos=unc.indexOf(idx);
+    const next=curPos+d;
+    idx=unc[Math.max(0,Math.min(unc.length-1,next))];
+  }
   renderTx();
 }
 let cpMappings={};
+let filteredIdxs=null; // null means no filter active, array means filtered
+
+function getFilteredIdxs(){
+  if(filteredIdxs===null)return txs.map((_,i)=>i);
+  return filteredIdxs;
+}
+
+function applyFilters(){
+  const dir=document.getElementById('filterDir').value;
+  const chain=document.getElementById('filterChain').value;
+  const status=document.getElementById('filterStatus').value;
+  const cp=document.getElementById('filterCp').value.toLowerCase().trim();
+  const amtMin=parseFloat(document.getElementById('filterAmtMin').value)||0;
+  const amtMax=parseFloat(document.getElementById('filterAmtMax').value)||Infinity;
+
+  const hasFilter=dir!=='all'||chain!=='all'||status!=='all'||cp||amtMin>0||amtMax<Infinity;
+
+  if(!hasFilter){filteredIdxs=null;renderTx();return;}
+
+  filteredIdxs=[];
+  txs.forEach((t,i)=>{
+    if(dir!=='all'&&t.dir!==dir)return;
+    if(chain==='base'&&!(t.walletAddr||activeWalletAddr||'').startsWith('0x'))return;
+    if(chain==='solana'&&(t.walletAddr||activeWalletAddr||'').startsWith('0x'))return;
+    if(status==='unclassified'&&glOf(t.hash)!=='Unclassified')return;
+    if(status==='classified'&&glOf(t.hash)==='Unclassified')return;
+    if(cp&&!t.cp.toLowerCase().includes(cp)&&!(t.walletName||'').toLowerCase().includes(cp))return;
+    if(t.amount<amtMin||t.amount>amtMax)return;
+    filteredIdxs.push(i);
+  });
+
+  // Reset idx to first filtered result
+  if(filteredIdxs.length>0&&!filteredIdxs.includes(idx)){idx=filteredIdxs[0];}
+  renderTx();
+}
+
+function clearFilters(){
+  document.getElementById('filterDir').value='all';
+  document.getElementById('filterChain').value='all';
+  document.getElementById('filterStatus').value='all';
+  document.getElementById('filterCp').value='';
+  document.getElementById('filterAmtMin').value='';
+  document.getElementById('filterAmtMax').value='';
+  filteredIdxs=null;
+  renderTx();
+}
+
 function classify(v){
+  if(v==="__custom__"){openCustom();return;}
   const tx=txs[idx];
   mappings[tx.hash]=v;
   if(v!=="Unclassified"){
+    logAction('classification','Classified transaction',`${addr(tx.hash)} as ${v} ($${fmt(tx.amount)} ${tx.dir})`);
     cpMappings[tx.cp]=v;
     let autoCount=0;
     txs.forEach(t=>{if(t.cp===tx.cp&&t.hash!==tx.hash){mappings[t.hash]=v;autoCount++;}});
     if(autoCount>0){
+      logAction('classification','Auto-classified '+autoCount+' transactions','Counterparty '+addr(tx.cp)+' mapped to '+v);
       const note=document.getElementById("classifyNotice");
       if(note){note.textContent="Auto-classified "+autoCount+" more transaction"+(autoCount>1?"s":"")+" from this counterparty";note.style.display="block";
         setTimeout(()=>{note.style.display="none";},4000);}
     }
-    // Advance to next unclassified
-    const unc=uncIdxs();
-    if(unc.length>0){const nextAfter=unc.find(i=>i>idx);idx=nextAfter!==undefined?nextAfter:unc[0];}
+    // Stay on current transaction so arrows are visible
   } else {
     const oldCp=tx.cp;delete cpMappings[oldCp];
     txs.forEach(t=>{if(t.cp===oldCp)delete mappings[t.hash];});
   }
   renderLedger();
+  saveToStore();
 }
 
 function getTarget(g,fallback){
@@ -386,6 +1435,8 @@ function computeTotals(){
 }
 
 function renderLedger(){
+  // Wallet chips
+  renderWalletChips();
   // Summary cards
   const s=scanData.summary,t=computeTotals();
   document.getElementById("summaryCards").innerHTML=[
@@ -421,22 +1472,25 @@ function renderTx(){
 
   document.getElementById("txCounter").innerHTML=(()=>{
     const unc=uncIdxs();
-    if(!unc.length)return'<span style="color:#16a34a">All classified!</span>';
+    const filtered=getFilteredIdxs();
+    const filterNote=filteredIdxs!==null?` <span style="color:#94a3b8;font-size:10px">(${filtered.length} of ${txs.length} shown)</span>`:'';
+    if(!unc.length)return'<span style="color:#16a34a">All classified!</span>'+filterNote;
     const pos=unc.indexOf(idx);
-    return`<strong>${pos+1}</strong> / ${unc.length} unclassified`;
+    return`<strong>${pos+1}</strong> / ${unc.length} unclassified`+filterNote;
   })();
   document.getElementById("prevBtn").disabled=uncIdxs().indexOf(idx)<=0;
   document.getElementById("nextBtn").disabled=(()=>{const unc=uncIdxs();return unc.indexOf(idx)>=unc.length-1;})();
 
   const sel=document.getElementById("glSelect");
-  sel.innerHTML=GL_OPTIONS.map(o=>`<option value="${o}" ${g===o?"selected":""}>${o}</option>`).join("");
+  sel.innerHTML=glSelectHtml(g);
   sel.className="gl-select"+(isMapped?" mapped":"");
 
   document.getElementById("txDetail").innerHTML=`
     <span class="tx-dir ${tx.dir==='inflow'?'in':'out'}">${tx.dir==='inflow'?'INFLOW':'OUTFLOW'}</span>
     <span class="tx-amt mono ${tx.dir==='inflow'?'in':'out'}">${tx.dir==='inflow'?'+':'-'}$${fmt(tx.amount)}</span>
     <span class="tx-cp">Counterparty: <strong class="mono">${addr(tx.cp)}</strong></span>
-    <span class="tx-meta mono">${addr(tx.hash)} &middot; Block ${(tx.block||0).toLocaleString()}</span>`;
+    ${tx.walletName?`<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#f1f5f9;color:#64748b">${tx.walletName}</span>`:''}
+    <span class="tx-meta mono">${addr(tx.origHash||tx.hash)} &middot; Block ${(tx.block||0).toLocaleString()}</span>`;
 
   // Journal
   const tDr=journal.reduce((s,l)=>s+l.dr,0),tCr=journal.reduce((s,l)=>s+l.cr,0);
@@ -449,69 +1503,154 @@ function renderTx(){
     <div class="j-total"><div></div><div>Total</div><div class="mono">$${fmt(tDr)}</div><div class="mono">$${fmt(tCr)}</div></div>`;
   document.getElementById("balCheck").innerHTML=`<span style="color:#16a34a">&#10003;</span> Debits = Credits`;
 
-  // Financial statements — per-transaction impact only
-  const o=OPENING;
-  // Compute what THIS transaction impacts
-  const ti={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,usdcChg:0,ethChg:0,uncIn:0,uncOut:0};
-  const p=pfx(g);
-  if(g==="Unclassified"){if(tx.dir==="inflow")ti.uncIn=tx.amount;else ti.uncOut=tx.amount;}
-  else{if(p==="4100")ti.revSvc=tx.amount;else if(p==="4200")ti.revProd=tx.amount;
-    else if(p==="6110")ti.expPay=tx.amount;else if(p==="6200")ti.expSw=tx.amount;else if(p==="6300")ti.expCloud=tx.amount;
-    else if(p==="6420")ti.expMkt=tx.amount;else if(p==="6500")ti.expProf=tx.amount;else if(p==="6600")ti.expOps=tx.amount;}
-  ti.expGas=tx.gas;
-  if(tx.dir==="inflow")ti.usdcChg=tx.amount;else{ti.usdcChg=-tx.amount;ti.ethChg=-tx.gas;}
-  const txRev=ti.revSvc+ti.revProd+ti.uncIn;
-  const txExp=ti.expPay+ti.expSw+ti.expCloud+ti.expMkt+ti.expProf+ti.expOps+ti.expGas+ti.uncOut;
-  const txNi=txRev-txExp;
+  // Financial statements — cumulative from zero, only classified transactions
+  // Compute cumulative totals across ALL classified transactions
+  const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
+    usdcIn:0,usdcOut:0,gasSpent:0,inCount:0,outCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+  txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
+    const gType=GL_TYPE[tp]||'expense';
+    if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
+    else if(tp==="6110")cum.expPay+=t.amount;else if(tp==="6200")cum.expSw+=t.amount;else if(tp==="6300")cum.expCloud+=t.amount;
+    else if(tp==="6420")cum.expMkt+=t.amount;else if(tp==="6500")cum.expProf+=t.amount;else if(tp==="6600")cum.expOps+=t.amount;
+    else if(tp==="7100"||tp==="1200"||tp==="4300")cum.xferNet+=(t.dir==="inflow"?1:-1)*t.amount;
+    else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
+    else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
+    if(t.dir==="inflow"){cum.usdcIn+=t.amount;cum.inCount++;}
+    else{cum.usdcOut+=t.amount;cum.outCount++;cum.gasSpent+=t.gas;}
+    cum.expGas+=t.gas;
+  });
+  const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
+  const customExpTotal=Object.values(cum.customExp).reduce((s,v)=>s+v,0);
+  const totRev=cum.revSvc+cum.revProd+customRevTotal;
+  const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
+  const ni=totRev-totExp;
+  const netUsdc=cum.usdcIn-cum.usdcOut;
+  const netAssets=netUsdc-cum.gasSpent;
 
-  const chg=(v,isExp)=>{if(Math.abs(v)<.001)return'<span class="chg zero">-</span>';return`<span class="chg ${isExp?(v>0?'neg':'pos'):(v>0?'pos':'neg')}">${v>0?'+':''}$${fmt(v)}</span>`};
+  const chg=(v,isExp)=>{if(Math.abs(v)<.001)return'';return`<span class="chg ${isExp?(v>0?'neg':'pos'):(v>0?'pos':'neg')}">$${fmt(Math.abs(v))}</span>`};
   const hc=id=>hitTargets.includes(id)?'hit':'';
-  const hb=id=>{const j=journal.findIndex(l=>l.t===id);return j>=0?`border-left-color:${COLORS[j%4]}`:'border-left-color:transparent'};
+  const hb=id=>{const ji=journal.findIndex(l=>l.t===id);return ji>=0?`border-left-color:${COLORS[ji%4]}`:'border-left-color:transparent'};
+
+  // Build rows only for non-zero line items — clickable for audit trail
+  const row=(id,label,val,isExp,glCode)=>Math.abs(val)<.01?`<div id="fs-${id}"></div>`:
+    `<div class="fs-line indent clickable ${hc(id)}" id="fs-${id}" style="${hb(id)}" onclick="openAudit('${glCode||''}','${label}')"><div>${label}</div><div style="text-align:right">${chg(val,isExp)}</div></div>`;
+
+  if(cum.classified===0){
+    document.getElementById("fsStack").innerHTML=`
+      <div style="text-align:center;padding:48px 20px;color:#94a3b8;border:1px dashed #e2e8f0;border-radius:8px">
+        <div style="font-size:14px;margin-bottom:4px;color:#64748b">No transactions classified yet</div>
+        <div style="font-size:12px">Classify transactions to build financial statements from on-chain data</div>
+      </div>`;
+    requestAnimationFrame(drawArrows);
+    // Still request AI classification even with empty financials
+    if(g==="Unclassified"){clearTimeout(aiDebounce);aiDebounce=setTimeout(()=>requestAiClassification(tx),600);}
+    else{document.getElementById('aiSuggest').classList.remove('visible');}
+    return;
+  }
+
+  // Revenue rows
+  let revRows='';
+  if(cum.revSvc>.01)revRows+=row('pnl-revsvc','4100 Revenue - Services',cum.revSvc,false,'4100');
+  else revRows+='<div id="fs-pnl-revsvc"></div>';
+  if(cum.revProd>.01)revRows+=row('pnl-revprod','4200 Revenue - Product',cum.revProd,false,'4200');
+  else revRows+='<div id="fs-pnl-revprod"></div>';
+  const hasRev=totRev>.01;
+
+  // Expense rows
+  let expRows='';
+  const expItems=[
+    ['pnl-payroll','6110 Payroll',cum.expPay,'6110'],['pnl-software','6200 Software & SaaS',cum.expSw,'6200'],
+    ['pnl-cloud','6300 Cloud Infrastructure',cum.expCloud,'6300'],['pnl-marketing','6420 Marketing & Ads',cum.expMkt,'6420'],
+    ['pnl-profsvc','6500 Professional Services',cum.expProf,'6500'],['pnl-ops','6600 Operations',cum.expOps,'6600'],
+    ['pnl-gas','Network Fees',cum.expGas,'gas']
+  ];
+  expItems.forEach(([id,label,val,code])=>{if(val>0.0000001)expRows+=row(id,label,val,true,code);else expRows+=`<div id="fs-${id}"></div>`;});
+  // Custom expense rows
+  Object.entries(cum.customExp).forEach(([label,val])=>{
+    const code=pfx(label);
+    expRows+=`<div class="fs-line indent clickable" style="grid-template-columns:1fr 100px;cursor:pointer" onclick="openAudit('${code}','${label}')"><div>${label}</div><div style="text-align:right"><span class="chg neg">$${fmt(val)}</span></div></div>`;
+  });
+  // Custom revenue rows
+  Object.entries(cum.customRev).forEach(([label,val])=>{
+    const code=pfx(label);
+    revRows+=`<div class="fs-line indent clickable" style="grid-template-columns:1fr 100px;cursor:pointer" onclick="openAudit('${code}','${label}')"><div>${label}</div><div style="text-align:right"><span class="chg pos">$${fmt(val)}</span></div></div>`;
+  });
+  const hasExp=totExp>.01;
+
+  // Hidden targets for arrows
+  const hiddenTargets='<div id="fs-pnl-unclass-in"></div><div id="fs-pnl-unclass-out"></div>';
 
   document.getElementById("fsStack").innerHTML=`
     <div class="fs-card">
-      <div class="fs-card-title">Income Statement<span class="sub">This Transaction</span></div>
-      <div class="fs-hdr"><div>Account</div><div>Prior Balance</div><div>This Tx</div></div>
-      <div class="fs-line section"><div>Revenue</div><div></div><div></div></div>
-      <div class="fs-line indent ${hc('pnl-revsvc')}" id="fs-pnl-revsvc" style="${hb('pnl-revsvc')}"><div>4100 Services</div><div>$${fmt(o.revSvc)}</div><div>${chg(ti.revSvc,false)}</div></div>
-      <div class="fs-line indent ${hc('pnl-revprod')}" id="fs-pnl-revprod" style="${hb('pnl-revprod')}"><div>4200 Product</div><div>$${fmt(o.revProd)}</div><div>${chg(ti.revProd,false)}</div></div>
-      ${ti.uncIn>0?`<div class="fs-line indent ${hc('pnl-unclass-in')}" id="fs-pnl-unclass-in" style="color:#b45309;${hb('pnl-unclass-in')}"><div>Unclassified In</div><div>-</div><div>${chg(ti.uncIn,false)}</div></div>`:`<div id="fs-pnl-unclass-in"></div>`}
-      <div class="fs-line subtotal"><div>Revenue Impact</div><div></div><div>${chg(txRev,false)}</div></div>
-      <div class="fs-line section"><div>Expenses</div><div></div><div></div></div>
-      <div class="fs-line indent ${hc('pnl-payroll')}" id="fs-pnl-payroll" style="${hb('pnl-payroll')}"><div>6110 Payroll</div><div>$${fmt(o.expPay)}</div><div>${chg(ti.expPay,true)}</div></div>
-      <div class="fs-line indent ${hc('pnl-software')}" id="fs-pnl-software" style="${hb('pnl-software')}"><div>6200 Software</div><div>$${fmt(o.expSw)}</div><div>${chg(ti.expSw,true)}</div></div>
-      <div class="fs-line indent ${hc('pnl-cloud')}" id="fs-pnl-cloud" style="${hb('pnl-cloud')}"><div>6300 Cloud</div><div>$${fmt(o.expCloud)}</div><div>${chg(ti.expCloud,true)}</div></div>
-      <div class="fs-line indent ${hc('pnl-marketing')}" id="fs-pnl-marketing" style="${hb('pnl-marketing')}"><div>6420 Marketing</div><div>$${fmt(o.expMkt)}</div><div>${chg(ti.expMkt,true)}</div></div>
-      <div class="fs-line indent ${hc('pnl-profsvc')}" id="fs-pnl-profsvc" style="${hb('pnl-profsvc')}"><div>6500 Prof. Svc</div><div>$${fmt(o.expProf)}</div><div>${chg(ti.expProf,true)}</div></div>
-      <div class="fs-line indent ${hc('pnl-ops')}" id="fs-pnl-ops" style="${hb('pnl-ops')}"><div>6600 Operations</div><div>$${fmt(o.expOps)}</div><div>${chg(ti.expOps,true)}</div></div>
-      <div class="fs-line indent ${hc('pnl-gas')}" id="fs-pnl-gas" style="${hb('pnl-gas')}"><div>Network Fees</div><div>$${fmt(o.expGas)}</div><div>${chg(ti.expGas,true)}</div></div>
-      ${ti.uncOut>0?`<div class="fs-line indent ${hc('pnl-unclass-out')}" id="fs-pnl-unclass-out" style="color:#b45309;${hb('pnl-unclass-out')}"><div>Unclassified Out</div><div>-</div><div>${chg(ti.uncOut,true)}</div></div>`:`<div id="fs-pnl-unclass-out"></div>`}
-      <div class="fs-line subtotal"><div>Expense Impact</div><div></div><div>${chg(txExp,true)}</div></div>
-      <div class="fs-line total"><div>Net Income Impact</div><div></div><div style="color:${txNi>=0?'#16a34a':'#ea580c'}">${txNi>=0?'+':''}$${fmt(txNi)}</div></div>
+      <div class="fs-card-title">Income Statement<span class="sub">${cum.classified} transactions</span></div>
+      ${hasRev||hasExp?`<div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Amount</div></div>`:''}
+      ${hasRev?`<div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Revenue</div><div></div></div>${revRows}
+        <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Revenue</div><div style="text-align:right;color:#16a34a">$${fmt(totRev)}</div></div>`:''}
+      ${hasExp?`<div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Expenses</div><div></div></div>${expRows}
+        <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Expenses</div><div style="text-align:right;color:#ea580c">($${fmt(totExp)})</div></div>`:''}
+      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Income</div><div style="text-align:right;color:${ni>=0?'#16a34a':'#ea580c'}">$${fmt(ni)}</div></div>
     </div>
+
     <div class="fs-card">
-      <div class="fs-card-title">Balance Sheet<span class="sub">This Transaction</span></div>
-      <div class="fs-hdr"><div>Account</div><div>Prior Balance</div><div>This Tx</div></div>
-      <div class="fs-line section"><div>Assets</div><div></div><div></div></div>
-      <div class="fs-line indent"><div>Cash (USD)</div><div>$${fmt(o.cash)}</div><div><span class="chg zero">-</span></div></div>
-      <div class="fs-line indent ${hc('bs-usdc')}" id="fs-bs-usdc" style="${hb('bs-usdc')}"><div>USDC</div><div>$${fmt(o.usdc)}</div><div>${chg(ti.usdcChg,false)}</div></div>
-      <div class="fs-line indent ${hc('bs-eth')}" id="fs-bs-eth" style="${hb('bs-eth')}"><div>ETH / SOL (gas)</div><div>$${fmt(o.eth)}</div><div>${chg(ti.ethChg,false)}</div></div>
-      <div class="fs-line indent"><div>Accounts Receivable</div><div>$${fmt(o.ar)}</div><div><span class="chg zero">-</span></div></div>
-      <div class="fs-line subtotal"><div>Asset Impact</div><div></div><div>${chg(ti.usdcChg+ti.ethChg,false)}</div></div>
-      <div class="fs-line section"><div>Liabilities & Equity</div><div></div><div></div></div>
-      <div class="fs-line indent"><div>Accounts Payable</div><div>$${fmt(o.ap)}</div><div><span class="chg zero">-</span></div></div>
-      <div class="fs-line indent"><div>Retained Earnings</div><div>$${fmt(o.re)}</div><div>${chg(txNi,false)}</div></div>
-      <div class="fs-line indent"><div>Common Stock</div><div>$${fmt(o.equity)}</div><div><span class="chg zero">-</span></div></div>
-      <div class="fs-line total"><div>L + E Impact</div><div></div><div>${chg(txNi,false)}</div></div>
-      <div class="fs-check">Assets ${txNi<0?'decrease':'increase'} = Equity ${txNi<0?'decreases':'increases'}: Balanced</div>
-    </div>`;
+      <div class="fs-card-title">Balance Sheet<span class="sub">From classified activity</span></div>
+      <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Balance</div></div>
+      <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
+      <div class="fs-line indent clickable ${hc('bs-usdc')}" id="fs-bs-usdc" style="grid-template-columns:1fr 100px;${hb('bs-usdc')}" onclick="openAudit('usdc','USDC')"><div>USDC</div><div style="text-align:right;color:${netUsdc>=0?'#16a34a':'#ea580c'}">$${fmt(netUsdc)}</div></div>
+      ${cum.gasSpent>0.0000001?`<div class="fs-line indent clickable ${hc('bs-eth')}" id="fs-bs-eth" style="grid-template-columns:1fr 100px;${hb('bs-eth')}" onclick="openAudit('gas','Network Fees')"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:`<div id="fs-bs-eth"></div>`}
+      <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+      <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Equity</div><div></div></div>
+      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
+      ${Math.abs(cum.xferNet)>.01?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Intercompany / Transfers</div><div style="text-align:right">$${fmt(cum.xferNet)}</div></div>`:''}
+      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+      <div class="fs-check pass">A = L + E: Balanced</div>
+    </div>
+
+    <div class="fs-card">
+      <div class="fs-card-title">Cash Flow Statement<span class="sub">Digital assets</span></div>
+      <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Item</div><div style="text-align:right">Amount</div></div>
+      <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Operating Activities</div><div></div></div>
+      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div></div>
+      ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Add: Non-cash gas fees</div><div style="text-align:right">$${fmt(cum.gasSpent)}</div></div>`:''}
+      <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Cash from Operations</div><div style="text-align:right;font-weight:600">$${fmt(ni+cum.gasSpent)}</div></div>
+      <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Digital Asset Flows</div><div></div></div>
+      ${cum.inCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}</div></div>`:''}
+      ${cum.outCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})</div></div>`:''}
+      ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
+      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Digital Asset Change</div><div style="text-align:right;font-weight:700;color:${netAssets>=0?'#16a34a':'#ea580c'}">$${fmt(netAssets)}</div></div>
+    </div>
+    ${hiddenTargets}`;
 
   requestAnimationFrame(drawArrows);
+  // Request AI classification for unclassified transactions
+  if(g==="Unclassified"){clearTimeout(aiDebounce);aiDebounce=setTimeout(()=>requestAiClassification(tx),600);}
+  else{document.getElementById('aiSuggest').classList.remove('visible');}
 }
 
 function renderReconciled(){
-  const ct=computeTotals(),o=OPENING,im=ct.im;
   const s=scanData.summary;
+
+  // Compute cumulative from zero
+  const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
+    usdcIn:0,usdcOut:0,gasSpent:0,inCount:0,outCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+  txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
+    const gType=GL_TYPE[tp]||'expense';
+    if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
+    else if(tp==="6110")cum.expPay+=t.amount;else if(tp==="6200")cum.expSw+=t.amount;else if(tp==="6300")cum.expCloud+=t.amount;
+    else if(tp==="6420")cum.expMkt+=t.amount;else if(tp==="6500")cum.expProf+=t.amount;else if(tp==="6600")cum.expOps+=t.amount;
+    else if(tp==="7100"||tp==="1200"||tp==="4300")cum.xferNet+=(t.dir==="inflow"?1:-1)*t.amount;
+    else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
+    else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
+    if(t.dir==="inflow"){cum.usdcIn+=t.amount;cum.inCount++;}
+    else{cum.usdcOut+=t.amount;cum.outCount++;cum.gasSpent+=t.gas;}
+    cum.expGas+=t.gas;
+  });
+  const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
+  const customExpTotal=Object.values(cum.customExp).reduce((s,v)=>s+v,0);
+  const totRev=cum.revSvc+cum.revProd+customRevTotal;
+  const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
+  const ni=totRev-totExp;
+  const netUsdc=cum.usdcIn-cum.usdcOut;
+  const netAssets=netUsdc-cum.gasSpent;
 
   // Update summary cards
   if(scanData){
@@ -519,33 +1658,18 @@ function renderReconciled(){
     document.querySelectorAll(".sc")[3].querySelector(".sc-value").style.color="#16a34a";
     document.querySelectorAll(".sc")[3].querySelector(".sc-sub").textContent="Fully classified";}
 
-  // Hide transaction-level UI
   document.querySelector(".tx-nav").style.display="none";
   document.getElementById("txDetail").style.display="none";
   document.getElementById("mainGrid").style.display="none";
   document.getElementById("autoNote").style.display="none";
+  document.getElementById("aiSuggest").classList.remove("visible");
 
-  const fmtR=(v)=>"$"+fmt(Math.abs(v));
-  const fmtChg=(v,isExp)=>{if(Math.abs(v)<.001)return'<span style="color:#94a3b8">-</span>';
-    const c=isExp?(v>0?"#ea580c":"#16a34a"):(v>0?"#16a34a":"#ea580c");
-    return`<span style="color:${c};font-weight:600">${v>0?"+":"-"}$${fmt(Math.abs(v))}</span>`};
+  const fmtV=n=>"$"+fmt(Math.abs(n));
+  const expRow=(label,val,code)=>val>.01?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('${code}','${label}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${label}</div><div style="text-align:right;color:#ea580c">$${fmt(val)}</div></div>`:'';
+  const revRow=(label,val,code)=>val>.01?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('${code}','${label}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${label}</div><div style="text-align:right;color:#16a34a">$${fmt(val)}</div></div>`:'';
 
-  // Build the reconciled view in the autoNote area (repurpose it)
   const target=document.getElementById("autoNote");
-  target.style.display="block";
-  target.style.background="none";target.style.border="none";target.style.padding="0";target.style.color="inherit";target.style.fontWeight="normal";
-
-  const totRev=ct.totRev-im.uncIn;
-  const totExp=ct.totExp-im.uncOut;
-  const closingUsdc=o.usdc+im.usdcChg;
-  const closingEth=o.eth+im.ethChg;
-  const totalAssets=o.cash+closingUsdc+closingEth+o.ar;
-  const totalLiab=o.ap+o.accrued;
-  const closingRE=totalAssets-totalLiab-o.equity;
-  const ni=closingRE-o.re;
-  const totalEquity=o.equity+closingRE;
-  const totalLE=totalLiab+totalEquity;
-  const balanced=Math.abs(totalAssets-totalLE)<0.02;
+  target.style.display="block";target.style.background="none";target.style.border="none";target.style.padding="0";target.style.color="inherit";target.style.fontWeight="normal";
 
   target.innerHTML=`
     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:center">
@@ -553,96 +1677,296 @@ function renderReconciled(){
       <div style="font-size:13px;color:#16a34a">${txs.length} transactions across ${Object.keys(cpMappings).length} unique counterparties &middot; ${s.inflow_count} inflows, ${s.outflow_count} outflows</div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
-        <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between">
-          <span>Income Statement</span><span style="font-size:11px;color:#94a3b8;font-weight:400">Period</span>
-        </div>
-        <div style="padding:0">
-          <div style="padding:8px 18px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:grid;grid-template-columns:1fr 90px 90px;background:#fafbfc;border-bottom:1px solid #f1f5f9">
-            <div>Account</div><div style="text-align:right">Prior</div><div style="text-align:right">Change</div>
-          </div>
+        <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Income Statement</div>
+        ${totRev>.01?`
           <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Revenue</div>
-          ${im.revSvc>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>4100 Services</div><div style="text-align:right">$${fmt(o.revSvc)}</div><div style="text-align:right">${fmtChg(im.revSvc,false)}</div></div>`:''}
-          ${im.revProd>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>4200 Product</div><div style="text-align:right">$${fmt(o.revProd)}</div><div style="text-align:right">${fmtChg(im.revProd,false)}</div></div>`:''}
-          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
-            <div>Total Revenue</div><div style="text-align:right">$${fmt(o.revSvc+o.revProd)}</div><div style="text-align:right">${fmtChg(totRev-(o.revSvc+o.revProd),false)}</div>
-          </div>
-
+          ${revRow('4100 Revenue - Services',cum.revSvc,'4100')}
+          ${revRow('4200 Revenue - Product',cum.revProd,'4200')}
+          ${Object.entries(cum.customRev).map(([label,val])=>`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('${pfx(label)}','${label}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${label}</div><div style="text-align:right;color:#16a34a">$${fmt(val)}</div></div>`).join('')}
+          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Revenue</div><div style="text-align:right;color:#16a34a">$${fmt(totRev)}</div></div>
+        `:''}
+        ${totExp>.01?`
           <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Expenses</div>
-          ${im.expPay>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6110 Payroll</div><div style="text-align:right">$${fmt(o.expPay)}</div><div style="text-align:right">${fmtChg(im.expPay,true)}</div></div>`:''}
-          ${im.expSw>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6200 Software & SaaS</div><div style="text-align:right">$${fmt(o.expSw)}</div><div style="text-align:right">${fmtChg(im.expSw,true)}</div></div>`:''}
-          ${im.expCloud>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6300 Cloud Infrastructure</div><div style="text-align:right">$${fmt(o.expCloud)}</div><div style="text-align:right">${fmtChg(im.expCloud,true)}</div></div>`:''}
-          ${im.expMkt>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6420 Marketing & Ads</div><div style="text-align:right">$${fmt(o.expMkt)}</div><div style="text-align:right">${fmtChg(im.expMkt,true)}</div></div>`:''}
-          ${im.expProf>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6500 Professional Services</div><div style="text-align:right">$${fmt(o.expProf)}</div><div style="text-align:right">${fmtChg(im.expProf,true)}</div></div>`:''}
-          ${im.expOps>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>6600 Operations</div><div style="text-align:right">$${fmt(o.expOps)}</div><div style="text-align:right">${fmtChg(im.expOps,true)}</div></div>`:''}
-          ${im.expGas>0.001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Network Fees</div><div style="text-align:right">$${fmt(o.expGas)}</div><div style="text-align:right">${fmtChg(im.expGas,true)}</div></div>`:''}
-          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
-            <div>Total Expenses</div><div style="text-align:right">($${fmt(o.expPay+o.expSw+o.expCloud+o.expMkt+o.expProf+o.expOps+o.expGas)})</div><div style="text-align:right">${fmtChg(totExp-(o.expPay+o.expSw+o.expCloud+o.expMkt+o.expProf+o.expOps+o.expGas),true)}</div>
-          </div>
-
-          <div style="padding:10px 18px;font-size:13px;font-weight:700;color:${ni>=0?'#16a34a':'#ea580c'};display:grid;grid-template-columns:1fr 180px;border-top:2px solid #cbd5e1;background:#f8fafc">
-            <div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div>
-          </div>
-        </div>
+          ${expRow('6110 Payroll',cum.expPay,'6110')}
+          ${expRow('6200 Software & SaaS',cum.expSw,'6200')}
+          ${expRow('6300 Cloud Infrastructure',cum.expCloud,'6300')}
+          ${expRow('6420 Marketing & Ads',cum.expMkt,'6420')}
+          ${expRow('6500 Professional Services',cum.expProf,'6500')}
+          ${expRow('6600 Operations',cum.expOps,'6600')}
+          ${expRow('Network Fees',cum.expGas,'gas')}
+          ${Object.entries(cum.customExp).map(([label,val])=>`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('${pfx(label)}','${label}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${label}</div><div style="text-align:right;color:#ea580c">$${fmt(val)}</div></div>`).join('')}
+          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Expenses</div><div style="text-align:right;color:#ea580c">($${fmt(totExp)})</div></div>
+        `:''}
+        <div style="padding:10px 18px;font-size:13px;font-weight:700;color:${ni>=0?'#16a34a':'#ea580c'};display:grid;grid-template-columns:1fr 100px;border-top:2px solid #cbd5e1;background:#f8fafc"><div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div></div>
       </div>
 
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
-        <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between">
-          <span>Balance Sheet</span><span style="font-size:11px;color:#94a3b8;font-weight:400">Closing</span>
-        </div>
-        <div style="padding:0">
-          <div style="padding:8px 18px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:grid;grid-template-columns:1fr 90px 90px;background:#fafbfc;border-bottom:1px solid #f1f5f9">
-            <div>Account</div><div style="text-align:right">Opening</div><div style="text-align:right">Closing</div>
-          </div>
-          <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Assets</div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Cash (USD)</div><div style="text-align:right">$${fmt(o.cash)}</div><div style="text-align:right">$${fmt(o.cash)}</div></div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>USDC</div><div style="text-align:right">$${fmt(o.usdc)}</div><div style="text-align:right;font-weight:600;color:${im.usdcChg>=0?'#16a34a':'#ea580c'}">$${fmt(closingUsdc)}</div></div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>ETH / SOL (gas)</div><div style="text-align:right">$${fmt(o.eth)}</div><div style="text-align:right">$${fmt(closingEth)}</div></div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Accounts Receivable</div><div style="text-align:right">$${fmt(o.ar)}</div><div style="text-align:right">$${fmt(o.ar)}</div></div>
-          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
-            <div>Total Assets</div><div style="text-align:right">$${fmt(o.cash+o.usdc+o.eth+o.ar)}</div><div style="text-align:right;font-weight:700">$${fmt(totalAssets)}</div>
-          </div>
-
-          <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Liabilities & Equity</div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Accounts Payable</div><div style="text-align:right">$${fmt(o.ap)}</div><div style="text-align:right">$${fmt(o.ap)}</div></div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Accrued Liabilities</div><div style="text-align:right">$${fmt(o.accrued)}</div><div style="text-align:right">$${fmt(o.accrued)}</div></div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Common Stock</div><div style="text-align:right">$${fmt(o.equity)}</div><div style="text-align:right">$${fmt(o.equity)}</div></div>
-          <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 90px 90px;border-bottom:1px solid #f8fafc"><div>Retained Earnings</div><div style="text-align:right">$${fmt(o.re)}</div><div style="text-align:right;font-weight:600;color:${ni>=0?'#16a34a':'#ea580c'}">$${fmt(closingRE)}</div></div>
-          <div style="padding:8px 18px;font-size:12px;font-weight:600;color:#1e293b;display:grid;grid-template-columns:1fr 90px 90px;border-top:1px solid #e2e8f0">
-            <div>Total L + E</div><div style="text-align:right">$${fmt(o.ap+o.accrued+o.equity+o.re)}</div><div style="text-align:right;font-weight:700">$${fmt(totalLE)}</div>
-          </div>
-
-          <div style="padding:10px 18px;font-size:12px;border-top:2px solid #cbd5e1;background:${balanced?'#f0fdf4':'#fef2f2'};color:${balanced?'#166534':'#991b1b'};font-weight:600">
-            ${balanced?'A = L + E: Balanced':'A ≠ L + E: Out of balance by $'+fmt(Math.abs(totalAssets-totalLE))}
-          </div>
-        </div>
+        <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Balance Sheet</div>
+        <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Assets</div>
+        <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('usdc','USDC')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>USDC</div><div style="text-align:right;color:${netUsdc>=0?'#16a34a':'#ea580c'}">$${fmt(netUsdc)}</div></div>
+        ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('gas','Network Fees')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
+        <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+        <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Equity</div>
+        <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
+        <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+        <div style="padding:10px 18px;font-size:12px;border-top:2px solid #cbd5e1;background:#f0fdf4;color:#166534;font-weight:600">A = L + E: Balanced</div>
       </div>
     </div>
 
-    <div style="margin-top:20px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
-      <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Wallet Reconciliation</div>
-      <div style="padding:12px 18px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 140px;gap:4px">
-        <div>Opening USDC Balance</div><div style="text-align:right">$${fmt(o.usdc)}</div>
-        <div>USDC Inflows (${s.inflow_count} transfers)</div><div style="text-align:right;color:#16a34a">+$${fmt(s.total_usdc_in)}</div>
-        <div>USDC Outflows (${s.outflow_count} transfers)</div><div style="text-align:right;color:#ea580c">-$${fmt(s.total_usdc_out)}</div>
-        <div style="border-top:1px solid #e2e8f0;padding-top:6px;font-weight:600;color:#1e293b">Closing USDC Balance</div><div style="text-align:right;border-top:1px solid #e2e8f0;padding-top:6px;font-weight:700;color:#1e293b">$${fmt(closingUsdc)}</div>
-        <div style="padding-top:4px">Net Change</div><div style="text-align:right;padding-top:4px;font-weight:600;color:${im.usdcChg>=0?'#16a34a':'#ea580c'}">${im.usdcChg>=0?'+':''}$${fmt(im.usdcChg)}</div>
-        <div>Gas Consumed (ETH/SOL)</div><div style="text-align:right;color:#ea580c">-$${fmt(Math.abs(im.ethChg))}</div>
-      </div>
-      <div style="padding:10px 18px;font-size:12px;border-top:1px solid #e2e8f0;background:#f0fdf4;color:#166534;font-weight:600">
-        On-chain activity fully reconciled to general ledger
-      </div>
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Cash Flow Statement</div>
+      <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Operating Activities</div>
+      <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div></div>
+      ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Add: Non-cash gas fees</div><div style="text-align:right">$${fmt(cum.gasSpent)}</div></div>`:''}
+      <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 120px;border-top:1px solid #e2e8f0"><div>Cash from Operations</div><div style="text-align:right">$${fmt(ni+cum.gasSpent)}</div></div>
+      <div style="padding:8px 18px;font-size:10px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Digital Asset Flows</div>
+      <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}</div></div>
+      <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})</div></div>
+      ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
+      <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Digital Asset Change</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
+    </div>
+
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;background:#f0fdf4;text-align:center">
+      <div style="font-size:13px;font-weight:600;color:#166534">On-chain activity fully reconciled to general ledger</div>
+      <div style="font-size:11px;color:#3b82f6;margin-top:4px;cursor:pointer" onclick="navTo('auditlog')">View full audit trail &rarr;</div>
     </div>
   `;
 }
+
+// ============ AI CLASSIFICATION ============
+let aiPending=null;
+let aiDebounce=null;
+function buildPriorContext(){
+  // Summarize prior classifications for AI context
+  const cpStats={};
+  txs.forEach(t=>{
+    const g=glOf(t.hash);if(g==="Unclassified")return;
+    const cp=t.cp;
+    if(!cpStats[cp])cpStats[cp]={counterparty:cp,gl_code:g,count:0,total:0,direction:t.dir,amounts:[]};
+    cpStats[cp].count++;cpStats[cp].total+=t.amount;cpStats[cp].amounts.push(t.amount);
+  });
+  return Object.values(cpStats).map(s=>({
+    counterparty:s.counterparty,
+    gl_code:s.gl_code,
+    count:s.count,
+    avg_amount:s.total/s.count,
+    direction:s.direction,
+    pattern:s.count>2?(s.amounts.every(a=>Math.abs(a-s.amounts[0])<1)?'recurring fixed':'recurring variable'):''
+  }));
+}
+async function requestAiClassification(tx){
+  const el=document.getElementById('aiSuggest');
+  const body=document.getElementById('aiSuggestBody');
+  // Don't show for classified transactions
+  if(glOf(tx.hash)!=="Unclassified"){el.classList.remove('visible');return;}
+  // Show loading state
+  el.classList.add('visible','loading');
+  body.innerHTML='<span style="color:#7c3aed">Analyzing transaction pattern...</span>';
+
+  const reqId=Date.now();aiPending=reqId;
+
+  try{
+    const chain=(tx.walletAddr||activeWalletAddr||'').startsWith('0x')?'Base':'Solana';
+    const res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        transaction:{direction:tx.dir,amount:tx.amount,counterparty:tx.cp,chain:chain,block:tx.block},
+        chart_of_accounts:GL_OPTIONS,
+        prior_classifications:buildPriorContext(),
+        client_profile:{
+          business_type:clientProfile.bizType,
+          typical_transactions:clientProfile.txTypes,
+          notes:clientProfile.notes
+        }
+      })
+    });
+    if(aiPending!==reqId)return; // stale request
+    const suggestion=await res.json();
+    if(aiPending!==reqId)return;
+
+    el.classList.remove('loading');
+    if(suggestion.gl_code&&suggestion.confidence>0){
+      const confClass=suggestion.confidence>=0.8?'high':suggestion.confidence>=0.5?'med':'low';
+      const confPct=Math.round(suggestion.confidence*100);
+      body.innerHTML=`
+        <span class="ai-gl">${suggestion.gl_code}</span>
+        <span class="ai-conf ${confClass}">${confPct}%</span>
+        <span class="ai-reason">${suggestion.reasoning||''}</span>
+        <button class="ai-accept" onclick="acceptAiSuggestion('${suggestion.gl_code.replace(/'/g,"\\'")}')">Accept</button>
+      `;
+    } else {
+      body.innerHTML=`<span style="color:#94a3b8;font-size:12px">${suggestion.reasoning||'Could not determine classification. Please classify manually.'}</span>`;
+    }
+  }catch(e){
+    if(aiPending!==reqId)return;
+    el.classList.remove('loading');
+    body.innerHTML='<span style="color:#94a3b8;font-size:12px">AI classification unavailable. Classify manually.</span>';
+  }
+}
+function acceptAiSuggestion(glCode){
+  logAction('classification','AI suggestion accepted',`${glCode} for ${addr(txs[idx].hash)}`);
+  classify(glCode);
+}
+
+// ============ EXPORT ============
+function toggleExportMenu(e){e.stopPropagation();const m=document.getElementById('exportMenu');m.classList.toggle('open');
+  const close=()=>{m.classList.remove('open');document.removeEventListener('click',close);};
+  if(m.classList.contains('open'))setTimeout(()=>document.addEventListener('click',close),0);
+}
+function buildExportData(){
+  const rows=[['Tx Hash','Block','Direction','Counterparty','Wallet','GL Code','Line','Account','Debit','Credit','Memo']];
+  txs.forEach(t=>{
+    const g=glOf(t.hash);
+    const journal=getJournal(t);
+    const walletName=t.walletName||'';
+    journal.forEach(l=>{
+      rows.push([t.origHash||t.hash,(t.block||0).toString(),t.dir,t.cp,walletName,g,l.n.toString(),l.acct,l.dr.toFixed(2),l.cr.toFixed(2),l.acct]);
+    });
+  });
+  return rows;
+}
+function exportJournalsCSV(){
+  const rows=buildExportData();
+  const csv=rows.map(r=>r.map(c=>'"'+(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download='shepherd_journal_entries.csv';a.click();
+  logAction('scan','Export CSV',txs.length+' transactions exported');
+  document.getElementById('exportMenu').classList.remove('open');
+}
+function exportJournalsXLSX(){
+  if(typeof XLSX==='undefined'){alert('Excel export loading, try again in a moment.');return;}
+  const rows=buildExportData();
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  // Column widths
+  ws['!cols']=[{wch:20},{wch:12},{wch:8},{wch:18},{wch:14},{wch:22},{wch:4},{wch:30},{wch:12},{wch:12},{wch:30}];
+  // Bold header row
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Journal Entries');
+
+  // Add summary sheet
+  const cum={inCount:0,outCount:0,totalIn:0,totalOut:0,classified:0};
+  txs.forEach(t=>{if(t.dir==='inflow'){cum.inCount++;cum.totalIn+=t.amount;}else{cum.outCount++;cum.totalOut+=t.amount;}if(glOf(t.hash)!=='Unclassified')cum.classified++;});
+  const sumRows=[['Shepherd - Export Summary'],[''],['Total Transactions',txs.length],['Classified',cum.classified],['Unclassified',txs.length-cum.classified],[''],['Inflows',cum.inCount,'$'+cum.totalIn.toFixed(2)],['Outflows',cum.outCount,'$'+cum.totalOut.toFixed(2)],['Net','','$'+(cum.totalIn-cum.totalOut).toFixed(2)],[''],['Generated',new Date().toLocaleString()]];
+  const ws2=XLSX.utils.aoa_to_sheet(sumRows);
+  ws2['!cols']=[{wch:22},{wch:14},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Summary');
+
+  XLSX.writeFile(wb,'shepherd_journal_entries.xlsx');
+  logAction('scan','Export XLSX',txs.length+' transactions exported');
+  document.getElementById('exportMenu').classList.remove('open');
+}
+function exportGoogleSheets(){
+  alert('Google Sheets integration coming soon. Use CSV or Excel export for now.');
+  document.getElementById('exportMenu').classList.remove('open');
+}
+
+// ============ CHART OF ACCOUNTS ============
+function renderCOA(){
+  const el=document.getElementById('coaTable');if(!el)return;
+  const typeLabel=t=>t==='revenue'?'<span style="color:#16a34a">Revenue</span>':t==='expense'?'<span style="color:#ea580c">Expense</span>':'<span style="color:#64748b">Transfer</span>';
+  const accts=GL_OPTIONS.filter(o=>o!=='Unclassified').map(o=>{const p=pfx(o);const name=o.split(' - ').slice(1).join(' - ')||o;return{code:p,name,full:o,type:GL_TYPE[p]||'expense'};});
+
+  el.innerHTML=`
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+      <div style="display:grid;grid-template-columns:80px 1fr 90px 50px;padding:8px 16px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#f8fafc;border-bottom:1px solid #e2e8f0">
+        <div>Code</div><div>Account Name</div><div>Type</div><div></div>
+      </div>
+      ${accts.map(a=>`<div style="display:grid;grid-template-columns:80px 1fr 90px 50px;padding:10px 16px;font-size:13px;border-bottom:1px solid #f8fafc;align-items:center">
+        <div class="mono" style="font-size:12px;color:#64748b">${a.code}</div>
+        <div style="color:#1e293b">${a.name}</div>
+        <div style="font-size:11px">${typeLabel(a.type)}</div>
+        <div style="text-align:right"><span style="color:#cbd5e1;cursor:pointer;font-size:14px" onclick="removeAccount('${a.full}')" title="Remove">&times;</span></div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:#94a3b8">${accts.length} accounts</div>`;
+}
+
+function removeAccount(full){
+  if(!confirm('Remove "'+full+'" from chart of accounts?'))return;
+  GL_OPTIONS=GL_OPTIONS.filter(o=>o!==full);
+  const code=pfx(full);delete GL_TYPE[code];
+  logAction('account','Account removed',full);
+  renderCOA();
+}
+
+function openCustom(){document.getElementById("customOverlay").classList.add("open");setTimeout(()=>document.getElementById("customCode").focus(),100);}
+function closeCustom(){document.getElementById("customOverlay").classList.remove("open");document.getElementById("customCode").value="";document.getElementById("customName").value="";}
+function saveCustomAccount(){
+  const code=document.getElementById("customCode").value.trim();
+  const name=document.getElementById("customName").value.trim();
+  const type=document.getElementById("customType").value;
+  if(!code||!name){alert("Enter both a code and name");return;}
+  const glEntry=code+" - "+name;
+  if(GL_OPTIONS.includes(glEntry)){alert("Account already exists");return;}
+  GL_OPTIONS.push(glEntry);
+  GL_TYPE[code]=type;
+  logAction('account','Account created',`${glEntry} (${type})`);
+  closeCustom();
+  // If on COA page, re-render. If on ledger, classify current tx.
+  if(document.getElementById("screen-coa").classList.contains("active")){renderCOA();}
+  else if(txs.length){classify(glEntry);}
+}
+function glSelectHtml(g){
+  return GL_OPTIONS.map(o=>`<option value="${o}" ${g===o?"selected":""}>${o}</option>`).join("")
+    +`<option value="__custom__" style="color:#3b82f6;font-style:italic">+ Create Custom Account</option>`;
+}
+
+// ============ AUDIT TRAIL ============
+function explorerUrl(tx){
+  const h=tx.origHash||tx.hash;
+  if(h&&h.startsWith("0x"))return"https://basescan.org/tx/"+h;
+  return"https://solscan.io/tx/"+h;
+}
+function openAudit(glCode,label){
+  let matching;
+  if(glCode==='gas'){
+    // Gas: show all classified outflow transactions with gas > 0
+    matching=txs.filter(t=>glOf(t.hash)!=="Unclassified"&&t.dir==="outflow"&&t.gas>.001);
+  } else if(glCode==='usdc'){
+    // USDC: show all classified transactions
+    matching=txs.filter(t=>glOf(t.hash)!=="Unclassified");
+  } else {
+    matching=txs.filter(t=>{const g=glOf(t.hash);return g!=="Unclassified"&&pfx(g)===glCode;});
+  }
+  const total=glCode==='gas'?matching.reduce((s,t)=>s+t.gas,0):matching.reduce((s,t)=>s+t.amount,0);
+  const inCount=matching.filter(t=>t.dir==="inflow").length;
+  const outCount=matching.filter(t=>t.dir==="outflow").length;
+
+  document.getElementById("auditTitle").textContent="Audit Trail: "+label;
+  document.getElementById("auditSummary").innerHTML=`
+    <div>Total Amount<span class="as-val">$${fmt(total)}</span></div>
+    <div>Transactions<span class="as-val">${matching.length}</span></div>
+    <div>Unique Counterparties<span class="as-val">${new Set(matching.map(t=>t.cp)).size}</span></div>
+    ${inCount?`<div>Inflows<span class="as-val">${inCount}</span></div>`:''}
+    ${outCount?`<div>Outflows<span class="as-val">${outCount}</span></div>`:''}
+  `;
+  document.getElementById("auditBody").innerHTML=`
+    <div class="audit-table-hdr"><div>Dir</div><div>Tx Hash / Counterparty</div><div>Block</div><div>Amount</div><div>Gas</div></div>
+    ${matching.map(t=>`<div class="audit-row">
+      <div><span class="dir-badge ${t.dir==='inflow'?'in':'out'}">${t.dir==='inflow'?'IN':'OUT'}</span></div>
+      <div>
+        <a class="tx-link" href="${explorerUrl(t)}" target="_blank" rel="noopener">${addr(t.hash)}</a>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Counterparty: <span class="mono">${addr(t.cp)}</span></div>
+      </div>
+      <div style="font-size:11px;color:#94a3b8">${(t.block||0).toLocaleString()}</div>
+      <div class="mono" style="font-weight:500;color:${t.dir==='inflow'?'#16a34a':'#ea580c'}">${t.dir==='inflow'?'+':'-'}$${fmt(t.amount)}</div>
+      <div class="mono" style="font-size:11px;color:#94a3b8">${t.gas>.001?'$'+fmt(t.gas):'-'}</div>
+    </div>`).join('')}
+  `;
+  document.getElementById("auditOverlay").classList.add("open");
+}
+function closeAudit(){document.getElementById("auditOverlay").classList.remove("open");}
 
 function drawArrows(){
   const svg=document.getElementById("arrowSvg"),grid=document.getElementById("mainGrid");
   if(!svg||!grid||!txs.length)return;
   const gr=grid.getBoundingClientRect();
   svg.setAttribute("width",gr.width);svg.setAttribute("height",gr.height);svg.innerHTML="";
-  const journal=getJournal(txs[idx]);
+  // Only draw arrows when current transaction is classified
+  const curTx=txs[idx];
+  if(!curTx||glOf(curTx.hash)==="Unclassified")return;
+  const journal=getJournal(curTx);
   journal.forEach((line,i)=>{
     const src=document.getElementById("jl-"+i),tgt=document.getElementById("fs-"+line.t);
     if(!src||!tgt||!tgt.offsetHeight)return;
@@ -659,5 +1983,35 @@ function drawArrows(){
 }
 window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
 </script>
+<!-- CUSTOM ACCOUNT MODAL -->
+<div class="custom-overlay" id="customOverlay" onclick="if(event.target===this)closeCustom()">
+  <div class="custom-modal">
+    <h3>Create Custom Account</h3>
+    <div class="cm-sub">Add a new GL account to your chart of accounts.</div>
+    <div class="cm-row">
+      <div class="cm-field">
+        <label>Code</label>
+        <input id="customCode" placeholder="e.g. 6210" maxlength="6">
+      </div>
+      <div class="cm-field">
+        <label>Account Name</label>
+        <input id="customName" placeholder="e.g. AWS Infrastructure">
+      </div>
+    </div>
+    <div class="cm-field">
+      <label>Type</label>
+      <select id="customType">
+        <option value="expense">Expense</option>
+        <option value="revenue">Revenue</option>
+        <option value="transfer">Transfer / Balance Sheet Only</option>
+      </select>
+    </div>
+    <div class="cm-actions">
+      <button style="background:#f1f5f9;color:#475569" onclick="closeCustom()">Cancel</button>
+      <button style="background:#3b82f6;color:#fff" onclick="saveCustomAccount()">Create Account</button>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </body>
 </html>
