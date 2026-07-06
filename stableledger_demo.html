@@ -1290,6 +1290,13 @@ function onScanComplete(report){
   // Save to persistent store
   const store=getStore(report.wallet);
   store.lastBlock=report.scan_range?report.scan_range.to_block:null;
+  store.txs=[...txs];
+  store.mappings={...mappings};
+  store.cpMappings={...cpMappings};
+  store.scanData=scanData;
+  store.scanTime=new Date().toLocaleString();
+  selectedWallets.clear();
+  selectedWallets.add(report.wallet.toLowerCase());
 
   // Update ledger badge
   const badge=document.getElementById("ledgerBadge");
