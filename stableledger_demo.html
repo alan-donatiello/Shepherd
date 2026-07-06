@@ -887,7 +887,7 @@ function renderTxTable(){
   if(wSel){
     const curVal=wSel.value;
     wSel.innerHTML='<option value="all">All wallets</option>'+
-      wallets.filter(w=>getStore(w.addr).txs.length>0).map(w=>`<option value="${w.addr}">${w.name}</option>`).join('');
+      wallets.filter(w=>{const ws=getStore(w.addr);return ws.scanTime||ws.txs.length>0;}).map(w=>`<option value="${w.addr}">${w.name}</option>`).join('');
     wSel.value=curVal;
   }
 
@@ -1068,7 +1068,7 @@ function renderWalletChips(){
     chips+=`<div style="font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid ${allSelected?'#3b82f6':'#e2e8f0'};background:${allSelected?'#eff6ff':'#fff'};color:${allSelected?'#3b82f6':'#64748b'};font-weight:${allSelected?'600':'400'}" onclick="selectAllWallets()">All Wallets</div>`;
   }
   wallets.forEach(w=>{
-    const hasData=getStore(w.addr).txs.length>0;
+    const ws=getStore(w.addr);const hasData=ws.scanTime||ws.txs.length>0;
     const isSelected=selectedWallets.has(w.addr.toLowerCase());
     if(hasData){
       chips+=`<div title="${w.addr}" style="font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid ${isSelected?'#3b82f6':'#e2e8f0'};background:${isSelected?'#eff6ff':'#fff'};color:${isSelected?'#3b82f6':'#64748b'};font-weight:${isSelected?'600':'400'}" onclick="toggleWallet('${w.addr}')">${w.name}</div>`;
@@ -1210,7 +1210,7 @@ function renderWallets(){
   if(!wallets.length){el.innerHTML='<div class="wc-empty" style="padding:20px 0">No wallets connected yet. Add a wallet above to get started.</div>';return;}
   el.innerHTML=wallets.map((w,i)=>{
     const s=getStore(w.addr);
-    const hasData=s.txs.length>0;
+    const hasData=s.scanTime||s.txs.length>0;
     const classified=hasData?s.txs.filter(t=>s.mappings[t.hash]&&s.mappings[t.hash]!=="Unclassified").length:0;
     return`<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;transition:background .15s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
       <div style="flex:1">
