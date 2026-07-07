@@ -223,7 +223,7 @@
   .ob-ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#7c3aed;background:#f5f3ff;padding:3px 8px;border-radius:4px;font-weight:500;margin-left:6px}
 
   /* Transactions table */
-  .tx-table-wrap{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;max-height:600px;overflow-y:auto}
+  .tx-table-wrap{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;max-height:calc(100vh - 280px);overflow-y:auto}
   .tx-table{width:100%;border-collapse:collapse;font-size:12px}
   .tx-table th{position:sticky;top:0;background:#f8fafc;padding:8px 12px;font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:500;cursor:pointer}
   .tx-table th:hover{color:#334155}
@@ -254,6 +254,52 @@
   .main-content{margin-left:220px;flex:1;min-height:100vh}
   .screen{display:none}.screen.active{display:block}
   .wc-center{max-width:640px;margin:80px auto 40px}
+
+  /* Dark mode */
+  body.dark{background:#0f172a;color:#e2e8f0}
+  body.dark .sidebar{background:#1e293b;border-color:#334155}
+  body.dark .sidebar-logo{border-color:#334155}
+  body.dark .nav-item{color:#94a3b8}
+  body.dark .nav-item:hover{background:#334155;color:#e2e8f0}
+  body.dark .nav-item.active{background:#1e3a5f;color:#60a5fa;border-left-color:#60a5fa}
+  body.dark .main-content{background:#0f172a}
+  body.dark .container{color:#e2e8f0}
+  body.dark h2,body.dark h3,body.dark .fs-card-title,body.dark strong{color:#f1f5f9}
+  body.dark .wc-center,.dark .filter-bar,.dark .tx-table th{background:#1e293b}
+  body.dark input,body.dark select,body.dark textarea{background:#1e293b;border-color:#334155;color:#e2e8f0}
+  body.dark .sc{background:#1e293b;border-color:#334155}
+  body.dark .fs-card{border-color:#334155}
+  body.dark .fs-line{border-color:#1e293b}
+  body.dark .fs-line.section{background:#1e293b}
+  body.dark .fs-line.subtotal,body.dark .fs-line.total{border-color:#334155}
+  body.dark .fs-hdr{background:#1e293b;border-color:#334155;color:#64748b}
+  body.dark .tx-table-wrap{border-color:#334155}
+  body.dark .tx-table th{background:#1e293b;border-color:#334155}
+  body.dark .tx-table td{border-color:#1e293b;color:#cbd5e1}
+  body.dark .tx-table tr:hover{background:#1e293b}
+  body.dark .btn{border-color:#334155}
+  body.dark .export-btn{border-color:#334155;color:#cbd5e1;background:#1e293b}
+  body.dark .export-menu{background:#1e293b;border-color:#334155}
+  body.dark .export-opt{color:#cbd5e1;border-color:#334155}
+  body.dark .export-opt:hover{background:#334155}
+  body.dark .ai-suggest{background:#1e1338;border-color:#4c1d95}
+  body.dark .audit-modal{background:#1e293b}
+  body.dark .audit-header{border-color:#334155}
+  body.dark .audit-summary{background:#0f172a;border-color:#334155}
+  body.dark .audit-table-hdr{background:#0f172a;border-color:#334155}
+  body.dark .audit-row{border-color:#1e293b;color:#cbd5e1}
+  body.dark .custom-modal{background:#1e293b}
+  body.dark .sidebar-footer{border-color:#334155;color:#475569}
+  body.dark .ob-chip{border-color:#334155;background:#1e293b;color:#cbd5e1}
+  body.dark .ob-chip.selected{border-color:#3b82f6;background:#1e3a5f;color:#60a5fa}
+  body.dark .wc-title{color:#f1f5f9}
+  body.dark .summary-cards .sc .sc-label{color:#64748b}
+
+  /* Bulk classify */
+  .bulk-bar{display:none;padding:10px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:12px;align-items:center;gap:10px}
+  .bulk-bar.visible{display:flex}
+  .bulk-bar select{font-size:12px;padding:5px 8px;border:1px solid #93c5fd;border-radius:5px;color:#1e293b;flex:1;max-width:240px}
+  .bulk-bar button{font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;border:none;cursor:pointer}
 </style>
 </head>
 <body>
@@ -448,6 +494,10 @@
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
       Reports
     </div>
+    <div class="nav-item" onclick="navTo('automations')" id="nav-automations">
+      <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>
+      Automations
+    </div>
     <div class="nav-item" onclick="navTo('config')" id="nav-config">
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
       Connections
@@ -486,7 +536,7 @@
   <div class="container">
     <div style="max-width:1000px;margin:30px auto">
       <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Reports</h2>
-      <p style="color:#64748b;font-size:13px;margin-bottom:24px">Standard accounting reports generated from on-chain data.</p>
+      
 
       <!-- Report selector -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px" id="reportCards">
@@ -551,6 +601,195 @@
 
         <div id="rollForwardTable"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: AUTOMATIONS -->
+<div class="screen" id="screen-automations">
+  <div class="container">
+    <div style="max-width:800px;margin:30px auto">
+      <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Automations</h2>
+      
+
+      <!-- Auto-Classify Section -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px">
+          <svg width="20" height="20" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/></svg>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#0f172a">AI Auto-Classification</div>
+            
+          </div>
+        </div>
+        <div style="padding:18px 20px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:500;color:#334155;margin-bottom:4px">Confidence threshold</div>
+              <div style="display:flex;gap:6px">
+                <button class="ob-chip" onclick="setConfThreshold(70,this)" style="font-size:12px;padding:5px 12px">70%</button>
+                <button class="ob-chip" onclick="setConfThreshold(80,this)" style="font-size:12px;padding:5px 12px">80%</button>
+                <button class="ob-chip selected" onclick="setConfThreshold(90,this)" id="confBtn90" style="font-size:12px;padding:5px 12px">90%</button>
+                <button class="ob-chip" onclick="setConfThreshold(95,this)" style="font-size:12px;padding:5px 12px">95%</button>
+              </div>
+              <input type="hidden" id="autoConfThreshold" value="90">
+            </div>
+          </div>
+          <button style="font-size:13px;font-weight:500;padding:10px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="runAutoClassify()" id="autoClassifyBtn">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg>
+            Run Auto-Classification Now
+          </button>
+          <div id="autoClassifyResult" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <!-- Rule Builder -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px">
+          <svg width="20" height="20" fill="none" stroke="#16a34a" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
+          <div style="font-size:14px;font-weight:600;color:#0f172a">Classification Rules</div>
+        </div>
+        <div style="padding:18px 20px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Direction</div>
+              <select id="ruleDir" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px">
+                <option value="all">Any</option><option value="inflow">Inflow</option><option value="outflow">Outflow</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Chain</div>
+              <select id="ruleChain" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px">
+                <option value="all">Any</option><option value="base">Base</option><option value="solana">Solana</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Classify as</div>
+              <select id="ruleGlCode" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px"></select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Counterparty contains</div>
+              <input id="ruleCp" placeholder="Address or label..." style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;box-sizing:border-box">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Amount min</div>
+              <input type="number" id="ruleAmtMin" placeholder="0" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;box-sizing:border-box">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Amount max</div>
+              <input type="number" id="ruleAmtMax" placeholder="∞" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;box-sizing:border-box">
+            </div>
+          </div>
+          <button style="font-size:12px;font-weight:500;padding:8px 16px;border-radius:6px;border:none;background:#16a34a;color:#fff;cursor:pointer" onclick="addRule()">Create Rule</button>
+        </div>
+        <div id="rulesList" style="border-top:1px solid #e2e8f0"></div>
+      </div>
+
+      <!-- Scheduled Scans -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px">
+          <svg width="20" height="20" fill="none" stroke="#3b82f6" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#0f172a">Scheduled Wallet Scans</div>
+            
+          </div>
+        </div>
+        <div style="padding:18px 20px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#334155;margin-bottom:4px">Scan frequency</div>
+              <select style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#1e293b" id="scanFrequency">
+                <option value="daily" selected>Daily</option>
+                <option value="12h">Every 12 hours</option>
+                <option value="6h">Every 6 hours</option>
+                <option value="hourly">Hourly</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:12px;font-weight:500;color:#334155;margin-bottom:4px">Scan time</div>
+              <input type="time" value="06:00" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#1e293b" id="scanTime">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;cursor:pointer">
+              <input type="checkbox" id="autoClassifyOnScan" checked> Auto-classify after scan
+            </label>
+          </div>
+          <div style="margin-top:12px;padding:10px 14px;background:#f8fafc;border-radius:6px;font-size:12px;color:#64748b">
+            <strong style="color:#334155">Status:</strong> Scheduled scans require the production environment. <span style="color:#3b82f6">Coming soon.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrations -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:14px;font-weight:600;color:#0f172a">Notifications</div>
+          
+        </div>
+        <div style="padding:18px 20px">
+          <!-- Email -->
+          <div style="padding:14px 0;border-bottom:1px solid #f1f5f9">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center">
+                <svg width="18" height="18" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:#0f172a">Email (Gmail SMTP)</div>
+                <div style="font-size:11px;color:#94a3b8" id="emailStatus">Not connected</div>
+              </div>
+            </div>
+            <div id="emailForm">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <input type="email" id="emailUser" placeholder="your@gmail.com" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+                <input type="password" id="emailPass" placeholder="App password" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="email" id="emailTo" placeholder="Send updates to..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectEmail()">Connect</button>
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testEmail()">Send Test</button>
+              </div>
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Gmail users: generate an app password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#3b82f6">myaccount.google.com/apppasswords</a></div>
+            </div>
+          </div>
+          <!-- Slack -->
+          <div style="padding:14px 0">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fce7f3;display:flex;align-items:center;justify-content:center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#e11d48"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:#0f172a">Slack (Incoming Webhook)</div>
+                <div style="font-size:11px;color:#94a3b8" id="slackStatus">Not connected</div>
+              </div>
+            </div>
+            <div id="slackForm">
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="slackWebhook" placeholder="https://hooks.slack.com/services/T.../B.../..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectSlack()">Connect</button>
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testSlack()">Send Test</button>
+              </div>
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Create a webhook at <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:#3b82f6">api.slack.com/messaging/webhooks</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notification Preview -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:14px;font-weight:600;color:#0f172a">Daily Update Preview</div>
+          
+        </div>
+        <div style="padding:18px 20px;background:#f8fafc" id="notificationPreview">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 18px;font-size:13px;color:#475569;line-height:1.8">
+            <div style="font-weight:600;color:#0f172a;font-size:14px;margin-bottom:8px">🐕 Shepherd Daily Update</div>
+            <div id="dailyPreviewContent">Connect wallets and classify transactions to see a preview of daily updates.</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -721,6 +960,13 @@
         </div>
         <button class="filter-clear" onclick="clearTxFilters()">Clear</button>
       </div>
+      <div class="bulk-bar" id="bulkBar">
+        <input type="checkbox" id="bulkSelectAll" onchange="toggleSelectAll(this.checked)" style="margin:0">
+        <span style="font-size:12px;color:#1d4ed8;font-weight:500" id="bulkCount">0 selected</span>
+        <select id="bulkGlCode"></select>
+        <button style="background:#3b82f6;color:#fff" onclick="bulkClassify()">Classify Selected</button>
+        <button style="background:#f1f5f9;color:#475569" onclick="clearSelection()">Cancel</button>
+      </div>
       <div id="txTableWrap"></div>
     </div>
   </div>
@@ -733,7 +979,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
         <div>
           <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Chart of Accounts</h2>
-          <p style="color:#64748b;font-size:13px">Manage GL codes used for transaction classification.</p>
+          
         </div>
         <button class="btn btn-primary" onclick="openCustom()" style="font-size:12px;padding:8px 14px">+ Add Account</button>
       </div>
@@ -749,7 +995,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
         <div>
           <h2 style="font-size:20px;font-weight:600;margin-bottom:4px">Audit Log</h2>
-          <p style="color:#64748b;font-size:13px">Complete history of all actions taken in Shepherd.</p>
+          
         </div>
         <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer" onclick="exportAuditLog()">Export CSV</button>
       </div>
@@ -769,8 +1015,17 @@
   <div class="container">
     <div style="max-width:640px;margin:40px auto">
       <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Settings</h2>
-      <p style="color:#64748b;font-size:13px;margin-bottom:32px">Manage your account, team access, and integrations.</p>
+      
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Dark Mode</div></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="darkModeLabel" style="font-size:12px;color:#94a3b8">Off</span>
+            <div onclick="toggleDarkMode()" style="width:40px;height:22px;border-radius:11px;background:#e2e8f0;cursor:pointer;position:relative;transition:background .2s" id="darkModeSwitch">
+              <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+            </div>
+          </div>
+        </div>
         <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:13px;font-weight:500">Chart of Accounts</div><div style="font-size:11px;color:#94a3b8">Customize GL codes and account mappings</div></div>
           <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
@@ -797,7 +1052,7 @@
   <div class="container">
     <div style="max-width:640px;margin:40px auto">
       <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Help</h2>
-      <p style="color:#64748b;font-size:13px;margin-bottom:32px">Getting started with Shepherd.</p>
+      
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
         <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">
           <div style="font-size:13px;font-weight:500;margin-bottom:6px">1. Connect a wallet</div>
@@ -918,7 +1173,7 @@ async function obScanAll(){
       selectedWallets.add(firstWithData.addr.toLowerCase());
       loadSelected();
       var badge=document.getElementById('ledgerBadge');
-      if(badge){badge.style.display='inline';badge.textContent=txs.length;}
+      if(badge){var unc=txs.filter(function(t){return !mappings[t.hash]||mappings[t.hash]==='Unclassified'}).length;badge.style.display=unc>0?'inline':'none';badge.textContent=unc;}
       navTo('ledger');
     }
   },1500);
@@ -1010,9 +1265,10 @@ function renderTxTable(){
 
   wrap.innerHTML=`<div class="tx-table-wrap"><table class="tx-table">
     <thead><tr>
-      <th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain</th><th>Block</th><th>Status</th><th>GL Code</th>
+      <th style="width:30px"><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain</th><th>Block</th><th>Status</th><th>GL Code</th>
     </tr></thead>
-    <tbody>${filtered.map(t=>`<tr>
+    <tbody>${filtered.map(t=>{const txid=t.walletAddr.toLowerCase()+'::'+t.hash;const chk=selectedTxIds.has(txid)?'checked':'';return`<tr>
+      <td><input type="checkbox" class="tx-row-cb" data-txid="${txid}" ${chk} onchange="toggleTxSelect('${txid}',this)"></td>
       <td><span class="dir-pill ${t.dir==='inflow'?'in':'out'}">${t.dir==='inflow'?'IN':'OUT'}</span></td>
       <td class="mono" style="font-weight:500;color:${t.dir==='inflow'?'#16a34a':'#ea580c'}">${t.dir==='inflow'?'+':'-'}$${fmt(t.amount)}</td>
       <td class="mono" style="font-size:11px">${addr(t.cp)}</td>
@@ -1021,7 +1277,7 @@ function renderTxTable(){
       <td style="font-size:11px;color:#94a3b8">${(t.block||0).toLocaleString()}</td>
       <td><span class="status-pill ${t.gl==='Unclassified'?'unclassified':'classified'}">${t.gl==='Unclassified'?'Pending':'Classified'}</span></td>
       <td style="font-size:11px;color:${t.gl==='Unclassified'?'#d97706':'#334155'}">${t.gl==='Unclassified'?'—':t.gl}</td>
-    </tr>`).join('')}</tbody>
+    </tr>`}).join('')}</tbody>
   </table></div>`;
 }
 
@@ -1174,6 +1430,7 @@ function navTo(id){
   if(id==='coa')renderCOA();
   if(id==='transactions')renderTxTable();
   if(id==='reports')renderReports();
+  if(id==='automations')renderAutomations();
   if(id==='auditlog')renderAuditLog();
 }
 function showConfig(){navTo('config');}
@@ -1948,6 +2205,361 @@ function exportGoogleSheets(){
   document.getElementById('exportMenu').classList.remove('open');
 }
 
+// ============ BULK CLASSIFY ============
+var txTableData=[];// current filtered data for bulk ops
+var selectedTxIds=new Set();
+
+function updateBulkBar(){
+  var bar=document.getElementById('bulkBar');
+  var countEl=document.getElementById('bulkCount');
+  var selectAll=document.getElementById('bulkSelectAll');
+  if(selectedTxIds.size>0){
+    bar.classList.add('visible');
+    countEl.textContent=selectedTxIds.size+' selected';
+    var glSel=document.getElementById('bulkGlCode');
+    glSel.innerHTML=GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){return'<option value="'+o+'">'+o+'</option>'}).join('');
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function toggleTxSelect(id,cb){
+  if(cb.checked)selectedTxIds.add(id);else selectedTxIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(checked){
+  var checkboxes=document.querySelectorAll('.tx-row-cb');
+  checkboxes.forEach(function(cb){cb.checked=checked;if(checked)selectedTxIds.add(cb.dataset.txid);else selectedTxIds.delete(cb.dataset.txid);});
+  updateBulkBar();
+}
+
+function clearSelection(){
+  selectedTxIds.clear();
+  var checkboxes=document.querySelectorAll('.tx-row-cb');
+  checkboxes.forEach(function(cb){cb.checked=false});
+  document.getElementById('bulkSelectAll').checked=false;
+  updateBulkBar();
+}
+
+function bulkClassify(){
+  var glCode=document.getElementById('bulkGlCode').value;
+  if(!glCode){alert('Select a GL code');return;}
+  var count=0;
+  selectedTxIds.forEach(function(id){
+    var parts=id.split('::');
+    if(parts.length===2){
+      var wAddr=parts[0];var txHash=parts[1];
+      var s=getStore(wAddr);
+      if(s){s.mappings[txHash]=glCode;var tx=s.txs.find(function(t){return t.hash===txHash});if(tx)s.cpMappings[tx.cp]=glCode;count++;}
+    }
+  });
+  logAction('classification','Bulk classified '+count+' transactions','as '+glCode);
+  clearSelection();
+  renderTxTable();
+}
+
+// ============ CLASSIFICATION RULES ============
+var classificationRules=[];
+
+function renderAutomations(){
+  updateDailyPreview();
+  renderRulesList();
+  var glSel=document.getElementById('ruleGlCode');
+  if(glSel)glSel.innerHTML=GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){return'<option value="'+o+'">'+o+'</option>'}).join('');
+}
+
+function addRule(){
+  var rule={
+    dir:document.getElementById('ruleDir').value,
+    chain:document.getElementById('ruleChain').value,
+    cp:document.getElementById('ruleCp').value.trim().toLowerCase(),
+    amtMin:parseFloat(document.getElementById('ruleAmtMin').value)||0,
+    amtMax:parseFloat(document.getElementById('ruleAmtMax').value)||Infinity,
+    glCode:document.getElementById('ruleGlCode').value,
+    created:new Date().toLocaleString()
+  };
+  if(!rule.glCode){alert('Select a GL code');return;}
+  classificationRules.push(rule);
+  // Apply rule to existing transactions
+  var applied=applyRule(rule);
+  logAction('account','Rule created','Classify as '+rule.glCode+' — applied to '+applied+' transactions');
+  renderRulesList();
+  // Clear inputs
+  document.getElementById('ruleDir').value='all';
+  document.getElementById('ruleChain').value='all';
+  document.getElementById('ruleCp').value='';
+  document.getElementById('ruleAmtMin').value='';
+  document.getElementById('ruleAmtMax').value='';
+}
+
+function applyRule(rule){
+  var count=0;
+  wallets.forEach(function(w){
+    var s=getStore(w.addr);
+    s.txs.forEach(function(t){
+      if(s.mappings[t.hash]&&s.mappings[t.hash]!=='Unclassified')return;
+      if(rule.dir!=='all'&&t.dir!==rule.dir)return;
+      if(rule.chain!=='all'){
+        var wChain=(w.chain||'').toLowerCase();
+        if(rule.chain!==wChain)return;
+      }
+      if(rule.cp&&!t.cp.toLowerCase().includes(rule.cp))return;
+      if(t.amount<rule.amtMin)return;
+      if(rule.amtMax<Infinity&&t.amount>rule.amtMax)return;
+      s.mappings[t.hash]=rule.glCode;
+      s.cpMappings[t.cp]=rule.glCode;
+      count++;
+    });
+  });
+  return count;
+}
+
+function applyAllRules(){
+  var total=0;
+  classificationRules.forEach(function(r){total+=applyRule(r);});
+  if(total>0)logAction('classification','Rules applied',total+' transactions classified');
+  return total;
+}
+
+function removeRule(i){
+  classificationRules.splice(i,1);
+  renderRulesList();
+}
+
+function renderRulesList(){
+  var el=document.getElementById('rulesList');
+  if(!el)return;
+  if(!classificationRules.length){el.innerHTML='<div style="padding:16px 20px;font-size:12px;color:#94a3b8">No rules created yet.</div>';return;}
+  el.innerHTML=classificationRules.map(function(r,i){
+    var desc=[];
+    if(r.dir!=='all')desc.push(r.dir==='inflow'?'Inflows':'Outflows');
+    if(r.chain!=='all')desc.push(r.chain==='base'?'Base':'Solana');
+    if(r.cp)desc.push('counterparty contains "'+r.cp+'"');
+    if(r.amtMin>0)desc.push('amount ≥ $'+r.amtMin);
+    if(r.amtMax<Infinity)desc.push('amount ≤ $'+r.amtMax);
+    return'<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #f1f5f9">'
+      +'<div style="flex:1">'
+      +'<div style="font-size:12px;color:#475569">'+(desc.length?desc.join(' + '):'All transactions')+'</div>'
+      +'<div style="font-size:12px;font-weight:500;color:#16a34a;margin-top:2px">→ '+r.glCode+'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<span style="font-size:10px;color:#94a3b8">'+r.created+'</span>'
+      +'<button style="font-size:12px;padding:4px 10px;border-radius:4px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer" onclick="var c=applyRule(classificationRules['+i+']);alert(c+\' transactions classified\')">Re-run</button>'
+      +'<span style="color:#cbd5e1;cursor:pointer;font-size:16px" onclick="removeRule('+i+')">&times;</span>'
+      +'</div></div>';
+  }).join('');
+}
+
+var emailConfig={};var slackConfig={};
+
+function setConfThreshold(val,el){
+  document.getElementById('autoConfThreshold').value=val;
+  el.parentElement.querySelectorAll('.ob-chip').forEach(function(c){c.classList.remove('selected')});
+  el.classList.add('selected');
+}
+
+function toggleDarkMode(){
+  document.body.classList.toggle('dark');
+  var isDark=document.body.classList.contains('dark');
+  document.getElementById('darkModeLabel').textContent=isDark?'On':'Off';
+}
+
+function connectEmail(){
+  var user=document.getElementById('emailUser').value.trim();
+  var pass=document.getElementById('emailPass').value.trim();
+  var to=document.getElementById('emailTo').value.trim();
+  if(!user||!pass||!to){alert('Fill in all email fields');return;}
+  emailConfig={smtp_host:'smtp.gmail.com',smtp_port:587,smtp_user:user,smtp_pass:pass,to:to};
+  document.getElementById('emailStatus').innerHTML='<span style="color:#16a34a">Connected: '+to+'</span>';
+  logAction('account','Email connected',to);
+  updateDailyPreview();
+}
+
+function connectSlack(){
+  var webhook=document.getElementById('slackWebhook').value.trim();
+  if(!webhook||!webhook.startsWith('https://hooks.slack.com/')){alert('Enter a valid Slack webhook URL');return;}
+  slackConfig={webhook_url:webhook};
+  document.getElementById('slackStatus').innerHTML='<span style="color:#16a34a">Connected</span>';
+  logAction('account','Slack connected','webhook configured');
+  updateDailyPreview();
+}
+
+function buildNotificationContent(){
+  var totalTx=0;var classified=0;var walletCount=0;
+  wallets.forEach(function(w){var s=getStore(w.addr);if(!s.txs.length)return;walletCount++;
+    s.txs.forEach(function(t){totalTx++;if(s.mappings[t.hash]&&s.mappings[t.hash]!=='Unclassified')classified++;});
+  });
+  var unclassified=totalTx-classified;
+  return{totalTx:totalTx,classified:classified,unclassified:unclassified,walletCount:walletCount};
+}
+
+async function testEmail(){
+  if(!emailConfig.smtp_user){alert('Connect email first');return;}
+  var stats=buildNotificationContent();
+  var html='<div style="font-family:sans-serif;max-width:500px">'
+    +'<h2 style="color:#0f172a">&#128021; Shepherd Daily Update</h2>'
+    +'<p><strong>Wallets scanned:</strong> '+stats.walletCount+'</p>'
+    +'<p><strong>Total transactions:</strong> '+stats.totalTx+'</p>'
+    +'<p style="color:#16a34a"><strong>Auto-classified:</strong> '+stats.classified+'</p>'
+    +(stats.unclassified>0?'<p style="color:#d97706"><strong>Needs review:</strong> '+stats.unclassified+'</p>':'<p style="color:#16a34a"><strong>Status:</strong> All classified &#10003;</p>')
+    +(stats.unclassified>0?'<br><a href="'+window.location.origin+'" style="display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:6px;font-weight:500">Classify Transactions &rarr;</a>':'')
+    +'<br><br><p style="color:#94a3b8;font-size:12px">Sent from Shepherd &middot; Continuous Close Accounting</p></div>';
+
+  try{
+    var res=await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({smtp_host:emailConfig.smtp_host,smtp_port:emailConfig.smtp_port,
+        smtp_user:emailConfig.smtp_user,smtp_pass:emailConfig.smtp_pass,
+        to:emailConfig.to,subject:'Shepherd Daily Update - '+new Date().toLocaleDateString(),body:html})
+    });
+    var result=await res.json();
+    if(result.success){alert('Test email sent to '+emailConfig.to);logAction('account','Test email sent',emailConfig.to);}
+    else{alert('Email failed: '+result.message);}
+  }catch(e){alert('Email error: '+e.message);}
+}
+
+async function testSlack(){
+  if(!slackConfig.webhook_url){alert('Connect Slack first');return;}
+  var stats=buildNotificationContent();
+  var text='*:dog: Shepherd Daily Update*\n'
+    +'Wallets scanned: '+stats.walletCount+'\n'
+    +'Total transactions: '+stats.totalTx+'\n'
+    +'Auto-classified: '+stats.classified+'\n'
+    +(stats.unclassified>0?':warning: Needs review: '+stats.unclassified+' transactions\n<'+window.location.origin+'|Classify now →>':':white_check_mark: All transactions classified');
+
+  try{
+    var res=await fetch('/api/send-slack',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({webhook_url:slackConfig.webhook_url,text:text})
+    });
+    var result=await res.json();
+    if(result.success){alert('Test message sent to Slack');logAction('account','Test Slack sent','webhook');}
+    else{alert('Slack failed: '+result.message);}
+  }catch(e){alert('Slack error: '+e.message);}
+}
+
+function updateDailyPreview(){
+  var el=document.getElementById('dailyPreviewContent');
+  if(!el)return;
+  var totalTx=0;var classified=0;var unclassified=0;var walletCount=0;
+  wallets.forEach(function(w){
+    var s=getStore(w.addr);
+    if(!s.txs.length)return;
+    walletCount++;
+    s.txs.forEach(function(t){
+      totalTx++;
+      if(s.mappings[t.hash]&&s.mappings[t.hash]!=='Unclassified')classified++;
+      else unclassified++;
+    });
+  });
+  if(!totalTx){el.textContent='Connect wallets and classify transactions to see a preview of daily updates.';return;}
+  var emailOk=document.getElementById('emailStatus').textContent.includes('Connected');
+  var slackOk=document.getElementById('slackStatus').textContent.includes('Connected');
+  var destinations=[];
+  if(emailOk)destinations.push('Email');
+  if(slackOk)destinations.push('Slack');
+
+  el.innerHTML='<strong>Scan Summary:</strong> '+walletCount+' wallet'+(walletCount>1?'s':'')+' scanned<br>'
+    +'<strong>Total Transactions:</strong> '+totalTx+'<br>'
+    +'<span style="color:#16a34a"><strong>Auto-Classified:</strong> '+classified+' transactions</span><br>'
+    +(unclassified>0?'<span style="color:#d97706"><strong>Needs Review:</strong> '+unclassified+' transaction'+(unclassified>1?'s':'')+' pending manual classification</span><br>':'<span style="color:#16a34a"><strong>Status:</strong> All transactions classified ✓</span><br>')
+    +'<br><span style="color:#94a3b8">Delivering to: '+(destinations.length?destinations.join(' & '):'No channels connected')+'</span>';
+}
+
+async function runAutoClassify(){
+  var btn=document.getElementById('autoClassifyBtn');
+  var resultEl=document.getElementById('autoClassifyResult');
+  var threshold=parseInt(document.getElementById('autoConfThreshold').value)/100;
+
+  btn.disabled=true;
+  btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="animation:obSpin 1s linear infinite"><circle cx="12" cy="12" r="10"/></svg> Running...';
+  resultEl.innerHTML='<div style="font-size:12px;color:#64748b">Scanning unclassified transactions...</div>';
+
+  var autoClassified=0;var failed=0;var skipped=0;var total=0;
+
+  // Build list of all unclassified transactions across all wallets
+  var tasks=[];
+  wallets.forEach(function(w){
+    var s=getStore(w.addr);
+    s.txs.forEach(function(t){
+      if(!s.mappings[t.hash]||s.mappings[t.hash]==='Unclassified'){
+        tasks.push({tx:t,wallet:w,store:s});
+      }
+    });
+  });
+  total=tasks.length;
+
+  if(!total){
+    btn.disabled=false;
+    btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg> Run Auto-Classification Now';
+    resultEl.innerHTML='<div style="padding:10px 14px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534">All transactions are already classified.</div>';
+    return;
+  }
+
+  resultEl.innerHTML='<div style="font-size:12px;color:#64748b">Processing '+total+' unclassified transactions...</div>';
+
+  for(var i=0;i<tasks.length;i++){
+    var task=tasks[i];
+    var t=task.tx;var w=task.wallet;var s=task.store;
+    var chain=w.chain||'Unknown';
+
+    resultEl.innerHTML='<div style="font-size:12px;color:#64748b">Classifying '+(i+1)+' of '+total+'... <span style="color:#16a34a">'+autoClassified+' auto-classified</span></div>'
+      +'<div style="background:#e2e8f0;border-radius:3px;height:4px;margin-top:6px"><div style="background:linear-gradient(90deg,#7c3aed,#3b82f6);height:100%;border-radius:3px;width:'+Math.round(((i+1)/total)*100)+'%;transition:width .3s"></div></div>';
+
+    // Check counterparty memory first
+    if(s.cpMappings[t.cp]){
+      s.mappings[t.hash]=s.cpMappings[t.cp];
+      autoClassified++;
+      logAction('classification','Auto-classified (memory)',addr(t.hash)+' as '+s.cpMappings[t.cp]);
+      continue;
+    }
+
+    // Call AI
+    try{
+      var prior=[];
+      Object.entries(s.cpMappings).forEach(function(e){prior.push({counterparty:e[0],gl_code:e[1],count:1,avg_amount:0,direction:'unknown'})});
+
+      var res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          transaction:{direction:t.dir,amount:t.amount,counterparty:t.cp,chain:chain,block:t.block},
+          chart_of_accounts:GL_OPTIONS,
+          prior_classifications:prior,
+          client_profile:{business_type:clientProfile.bizType,typical_transactions:clientProfile.txTypes,notes:clientProfile.notes}
+        })
+      });
+      var suggestion=await res.json();
+
+      if(suggestion.gl_code&&suggestion.confidence>=threshold){
+        s.mappings[t.hash]=suggestion.gl_code;
+        s.cpMappings[t.cp]=suggestion.gl_code;
+        autoClassified++;
+        logAction('classification','Auto-classified (AI '+Math.round(suggestion.confidence*100)+'%)',addr(t.hash)+' as '+suggestion.gl_code);
+      } else {
+        skipped++;
+      }
+    }catch(e){failed++;console.log('Auto-classify error:',e);}
+
+    // Small delay to avoid rate limits
+    await new Promise(function(r){setTimeout(r,300)});
+  }
+
+  var remaining=total-autoClassified;
+
+  btn.disabled=false;
+  btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z"/></svg> Run Auto-Classification Now';
+
+  resultEl.innerHTML='<div style="padding:14px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">'
+    +'<div style="font-size:14px;font-weight:600;color:#166534;margin-bottom:8px">Auto-Classification Complete</div>'
+    +'<div style="font-size:13px;color:#475569;line-height:1.8">'
+    +'<span style="color:#16a34a;font-weight:500">'+autoClassified+'</span> transactions auto-classified<br>'
+    +(remaining>0?'<span style="color:#d97706;font-weight:500">'+remaining+'</span> transactions need manual review<br>':'')
+    +(skipped>0?'<span style="color:#94a3b8">'+skipped+' below '+Math.round(threshold*100)+'% confidence threshold</span><br>':'')
+    +(failed>0?'<span style="color:#94a3b8">'+failed+' failed (API error)</span><br>':'')
+    +'</div></div>';
+
+  logAction('account','Auto-classification run',autoClassified+' classified, '+remaining+' remaining');
+  updateDailyPreview();
+}
+
 // ============ REPORTS ============
 function renderReports(){renderRollForward();}
 
@@ -2004,11 +2616,11 @@ function renderRollForward(){
   var f=function(v){return'$'+fmt(Math.abs(v))};
 
   var inRows=Object.entries(inByGL).sort(function(a,b){return b[1]-a[1]}).map(function(e){
-    return'<tr><td style="padding-left:28px;color:#475569">'+e[0]+'</td><td style="text-align:right;color:#16a34a">+'+f(e[1])+'</td></tr>';
+    return'<tr><td style="padding:10px 16px 10px 28px;color:#475569">'+e[0]+'</td><td style="text-align:right;color:#16a34a">+'+f(e[1])+'</td></tr>';
   }).join('');
 
   var outRows=Object.entries(outByGL).sort(function(a,b){return b[1]-a[1]}).map(function(e){
-    return'<tr><td style="padding-left:28px;color:#475569">'+e[0]+'</td><td style="text-align:right;color:#ea580c">('+f(e[1])+')</td></tr>';
+    return'<tr><td style="padding:10px 16px 10px 28px;color:#475569">'+e[0]+'</td><td style="text-align:right;color:#ea580c">('+f(e[1])+')</td></tr>';
   }).join('');
 
   wrap.innerHTML='<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">'
@@ -2023,23 +2635,23 @@ function renderRollForward(){
     +'<td style="text-align:right;padding:12px 16px;font-weight:600">'+f(opening)+'</td></tr>'
 
     // Additions header
-    +'<tr style="background:#f0fdf4;border-bottom:1px solid #e2e8f0"><td style="padding:10px 16px;font-weight:600;color:#166534" colspan="2">Additions (Inflows)</td></tr>'
+    +'<tr style="background:#f0fdf4;border-bottom:1px solid #e2e8f0"><td style="padding:12px 16px;font-weight:600;color:#166534" colspan="2">Additions (Inflows)</td></tr>'
     +inRows
-    +'<tr style="border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0"><td style="padding:10px 16px;font-weight:600;color:#1e293b">Total Additions</td>'
+    +'<tr style="border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0"><td style="padding:12px 16px;font-weight:600;color:#1e293b">Total Additions</td>'
     +'<td style="text-align:right;padding:10px 16px;font-weight:600;color:#16a34a">+'+f(totalIn)+'</td></tr>'
 
     // Dispositions header
-    +'<tr style="background:#fff7ed;border-bottom:1px solid #e2e8f0"><td style="padding:10px 16px;font-weight:600;color:#9a3412" colspan="2">Dispositions (Outflows)</td></tr>'
+    +'<tr style="background:#fff7ed;border-bottom:1px solid #e2e8f0"><td style="padding:12px 16px;font-weight:600;color:#9a3412" colspan="2">Dispositions (Outflows)</td></tr>'
     +outRows
-    +'<tr style="border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0"><td style="padding:10px 16px;font-weight:600;color:#1e293b">Total Dispositions</td>'
+    +'<tr style="border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0"><td style="padding:12px 16px;font-weight:600;color:#1e293b">Total Dispositions</td>'
     +'<td style="text-align:right;padding:10px 16px;font-weight:600;color:#ea580c">('+f(totalOut)+')</td></tr>'
 
     // Gas
-    +(totalGas>0.0000001?'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:10px 16px;color:#64748b">Network Fees (Gas)</td>'
+    +(totalGas>0.0000001?'<tr style="border-bottom:1px solid #e2e8f0"><td style="padding:12px 16px;color:#64748b">Network Fees (Gas)</td>'
     +'<td style="text-align:right;padding:10px 16px;color:#ea580c">('+f(totalGas)+')</td></tr>':'')
 
     // Net change
-    +'<tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc"><td style="padding:10px 16px;font-weight:600;color:#334155">Net Change</td>'
+    +'<tr style="border-bottom:1px solid #e2e8f0;background:#f8fafc"><td style="padding:12px 16px;font-weight:600;color:#334155">Net Change</td>'
     +'<td style="text-align:right;padding:10px 16px;font-weight:600;color:'+(totalIn-totalOut>=0?'#16a34a':'#ea580c')+'">'+(totalIn-totalOut>=0?'+':'-')+f(totalIn-totalOut)+'</td></tr>'
 
     // Closing
