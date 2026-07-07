@@ -300,6 +300,15 @@
   .bulk-bar.visible{display:flex}
   .bulk-bar select{font-size:12px;padding:5px 8px;border:1px solid #93c5fd;border-radius:5px;color:#1e293b;flex:1;max-width:240px}
   .bulk-bar button{font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;border:none;cursor:pointer}
+
+  /* Editable GL chips */
+  .gl-chip{font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px;position:relative}
+  .gl-chip:hover{border-color:#93c5fd}
+  .gl-chip.selected{border-color:#3b82f6;background:#eff6ff;color:#3b82f6;font-weight:500}
+  .gl-chip .gl-edit{display:none;font-size:10px;color:#94a3b8;cursor:pointer;margin-left:2px}
+  .gl-chip:hover .gl-edit{display:inline}
+  .gl-chip .gl-edit:hover{color:#3b82f6}
+  .gl-chip input{border:none;outline:none;background:transparent;font-size:12px;color:inherit;font-weight:inherit;width:100%;font-family:inherit;padding:0}
 </style>
 </head>
 <body>
@@ -516,35 +525,35 @@
 
         <div id="obGLCreateSection">
           <div class="ob-section">
-            <span class="ob-label">Revenue accounts</span>
+            <span class="ob-label">Suggested revenue accounts</span>
             <div class="ob-chips" id="obGLRevChips">
-              <div class="ob-chip selected" onclick="obToggleGL(this)">4100 - Revenue - Services</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">4200 - Revenue - Product</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">4300 - Customer Refund</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">4400 - Interest Income</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">4500 - Staking Revenue</div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">4100 - Revenue - Services</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">4200 - Revenue - Product</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4300 - Customer Refund</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4400 - Interest Income</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4500 - Staking Revenue</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
             </div>
           </div>
           <div class="ob-section">
-            <span class="ob-label">Expense accounts</span>
+            <span class="ob-label">Suggested expense accounts</span>
             <div class="ob-chips" id="obGLExpChips">
-              <div class="ob-chip selected" onclick="obToggleGL(this)">6110 - Payroll</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">6200 - Software & SaaS</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">6300 - Cloud Infrastructure</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">6400 - Rent & Facilities</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">6420 - Marketing & Ads</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">6500 - Professional Services</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">6600 - Office & Operations</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">6700 - Travel & Entertainment</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">6800 - Insurance</div>
-              <div class="ob-chip" onclick="obToggleGL(this)">6900 - Depreciation</div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">6110 - Payroll</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">6200 - Software & SaaS</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">6300 - Cloud Infrastructure</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">6400 - Rent & Facilities</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">6420 - Marketing & Ads</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">6500 - Professional Services</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">6600 - Office & Operations</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">6700 - Travel & Entertainment</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">6800 - Insurance</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">6900 - Depreciation</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
             </div>
           </div>
           <div class="ob-section">
-            <span class="ob-label">Transfer / balance sheet accounts</span>
+            <span class="ob-label">Suggested transfer accounts</span>
             <div class="ob-chips" id="obGLXferChips">
-              <div class="ob-chip selected" onclick="obToggleGL(this)">7100 - Intercompany Transfer</div>
-              <div class="ob-chip selected" onclick="obToggleGL(this)">1200 - Treasury Rebalance</div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">7100 - Intercompany Transfer</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">1200 - Treasury Rebalance</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
             </div>
           </div>
           <div style="margin-top:8px">
@@ -1404,10 +1413,28 @@ function obGLMode(mode,el){
   document.getElementById('obGLUploadSection').style.display=mode==='upload'?'block':'none';
 }
 function obToggleGL(el){el.classList.toggle('selected');}
+function obEditGL(chip){
+  var textEl=chip.querySelector('.gl-text');
+  if(!textEl)return;
+  var current=textEl.textContent;
+  var input=document.createElement('input');
+  input.value=current;
+  input.style.cssText='border:none;outline:none;background:transparent;font-size:12px;color:inherit;font-weight:inherit;width:'+Math.max(current.length*7,80)+'px;font-family:inherit;padding:0';
+  textEl.replaceWith(input);
+  input.focus();input.select();
+  var save=function(){
+    var newText=input.value.trim()||current;
+    var span=document.createElement('span');
+    span.className='gl-text';span.textContent=newText;
+    input.replaceWith(span);
+  };
+  input.addEventListener('blur',save);
+  input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();save();}});
+}
 function obSaveGL(){
   var selected=[];
   document.querySelectorAll('#obGLRevChips .ob-chip.selected, #obGLExpChips .ob-chip.selected, #obGLXferChips .ob-chip.selected').forEach(function(el){
-    selected.push(el.textContent.trim());
+    var t=el.querySelector('.gl-text');selected.push(t?t.textContent.trim():el.textContent.trim());
   });
   if(selected.length>0){
     GL_OPTIONS=['Unclassified'].concat(selected);
