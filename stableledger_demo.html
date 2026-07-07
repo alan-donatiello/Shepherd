@@ -1696,6 +1696,10 @@ function navTo(id){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   document.getElementById("nav-"+id).classList.add("active");
   if(id==='ledger'){
+    // If no wallets selected, select all that have data
+    if(selectedWallets.size===0){
+      wallets.forEach(function(w){var ws=getStore(w.addr);if(ws.txs.length>0)selectedWallets.add(w.addr.toLowerCase());});
+    }
     if(selectedWallets.size>0)loadSelected();
     if(txs.length)renderLedger();
   }
@@ -2831,6 +2835,14 @@ async function runAutoClassify(){
 
   logAction('account','Auto-classification run',autoClassified+' classified, '+remaining+' remaining');
   updateDailyPreview();
+
+  // Update ledger badge with remaining unclassified count
+  var totalUnc=0;
+  wallets.forEach(function(w){var s=getStore(w.addr);s.txs.forEach(function(t){
+    if(!s.mappings[t.hash]||s.mappings[t.hash]==='Unclassified')totalUnc++;
+  });});
+  var badge=document.getElementById('ledgerBadge');
+  if(badge){badge.style.display=totalUnc>0?'inline':'none';badge.textContent=totalUnc;}
 }
 
 // ============ REPORTS ============
