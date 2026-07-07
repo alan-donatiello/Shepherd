@@ -326,8 +326,8 @@
     <div class="onboard-card">
       <!-- Step 1: Business -->
       <div class="ob-step" id="obStep1" style="display:block;color:#000">
-        <h2>About your business</h2>
-        <div class="ob-sub">This helps Shepherd classify your transactions accurately from the first scan.</div>
+        <h2>Train your AI</h2>
+        <div class="ob-sub">Tell Shepherd about your business so it can classify transactions accurately from day one.</div>
         <div class="ob-section">
           <span class="ob-label">Business type</span>
           <div class="ob-chips" id="obBizType">
@@ -343,21 +343,30 @@
             <div class="ob-chip" onclick="obToggle(this,'bizType')">Other</div>
           </div>
         </div>
+
         <div class="ob-section">
-          <span class="ob-label">How many transactions per month?</span>
-          <div class="ob-chips" id="obVolume">
-            <div class="ob-chip" onclick="obSelect(this,'volume')">Under 100</div>
-            <div class="ob-chip" onclick="obSelect(this,'volume')">100 &ndash; 500</div>
-            <div class="ob-chip" onclick="obSelect(this,'volume')">500 &ndash; 2K</div>
-            <div class="ob-chip" onclick="obSelect(this,'volume')">2K &ndash; 10K</div>
-            <div class="ob-chip" onclick="obSelect(this,'volume')">10K+</div>
+          <span class="ob-label">What are your typical transactions?</span>
+          <div class="ob-chips" id="obTxTypes">
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Payroll</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Vendor payments</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Client revenue</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Treasury mgmt</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">DeFi activity</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Intercompany transfers</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">SaaS subscriptions</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Contractor payments</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Grants / distributions</div>
           </div>
+        </div>
+        <div class="ob-section">
+          <span class="ob-label">Anything else Shepherd should know?</span>
+          <textarea class="ob-textarea" id="obNotes" placeholder="e.g. &quot;Biweekly payroll in round amounts&quot; or &quot;Most inflows are from 3 enterprise clients&quot;"></textarea>
         </div>
         <div class="ob-nav">
           <div></div>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(2)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
       <!-- Step 2: Chains & Tokens -->
@@ -390,39 +399,12 @@
         </div>
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
-          <button style="background:#3b82f6;color:#fff" onclick="obNext(3)">Continue &rarr;</button>
-        </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
-      </div>
-
-      <!-- Step 3: AI Context -->
-      <div class="ob-step" id="obStep3" style="display:none">
-        <h2>Train the AI</h2>
-        <div class="ob-sub">Help Shepherd understand your transaction patterns for higher classification accuracy.</div>
-        <div class="ob-section">
-          <span class="ob-label">What are your typical transactions?</span>
-          <div class="ob-chips" id="obTxTypes">
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Payroll</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Vendor payments</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Client revenue</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Treasury mgmt</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">DeFi activity</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Intercompany transfers</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">SaaS subscriptions</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Contractor payments</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Grants / distributions</div>
-          </div>
-        </div>
-        <div class="ob-section">
-          <span class="ob-label">Anything else Shepherd should know?</span>
-          <textarea class="ob-textarea" id="obNotes" placeholder="e.g. &quot;Biweekly payroll in round amounts&quot; or &quot;Most inflows are from 3 enterprise clients&quot;"></textarea>
-        </div>
-        <div class="ob-nav">
-          <button style="background:#f1f5f9;color:#475569" onclick="obNext(2)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
+
+
       <!-- Step 4: Automation -->
       <div class="ob-step" id="obStep4" style="display:none">
         <h2>Automations</h2>
@@ -484,10 +466,10 @@
         </div>
 
         <div class="ob-nav">
-          <button style="background:#f1f5f9;color:#475569" onclick="obNext(5)">&larr; Back</button>
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(2)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveAutomation();obNext(7)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
 
@@ -506,10 +488,10 @@
           <div id="obWalletList" style="margin-top:12px"></div>
         </div>
         <div class="ob-nav">
-          <button style="background:#f1f5f9;color:#475569" onclick="obNext(3)">&larr; Back</button>
-          <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obComplete()">Scan & Launch &rarr;</button>
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(7)">&larr; Back</button>
+          <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obComplete()">Scan &amp; Launch &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
       </div>
 
 
@@ -577,7 +559,7 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(4)">&larr; Back</button>
           <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obSaveGL();obComplete()">Scan & Launch &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
       </div>
       <!-- Step 6: Scanning -->
       <div class="ob-step" id="obStep6" style="display:none">
@@ -598,7 +580,7 @@
           <div id="obScanProgress" style="margin-bottom:8px"></div>
           <div style="font-size:11px;color:#94a3b8" id="obScanDetail"></div>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
       </div>
 
     </div>
@@ -1240,16 +1222,16 @@ function obNext(step){
 }
 function obComplete(){
   clientProfile.notes=(document.getElementById('obNotes')||{}).value||'';
-  // Auto-add wallet if there's one in the input field
-  const pendingAddr=(document.getElementById('obWalletAddr')||{}).value||'';
+  var pendingAddr=(document.getElementById('obWalletAddr')||{}).value||'';
   if(pendingAddr.trim())obAddWallet();
   if(!obWallets.length){
     document.getElementById('onboardScreen').style.display='none';
     document.getElementById('appShell').style.display='flex';
+    navTo('ledger');
     return;
   }
   obNext(6);
-  setTimeout(()=>obScanAll(),300);
+  setTimeout(function(){return obScanAll()},300);
 }
 
 async function obScanAll(){
@@ -1315,6 +1297,7 @@ async function obScanAll(){
   setTimeout(function(){
     document.getElementById('onboardScreen').style.display='none';
     document.getElementById('appShell').style.display='flex';
+    navTo('ledger');
     var firstWithData=wallets.find(function(w){return getStore(w.addr).txs.length>0});
     if(firstWithData){
       selectedWallets.clear();
