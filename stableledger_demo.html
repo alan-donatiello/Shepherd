@@ -414,38 +414,69 @@
         </div>
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
-      <!-- Step 4: Rules & AI -->
+      <!-- Step 4: Automation -->
       <div class="ob-step" id="obStep4" style="display:none">
         <h2>Set up automation</h2>
-        <div class="ob-section">
-          <span class="ob-label">AI auto-classification confidence</span>
-          <div class="ob-chips" id="obConfChips">
-            <div class="ob-chip" onclick="obSetConf(70,this)">70%</div>
-            <div class="ob-chip" onclick="obSetConf(80,this)">80%</div>
-            <div class="ob-chip selected" onclick="obSetConf(90,this)">90%</div>
-            <div class="ob-chip" onclick="obSetConf(95,this)">95%</div>
+
+        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:14px">
+          <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>
+            <span style="font-size:13px;font-weight:600;color:#0f172a">AI Auto-Classification</span>
+          </div>
+          <div style="padding:12px 14px">
+            <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Confidence Threshold</div>
+            <div class="ob-chips" id="obConfChips">
+              <div class="ob-chip" onclick="obSetConf(70,this)">70%</div>
+              <div class="ob-chip" onclick="obSetConf(80,this)">80%</div>
+              <div class="ob-chip selected" onclick="obSetConf(90,this)">90%</div>
+              <div class="ob-chip" onclick="obSetConf(95,this)">95%</div>
+            </div>
           </div>
         </div>
-        <div class="ob-section">
-          <span class="ob-label">Quick rules</span>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
-              <input type="checkbox" id="obRulePayroll"> Classify round outflows ($1,000+) on 1st/15th as <strong>Payroll</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
-              <input type="checkbox" id="obRuleRevenue"> Classify all inflows as <strong>Revenue - Services</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
-              <input type="checkbox" id="obRuleOps"> Classify small outflows (under $100) as <strong>Operations</strong>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
-              <input type="checkbox" id="obRuleSaas"> Classify recurring outflows ($50-$500) as <strong>Software & SaaS</strong>
-            </label>
+
+        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:14px">
+          <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" fill="none" stroke="#16a34a" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"/></svg>
+            <span style="font-size:13px;font-weight:600;color:#0f172a">Classification Rules</span>
+          </div>
+          <div style="padding:12px 14px">
+            <div id="obRulesPreview" style="margin-bottom:8px"></div>
+            <button style="font-size:12px;padding:7px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:5px" onclick="openObRuleBuilder()">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+              Add rule
+            </button>
           </div>
         </div>
+
+        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:14px">
+          <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" fill="none" stroke="#3b82f6" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
+            <span style="font-size:13px;font-weight:600;color:#0f172a">Notifications</span>
+          </div>
+          <div style="padding:12px 14px">
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+              <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:11px;color:#64748b;width:70px">Email</span>
+                <input type="email" id="obEmailAddr" placeholder="team@company.com" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;flex:1">
+                <input type="password" id="obEmailPass" placeholder="App password" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;width:110px">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:11px;color:#64748b;width:70px">Slack</span>
+                <input type="text" id="obSlack" placeholder="https://hooks.slack.com/services/..." style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;flex:1">
+              </div>
+            </div>
+            <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Send updates</div>
+            <div class="ob-chips">
+              <div class="ob-chip" onclick="obSelect(this,'notifFreq')">Real-time</div>
+              <div class="ob-chip selected" onclick="obSelect(this,'notifFreq')">Daily</div>
+              <div class="ob-chip" onclick="obSelect(this,'notifFreq')">Weekly</div>
+            </div>
+          </div>
+        </div>
+
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(3)">&larr; Back</button>
-          <button style="background:#3b82f6;color:#fff" onclick="obSaveRules();obNext(5)">Continue &rarr;</button>
+          <button style="background:#3b82f6;color:#fff" onclick="obSaveAutomation();obNext(5)">Continue &rarr;</button>
         </div>
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
       </div>
@@ -1231,25 +1262,71 @@ function obSetConf(val,el){
   el.classList.add('selected');
 }
 
-function obSaveRules(){
-  // Save AI threshold
-  // already saved via obSetConf updating the hidden input
+function openObRuleBuilder(){
+  var gl=document.getElementById('obRuleGl');
+  if(gl)gl.innerHTML=GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){return'<option value="'+o+'">'+o+'</option>'}).join('');
+  document.getElementById('obRuleOverlay').classList.add('open');
+}
+function closeObRuleBuilder(){document.getElementById('obRuleOverlay').classList.remove('open');}
 
-  // Create rules from checked quick rules
-  if(document.getElementById('obRulePayroll')&&document.getElementById('obRulePayroll').checked){
-    classificationRules.push({dir:'outflow',chain:'all',cp:'',amtMin:1000,amtMax:Infinity,glCode:'6110 - Payroll',created:new Date().toLocaleString()});
+function addObRule(){
+  var rule={
+    dir:document.getElementById('obRuleDir').value,
+    chain:document.getElementById('obRuleChain').value,
+    cp:(document.getElementById('obRuleCp').value||'').trim().toLowerCase(),
+    amtMin:parseFloat(document.getElementById('obRuleAmtMin').value)||0,
+    amtMax:parseFloat(document.getElementById('obRuleAmtMax').value)||Infinity,
+    glCode:document.getElementById('obRuleGl').value,
+    created:new Date().toLocaleString()
+  };
+  if(!rule.glCode){alert('Select a GL code');return;}
+  classificationRules.push(rule);
+  closeObRuleBuilder();
+  renderObRulesPreview();
+}
+
+function removeObRule(i){classificationRules.splice(i,1);renderObRulesPreview();}
+
+function renderObRulesPreview(){
+  var el=document.getElementById('obRulesPreview');
+  if(!el)return;
+  if(!classificationRules.length){el.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:4px 0">No rules yet.</div>';return;}
+  el.innerHTML=classificationRules.map(function(r,i){
+    var desc=[];
+    if(r.dir!=='all')desc.push(r.dir==='inflow'?'Inflows':'Outflows');
+    if(r.chain!=='all')desc.push(r.chain);
+    if(r.cp)desc.push('"'+r.cp+'"');
+    if(r.amtMin>0)desc.push('$'+r.amtMin+'+');
+    if(r.amtMax<Infinity)desc.push('≤$'+r.amtMax);
+    return'<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;margin-bottom:4px;font-size:12px">'
+      +'<span style="color:#475569">'+(desc.length?desc.join(' + '):'All')+'</span>'
+      +'<span style="display:flex;align-items:center;gap:6px"><span style="color:#16a34a;font-weight:500">→ '+r.glCode.split(' - ')[1]+'</span>'
+      +'<span style="color:#cbd5e1;cursor:pointer" onclick="removeObRule('+i+')">&times;</span></span></div>';
+  }).join('');
+}
+
+function obSaveAutomation(){
+  var emailAddr=(document.getElementById('obEmailAddr')||{}).value||'';
+  var emailPass=(document.getElementById('obEmailPass')||{}).value||'';
+  var slack=(document.getElementById('obSlack')||{}).value||'';
+
+  if(emailAddr&&emailPass){
+    emailConfig={smtp_host:'smtp.gmail.com',smtp_port:587,smtp_user:emailAddr,smtp_pass:emailPass,to:emailAddr};
+    document.getElementById('emailStatus').innerHTML='<span style="color:#16a34a">Connected: '+emailAddr+'</span>';
+    // Pre-fill automations page fields
+    var eu=document.getElementById('emailUser');if(eu)eu.value=emailAddr;
+    var ep=document.getElementById('emailPass');if(ep)ep.value=emailPass;
+    var et=document.getElementById('emailTo');if(et)et.value=emailAddr;
+    logAction('account','Email connected (onboarding)',emailAddr);
   }
-  if(document.getElementById('obRuleRevenue')&&document.getElementById('obRuleRevenue').checked){
-    classificationRules.push({dir:'inflow',chain:'all',cp:'',amtMin:0,amtMax:Infinity,glCode:'4100 - Revenue - Services',created:new Date().toLocaleString()});
-  }
-  if(document.getElementById('obRuleOps')&&document.getElementById('obRuleOps').checked){
-    classificationRules.push({dir:'outflow',chain:'all',cp:'',amtMin:0,amtMax:100,glCode:'6600 - Office & Operations',created:new Date().toLocaleString()});
-  }
-  if(document.getElementById('obRuleSaas')&&document.getElementById('obRuleSaas').checked){
-    classificationRules.push({dir:'outflow',chain:'all',cp:'',amtMin:50,amtMax:500,glCode:'6200 - Software & SaaS',created:new Date().toLocaleString()});
+  if(slack&&slack.startsWith('https://hooks.slack.com/')){
+    slackConfig={webhook_url:slack};
+    document.getElementById('slackStatus').innerHTML='<span style="color:#16a34a">Connected</span>';
+    var sw=document.getElementById('slackWebhook');if(sw)sw.value=slack;
+    logAction('account','Slack connected (onboarding)','webhook configured');
   }
   if(classificationRules.length>0){
-    logAction('account','Onboarding rules created',classificationRules.length+' rules');
+    logAction('account','Rules created (onboarding)',classificationRules.length+' rules');
   }
 }
 let obWallets=[];
@@ -2924,5 +3001,43 @@ window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
   </div>
 </div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<!-- ONBOARDING RULE BUILDER MODAL -->
+<div class="custom-overlay" id="obRuleOverlay" onclick="if(event.target===this)closeObRuleBuilder()" style="z-index:70">
+  <div class="custom-modal" style="max-width:480px">
+    <h3>Add Classification Rule</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;margin-bottom:8px">
+      <div class="cm-field">
+        <label>Direction</label>
+        <select id="obRuleDir" style="width:100%"><option value="all">Any</option><option value="inflow">Inflow</option><option value="outflow">Outflow</option></select>
+      </div>
+      <div class="cm-field">
+        <label>Chain</label>
+        <select id="obRuleChain" style="width:100%"><option value="all">Any</option><option value="base">Base</option><option value="solana">Solana</option></select>
+      </div>
+    </div>
+    <div class="cm-field">
+      <label>Counterparty contains</label>
+      <input id="obRuleCp" placeholder="Address or label...">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="cm-field">
+        <label>Amount min</label>
+        <input type="number" id="obRuleAmtMin" placeholder="0">
+      </div>
+      <div class="cm-field">
+        <label>Amount max</label>
+        <input type="number" id="obRuleAmtMax" placeholder="No limit">
+      </div>
+    </div>
+    <div class="cm-field">
+      <label>Classify as</label>
+      <select id="obRuleGl" style="width:100%"></select>
+    </div>
+    <div class="cm-actions">
+      <button style="background:#f1f5f9;color:#475569" onclick="closeObRuleBuilder()">Cancel</button>
+      <button style="background:#16a34a;color:#fff" onclick="addObRule()">Add Rule</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
