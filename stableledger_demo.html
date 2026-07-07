@@ -348,7 +348,7 @@
           <div></div>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(2)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
       <!-- Step 2: Chains & Tokens -->
@@ -383,7 +383,7 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(3)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
       <!-- Step 3: AI Context -->
@@ -412,11 +412,11 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(2)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
       <!-- Step 4: Automation -->
       <div class="ob-step" id="obStep4" style="display:none">
-        <h2>Set up automation</h2>
+        <h2>Automations</h2>
 
         <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:14px">
           <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px">
@@ -475,23 +475,22 @@
         </div>
 
         <div class="ob-nav">
-          <button style="background:#f1f5f9;color:#475569" onclick="obNext(3)">&larr; Back</button>
-          <button style="background:#3b82f6;color:#fff" onclick="obSaveAutomation();obNext(5)">Continue &rarr;</button>
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(5)">&larr; Back</button>
+          <button style="background:#3b82f6;color:#fff" onclick="obSaveAutomation();obNext(7)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
       </div>
 
 
       <!-- Step 5: Connect Wallets -->
       <div class="ob-step" id="obStep5" style="display:none">
         <h2>Connect your wallets</h2>
-        <div class="ob-sub">Add your wallet addresses and we'll start scanning immediately.</div>
         <div class="ob-section">
           <span class="ob-label">Wallet address</span>
           <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base) or Solana address">
           <div style="display:flex;gap:8px">
             <input class="ob-input" id="obWalletLabel" placeholder="Label (e.g. Treasury, Payroll)" style="flex:1">
-            <input class="ob-input" id="obLookback" type="number" placeholder="Blocks" style="width:80px;text-align:center" title="Lookback blocks">
+            <input class="ob-input" id="obLookback" type="number" placeholder="Blocks" style="width:80px;text-align:left" title="Lookback blocks">
             <button style="font-size:12px;padding:8px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap;height:38px" onclick="obAddWallet()">Add</button>
           </div>
           
@@ -504,6 +503,73 @@
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
       </div>
 
+
+      <!-- Step 7: Chart of Accounts -->
+      <div class="ob-step" id="obStep7" style="display:none">
+        <h2>Set up your chart of accounts</h2>
+        <div class="ob-section">
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="ob-chip selected" onclick="obGLMode('create',this)" id="obGLCreate" style="padding:8px 16px">Create from scratch</button>
+            <button class="ob-chip" onclick="obGLMode('upload',this)" id="obGLUpload" style="padding:8px 16px">Upload existing</button>
+          </div>
+        </div>
+
+        <div id="obGLCreateSection">
+          <div class="ob-section">
+            <span class="ob-label">Revenue accounts</span>
+            <div class="ob-chips" id="obGLRevChips">
+              <div class="ob-chip selected" onclick="obToggleGL(this)">4100 - Revenue - Services</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">4200 - Revenue - Product</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">4300 - Customer Refund</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">4400 - Interest Income</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">4500 - Staking Revenue</div>
+            </div>
+          </div>
+          <div class="ob-section">
+            <span class="ob-label">Expense accounts</span>
+            <div class="ob-chips" id="obGLExpChips">
+              <div class="ob-chip selected" onclick="obToggleGL(this)">6110 - Payroll</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">6200 - Software & SaaS</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">6300 - Cloud Infrastructure</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">6400 - Rent & Facilities</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">6420 - Marketing & Ads</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">6500 - Professional Services</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">6600 - Office & Operations</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">6700 - Travel & Entertainment</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">6800 - Insurance</div>
+              <div class="ob-chip" onclick="obToggleGL(this)">6900 - Depreciation</div>
+            </div>
+          </div>
+          <div class="ob-section">
+            <span class="ob-label">Transfer / balance sheet accounts</span>
+            <div class="ob-chips" id="obGLXferChips">
+              <div class="ob-chip selected" onclick="obToggleGL(this)">7100 - Intercompany Transfer</div>
+              <div class="ob-chip selected" onclick="obToggleGL(this)">1200 - Treasury Rebalance</div>
+            </div>
+          </div>
+          <div style="margin-top:8px">
+            <button style="font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:5px" onclick="openCustom()">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+              Add custom account
+            </button>
+          </div>
+        </div>
+
+        <div id="obGLUploadSection" style="display:none">
+          <div style="border:2px dashed #e2e8f0;border-radius:8px;padding:32px;text-align:center;color:#94a3b8;margin-bottom:12px">
+            <svg width="32" height="32" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+            <div style="font-size:13px;color:#64748b;margin-bottom:4px">Upload your chart of accounts</div>
+            <div style="font-size:11px">CSV or Excel with columns: Code, Name, Type</div>
+            <input type="file" id="obGLFile" accept=".csv,.xlsx" style="margin-top:12px;font-size:12px" onchange="obParseGLFile(this)">
+          </div>
+        </div>
+
+        <div class="ob-nav">
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(4)">&larr; Back</button>
+          <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obSaveGL();obComplete()">Scan & Launch &rarr;</button>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
+      </div>
       <!-- Step 6: Scanning -->
       <div class="ob-step" id="obStep6" style="display:none">
         <div style="text-align:center;padding:30px 0;color:#0f172a">
@@ -523,7 +589,7 @@
           <div id="obScanProgress" style="margin-bottom:8px"></div>
           <div style="font-size:11px;color:#94a3b8" id="obScanDetail"></div>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
       </div>
 
     </div>
@@ -1328,6 +1394,53 @@ function obSaveAutomation(){
   if(classificationRules.length>0){
     logAction('account','Rules created (onboarding)',classificationRules.length+' rules');
   }
+}
+
+// GL Setup
+function obGLMode(mode,el){
+  el.parentElement.querySelectorAll('.ob-chip').forEach(function(c){c.classList.remove('selected')});
+  el.classList.add('selected');
+  document.getElementById('obGLCreateSection').style.display=mode==='create'?'block':'none';
+  document.getElementById('obGLUploadSection').style.display=mode==='upload'?'block':'none';
+}
+function obToggleGL(el){el.classList.toggle('selected');}
+function obSaveGL(){
+  var selected=[];
+  document.querySelectorAll('#obGLRevChips .ob-chip.selected, #obGLExpChips .ob-chip.selected, #obGLXferChips .ob-chip.selected').forEach(function(el){
+    selected.push(el.textContent.trim());
+  });
+  if(selected.length>0){
+    GL_OPTIONS=['Unclassified'].concat(selected);
+    selected.forEach(function(code){
+      var prefix=code.split(' ')[0];
+      if(prefix.startsWith('4'))GL_TYPE[prefix]='revenue';
+      else if(prefix.startsWith('6')||prefix.startsWith('5'))GL_TYPE[prefix]='expense';
+      else GL_TYPE[prefix]='transfer';
+    });
+    logAction('account','Chart of accounts configured',selected.length+' accounts');
+  }
+}
+function obParseGLFile(input){
+  if(!input.files||!input.files[0])return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    var lines=text.split('\n').filter(function(l){return l.trim()});
+    if(lines.length>1){
+      var added=0;
+      for(var i=1;i<lines.length;i++){
+        var cols=lines[i].split(',').map(function(c){return c.trim().replace(/"/g,'')});
+        if(cols.length>=2){
+          var code=cols[0];var name=cols[1];var type=cols.length>2?cols[2].toLowerCase():'expense';
+          var entry=code+' - '+name;
+          if(!GL_OPTIONS.includes(entry)){GL_OPTIONS.push(entry);GL_TYPE[code]=type;added++;}
+        }
+      }
+      alert('Imported '+added+' accounts from file');
+      logAction('account','GL imported from file',added+' accounts');
+    }
+  };
+  reader.readAsText(input.files[0]);
 }
 let obWallets=[];
 function obAddWallet(){
