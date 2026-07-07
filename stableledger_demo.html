@@ -348,7 +348,7 @@
           <div></div>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(2)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
       <!-- Step 2: Chains & Tokens -->
@@ -383,7 +383,7 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(3)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
       <!-- Step 3: AI Context -->
@@ -412,11 +412,47 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(2)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+      </div>
+      <!-- Step 4: Rules & AI -->
+      <div class="ob-step" id="obStep4" style="display:none">
+        <h2>Set up automation</h2>
+        <div class="ob-section">
+          <span class="ob-label">AI auto-classification confidence</span>
+          <div class="ob-chips" id="obConfChips">
+            <div class="ob-chip" onclick="obSetConf(70,this)">70%</div>
+            <div class="ob-chip" onclick="obSetConf(80,this)">80%</div>
+            <div class="ob-chip selected" onclick="obSetConf(90,this)">90%</div>
+            <div class="ob-chip" onclick="obSetConf(95,this)">95%</div>
+          </div>
+        </div>
+        <div class="ob-section">
+          <span class="ob-label">Quick rules</span>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
+              <input type="checkbox" id="obRulePayroll"> Classify round outflows ($1,000+) on 1st/15th as <strong>Payroll</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
+              <input type="checkbox" id="obRuleRevenue"> Classify all inflows as <strong>Revenue - Services</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
+              <input type="checkbox" id="obRuleOps"> Classify small outflows (under $100) as <strong>Operations</strong>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;padding:8px 12px;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer">
+              <input type="checkbox" id="obRuleSaas"> Classify recurring outflows ($50-$500) as <strong>Software & SaaS</strong>
+            </label>
+          </div>
+        </div>
+        <div class="ob-nav">
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(3)">&larr; Back</button>
+          <button style="background:#3b82f6;color:#fff" onclick="obSaveRules();obNext(5)">Continue &rarr;</button>
+        </div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
       </div>
 
-      <!-- Step 4: Connect Wallets -->
-      <div class="ob-step" id="obStep4" style="display:none">
+
+      <!-- Step 5: Connect Wallets -->
+      <div class="ob-step" id="obStep5" style="display:none">
         <h2>Connect your wallets</h2>
         <div class="ob-sub">Add your wallet addresses and we'll start scanning immediately.</div>
         <div class="ob-section">
@@ -437,8 +473,8 @@
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
       </div>
 
-      <!-- Step 5: Scanning -->
-      <div class="ob-step" id="obStep5" style="display:none">
+      <!-- Step 6: Scanning -->
+      <div class="ob-step" id="obStep6" style="display:none">
         <div style="text-align:center;padding:30px 0;color:#0f172a">
           <div style="margin-bottom:24px">
             <svg width="48" height="48" viewBox="0 0 48 48" id="obSpinner" style="animation:obSpin 1.2s linear infinite">
@@ -456,7 +492,7 @@
           <div id="obScanProgress" style="margin-bottom:8px"></div>
           <div style="font-size:11px;color:#94a3b8" id="obScanDetail"></div>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
       </div>
 
     </div>
@@ -1106,7 +1142,7 @@ function obComplete(){
     document.getElementById('appShell').style.display='flex';
     return;
   }
-  obNext(5);
+  obNext(6);
   setTimeout(()=>obScanAll(),300);
 }
 
@@ -1164,6 +1200,12 @@ async function obScanAll(){
 
   logAction('account','Onboarding completed',obWallets.length+' wallets scanned, '+totalTxFound+' transactions');
 
+  // Apply onboarding rules to scanned transactions
+  if(classificationRules.length>0){
+    var ruleApplied=applyAllRules();
+    if(ruleApplied>0&&statusEl)statusEl.innerHTML='<span style="color:#16a34a">'+totalTxFound+' transactions found, '+ruleApplied+' auto-classified by rules</span>';
+  }
+
   setTimeout(function(){
     document.getElementById('onboardScreen').style.display='none';
     document.getElementById('appShell').style.display='flex';
@@ -1181,6 +1223,34 @@ async function obScanAll(){
 function skipOnboarding(){
   document.getElementById('onboardScreen').style.display='none';
   document.getElementById('appShell').style.display='flex';
+}
+
+function obSetConf(val,el){
+  document.getElementById('autoConfThreshold').value=val;
+  el.parentElement.querySelectorAll('.ob-chip').forEach(function(c){c.classList.remove('selected')});
+  el.classList.add('selected');
+}
+
+function obSaveRules(){
+  // Save AI threshold
+  // already saved via obSetConf updating the hidden input
+
+  // Create rules from checked quick rules
+  if(document.getElementById('obRulePayroll')&&document.getElementById('obRulePayroll').checked){
+    classificationRules.push({dir:'outflow',chain:'all',cp:'',amtMin:1000,amtMax:Infinity,glCode:'6110 - Payroll',created:new Date().toLocaleString()});
+  }
+  if(document.getElementById('obRuleRevenue')&&document.getElementById('obRuleRevenue').checked){
+    classificationRules.push({dir:'inflow',chain:'all',cp:'',amtMin:0,amtMax:Infinity,glCode:'4100 - Revenue - Services',created:new Date().toLocaleString()});
+  }
+  if(document.getElementById('obRuleOps')&&document.getElementById('obRuleOps').checked){
+    classificationRules.push({dir:'outflow',chain:'all',cp:'',amtMin:0,amtMax:100,glCode:'6600 - Office & Operations',created:new Date().toLocaleString()});
+  }
+  if(document.getElementById('obRuleSaas')&&document.getElementById('obRuleSaas').checked){
+    classificationRules.push({dir:'outflow',chain:'all',cp:'',amtMin:50,amtMax:500,glCode:'6200 - Software & SaaS',created:new Date().toLocaleString()});
+  }
+  if(classificationRules.length>0){
+    logAction('account','Onboarding rules created',classificationRules.length+' rules');
+  }
 }
 let obWallets=[];
 function obAddWallet(){
@@ -1425,7 +1495,10 @@ function navTo(id){
   showScreen(id);
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   document.getElementById("nav-"+id).classList.add("active");
-  if(id==='ledger'&&txs.length)renderLedger();
+  if(id==='ledger'){
+    if(selectedWallets.size>0)loadSelected();
+    if(txs.length)renderLedger();
+  }
   if(id==='config')renderWallets();
   if(id==='coa')renderCOA();
   if(id==='transactions')renderTxTable();
