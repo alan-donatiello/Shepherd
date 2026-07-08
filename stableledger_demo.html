@@ -1019,6 +1019,9 @@
           <div class="export-opt" onclick="exportGoogleSheets()">
             <span>Google Sheets</span><span class="eo-sub">Coming soon</span>
           </div>
+          <div class="export-opt" onclick="pushToQBO()">
+            <span>Push to QuickBooks</span><span class="eo-sub" id="qboExportStatus"></span>
+          </div>
         </div>
       </div>
       <button style="font-size:11px;font-weight:500;padding:5px 12px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:4px" onclick="refreshScan()" id="refreshBtn">
@@ -1155,8 +1158,8 @@
           <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
         </div>
         <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:13px;font-weight:500">ERP Integration</div><div style="font-size:11px;color:#94a3b8">Connect to QuickBooks, Xero, or NetSuite</div></div>
-          <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
+          <div><div style="font-size:13px;font-weight:500">QuickBooks Online</div><div style="font-size:11px;color:#94a3b8" id="qboSettingsStatus">Not connected</div></div>
+          <button style="font-size:11px;padding:4px 12px;border-radius:4px;border:none;background:#2CA01C;color:#fff;cursor:pointer" onclick="connectQBO()">Connect</button>
         </div>
         <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:13px;font-weight:500">Team Access</div><div style="font-size:11px;color:#94a3b8">Invite team members and manage permissions</div></div>
@@ -2429,6 +2432,76 @@ function acceptAiSuggestion(glCode){
   logAction('classification','AI suggestion accepted',`${glCode} for ${addr(txs[idx].hash)}`);
   classify(glCode);
 }
+
+// ============ QUICKBOOKS INTEGRATION ============
+var qboConnected=false;
+
+function connectQBO(){
+  var w=window.open('/qbo/auth','qbo_auth','width=600,height=700');
+  window.addEventListener('message',function handler(e){
+    if(e.data==='qbo_connected'){
+      qboConnected=true;
+      document.getElementById('qboSettingsStatus').innerHTML='<span style="color:#16a34a">Connected</span>';
+      var exp=document.getElementById('qboExportStatus');if(exp)exp.textContent='Connected';
+      logAction('account','QuickBooks connected','OAuth completed');
+      window.removeEventListener('message',handler);
+    }
+  });
+}
+
+async function checkQBOStatus(){
+  try{
+    var res=await fetch('/api/qbo/status');
+    var data=await res.json();
+    if(data.connected){
+      qboConnected=true;
+      document.getElementById('qboSettingsStatus').innerHTML='<span style="color:#16a34a">Connected</span>';
+      var exp=document.getElementById('qboExportStatus');if(exp)exp.textContent='Connected';
+    }
+  }catch(e){}
+}
+
+async function pushToQBO(){
+  document.getElementById('exportMenu').classList.remove('open');
+  if(!qboConnected){
+    if(confirm('QuickBooks is not connected. Connect now?'))connectQBO();
+    return;
+  }
+
+  // Build journal entries from classified transactions
+  var journals=[];
+  txs.forEach(function(t){
+    var gl=glOf(t.hash);
+    if(gl==='Unclassified')return;
+    var journal=getJournal(t);
+    journal.forEach(function(line){
+      journals.push({
+        amount:line.dr>0?line.dr:line.cr,
+        type:line.dr>0?'debit':'credit',
+        account_name:line.acct,
+        memo:gl+' - '+addr(t.origHash||t.hash),
+        date:new Date().toISOString().split('T')[0]
+      });
+    });
+  });
+
+  if(!journals.length){alert('No classified transactions to push.');return;}
+
+  try{
+    var res=await fetch('/api/qbo/push',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({journals:journals})});
+    var result=await res.json();
+    if(result.success){
+      alert('Journal entries pushed to QuickBooks! ID: '+result.id);
+      logAction('account','Pushed to QuickBooks',journals.length+' journal lines, ID: '+result.id);
+    } else {
+      alert('QuickBooks error: '+result.message);
+    }
+  }catch(e){alert('Push failed: '+e.message);}
+}
+
+// Check QBO status on load
+setTimeout(checkQBOStatus,1000);
 
 // ============ EXPORT ============
 function toggleExportMenu(e){e.stopPropagation();const m=document.getElementById('exportMenu');m.classList.toggle('open');
