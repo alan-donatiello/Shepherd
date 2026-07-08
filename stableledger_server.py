@@ -9,12 +9,16 @@ Then open http://localhost:8090 in your browser.
 """
 
 import json
+import base64
 import os
 import sys
 import time
 import threading
 import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
+try:
+    ssl._create_default_https_context = ssl._create_unverified_context
+except Exception:
+    pass
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -492,7 +496,7 @@ def qbo_refresh_access_token():
     if not qbo_tokens["refresh_token"]:
         return False
     try:
-        import base64
+
         auth = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
         body = urllib.parse.urlencode({
             "grant_type": "refresh_token",
@@ -699,6 +703,12 @@ def run_scan(wallet, lookback, from_block=None):
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        # Health check
+        if self.path == "/health":
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+            return
 
         if self.path == "/api/qbo/status":
             connected = bool(qbo_tokens["access_token"] and qbo_tokens["realm_id"])
@@ -716,7 +726,6 @@ class Handler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"<h3>QBO_CLIENT_ID not set. Set it as an environment variable.</h3>")
                 return
-            import urllib.parse
             params = urllib.parse.urlencode({
                 "client_id": QBO_CLIENT_ID,
                 "response_type": "code",
@@ -731,7 +740,6 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/qbo/callback"):
-            import urllib.parse
             query = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(query)
             code = params.get("code", [""])[0]
@@ -739,7 +747,6 @@ class Handler(SimpleHTTPRequestHandler):
 
             if code and realm_id:
                 try:
-                    import base64
                     auth = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
                     body = urllib.parse.urlencode({
                         "grant_type": "authorization_code",
