@@ -9,7 +9,6 @@ Then open http://localhost:8090 in your browser.
 """
 
 import json
-import base64
 import os
 import sys
 import time
@@ -436,91 +435,6 @@ class SolanaStablecoinLedger:
 
 
 
-# ======================== QUICKBOOKS INTEGRATION ========================
-QBO_CLIENT_ID = os.environ.get("QBO_CLIENT_ID", "")
-QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "")
-QBO_REDIRECT_URI = os.environ.get("QBO_REDIRECT_URI", "http://localhost:8090/qbo/callback")
-QBO_ENVIRONMENT = os.environ.get("QBO_ENVIRONMENT", "sandbox")  # sandbox or production
-
-qbo_tokens = {"access_token": None, "refresh_token": None, "realm_id": None, "expires_at": 0}
-
-def qbo_base_url():
-    if QBO_ENVIRONMENT == "production":
-        return "https://quickbooks.api.intuit.com"
-    return "https://sandbox-quickbooks.api.intuit.com"
-
-def qbo_push_journal_entry(journals, memo="Shepherd Auto-Generated"):
-    """Push classified journal entries to QuickBooks as a single journal entry."""
-    if not qbo_tokens["access_token"] or not qbo_tokens["realm_id"]:
-        return {"success": False, "message": "QuickBooks not connected"}
-
-    # Build QBO journal entry lines
-    lines = []
-    for j in journals:
-        # Each journal line needs an account reference
-        lines.append({
-            "DetailType": "JournalEntryLineDetail",
-            "Amount": round(j["amount"], 2),
-            "Description": j.get("memo", memo),
-            "JournalEntryLineDetail": {
-                "PostingType": "Debit" if j["type"] == "debit" else "Credit",
-                "AccountRef": {"name": j["account_name"]}
-            }
-        })
-
-    payload = {
-        "Line": lines,
-        "TxnDate": j.get("date", datetime.now().strftime("%Y-%m-%d")),
-        "PrivateNote": memo
-    }
-
-    try:
-        url = f"{qbo_base_url()}/v3/company/{qbo_tokens['realm_id']}/journalentry?minorversion=65"
-        body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=body, headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {qbo_tokens['access_token']}",
-            "Accept": "application/json"
-        })
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read().decode())
-        return {"success": True, "id": result.get("JournalEntry", {}).get("Id"), "message": "Journal entry created in QuickBooks"}
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode() if e.fp else str(e)
-        return {"success": False, "message": f"QBO Error {e.code}: {error_body[:200]}"}
-    except Exception as e:
-        return {"success": False, "message": str(e)[:200]}
-
-def qbo_refresh_access_token():
-    """Refresh the QBO access token using the refresh token."""
-    if not qbo_tokens["refresh_token"]:
-        return False
-    try:
-
-        auth = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
-        body = urllib.parse.urlencode({
-            "grant_type": "refresh_token",
-            "refresh_token": qbo_tokens["refresh_token"]
-        }).encode()
-        req = urllib.request.Request(
-            "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
-            data=body,
-            headers={
-                "Authorization": f"Basic {auth}",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json"
-            }
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            tokens = json.loads(resp.read().decode())
-        qbo_tokens["access_token"] = tokens["access_token"]
-        qbo_tokens["refresh_token"] = tokens["refresh_token"]
-        qbo_tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
-        return True
-    except Exception as e:
-        print(f"  [QBO] Token refresh error: {e}")
-        return False
-
 # ======================== HTTP SERVER ========================
 
 # Configure AI provider: "claude" or "gemini"
@@ -710,79 +624,6 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(b"ok")
             return
 
-        if self.path == "/api/qbo/status":
-            connected = bool(qbo_tokens["access_token"] and qbo_tokens["realm_id"])
-            self.send_response(200)
-            self._cors()
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"connected": connected, "realm_id": qbo_tokens.get("realm_id")}).encode())
-            return
-
-        if self.path.startswith("/qbo/auth"):
-            if not QBO_CLIENT_ID:
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html")
-                self.end_headers()
-                self.wfile.write(b"<h3>QBO_CLIENT_ID not set. Set it as an environment variable.</h3>")
-                return
-            params = urllib.parse.urlencode({
-                "client_id": QBO_CLIENT_ID,
-                "response_type": "code",
-                "scope": "com.intuit.quickbooks.accounting",
-                "redirect_uri": QBO_REDIRECT_URI,
-                "state": "shepherd"
-            })
-            auth_url = f"https://appcenter.intuit.com/connect/oauth2?{params}"
-            self.send_response(302)
-            self.send_header("Location", auth_url)
-            self.end_headers()
-            return
-
-        if self.path.startswith("/qbo/callback"):
-            query = urllib.parse.urlparse(self.path).query
-            params = urllib.parse.parse_qs(query)
-            code = params.get("code", [""])[0]
-            realm_id = params.get("realmId", [""])[0]
-
-            if code and realm_id:
-                try:
-                    auth = base64.b64encode(f"{QBO_CLIENT_ID}:{QBO_CLIENT_SECRET}".encode()).decode()
-                    body = urllib.parse.urlencode({
-                        "grant_type": "authorization_code",
-                        "code": code,
-                        "redirect_uri": QBO_REDIRECT_URI
-                    }).encode()
-                    req = urllib.request.Request(
-                        "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
-                        data=body,
-                        headers={
-                            "Authorization": f"Basic {auth}",
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Accept": "application/json"
-                        }
-                    )
-                    with urllib.request.urlopen(req, timeout=15) as resp:
-                        tokens = json.loads(resp.read().decode())
-
-                    qbo_tokens["access_token"] = tokens["access_token"]
-                    qbo_tokens["refresh_token"] = tokens["refresh_token"]
-                    qbo_tokens["realm_id"] = realm_id
-                    qbo_tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
-                    print(f"  [QBO] Connected! Realm ID: {realm_id}")
-
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html")
-                    self.end_headers()
-                    self.wfile.write(b"<html><body><h2>QuickBooks Connected!</h2><p>You can close this tab.</p><script>window.opener&&window.opener.postMessage('qbo_connected','*');setTimeout(()=>window.close(),2000)</script></body></html>")
-                except Exception as e:
-                    self.send_response(500)
-                    self.send_header("Content-Type", "text/html")
-                    self.end_headers()
-                    self.wfile.write(f"<h3>OAuth Error: {e}</h3>".encode())
-            return
-
-
         if self.path == "/" or self.path == "/index.html":
             html_path = Path(__file__).parent / "stableledger_demo.html"
             if html_path.exists():
@@ -920,26 +761,6 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
 
-        if self.path == "/api/qbo/push":
-            length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length).decode()) if length else {}
-            journals = body.get("journals", [])
-
-            # Refresh token if expired
-            if time.time() > qbo_tokens.get("expires_at", 0) - 300:
-                qbo_refresh_access_token()
-
-            print(f"  [QBO] Pushing {len(journals)} journal lines")
-            result = qbo_push_journal_entry(journals)
-            print(f"  [QBO] Result: {result}")
-
-            self.send_response(200)
-            self._cors()
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps(result).encode())
-            return
-
         if self.path == "/api/scan":
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode()) if length else {}
@@ -997,7 +818,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8090))
-    print(f"Shepherd server starting on http://localhost:{port}")
+    print(f"Shepherd server v2.1 starting on http://localhost:{port}")
     print(f"Open that URL in your browser.")
     if AI_PROVIDER == "gemini" and GEMINI_API_KEY:
         print(f"AI classification: Gemini Flash (enabled)")
