@@ -302,11 +302,11 @@
   .bulk-bar button{font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;border:none;cursor:pointer}
 
   /* Editable GL chips */
-  .gl-chip{font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:4px;position:relative}
+  .gl-chip{font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;transition:border-color .15s,background-color .15s;display:inline-flex;align-items:center;gap:4px;position:relative}
   .gl-chip:hover{border-color:#93c5fd}
   .gl-chip.selected{border-color:#3b82f6;background:#eff6ff;color:#3b82f6;font-weight:500}
-  .gl-chip .gl-edit{display:none;font-size:10px;color:#94a3b8;cursor:pointer;margin-left:2px}
-  .gl-chip:hover .gl-edit{display:inline}
+  .gl-chip .gl-edit{visibility:hidden;font-size:10px;color:#94a3b8;cursor:pointer;margin-left:2px;width:12px;display:inline-block;text-align:center}
+  .gl-chip:hover .gl-edit{visibility:visible}
   .gl-chip .gl-edit:hover{color:#3b82f6}
   .gl-chip input{border:none;outline:none;background:transparent;font-size:12px;color:inherit;font-weight:inherit;width:100%;font-family:inherit;padding:0}
 </style>
@@ -417,10 +417,10 @@
           <div style="padding:12px 14px">
             <div style="font-size:11px;font-weight:500;color:#334155;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Confidence Threshold</div>
             <div class="ob-chips" id="obConfChips">
-              <div class="ob-chip" onclick="obSetConf(70,this)">70%</div>
               <div class="ob-chip" onclick="obSetConf(80,this)">80%</div>
               <div class="ob-chip selected" onclick="obSetConf(90,this)">90%</div>
               <div class="ob-chip" onclick="obSetConf(95,this)">95%</div>
+              <div class="ob-chip" onclick="obSetConf(99,this)">99%</div>
             </div>
           </div>
         </div>
@@ -664,13 +664,13 @@
 
       <!-- Report selector -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px" id="reportCards">
-        <div style="padding:16px;border:2px solid #3b82f6;border-radius:8px;background:#eff6ff;cursor:pointer" onclick="showReport('rollforward')">
+        <div style="padding:16px;border:2px solid #3b82f6;border-radius:8px;background:#eff6ff;cursor:pointer" onclick="showReport('rollforward')" id="reportCard-rollforward">
           <div style="font-size:13px;font-weight:600;color:#1d4ed8;margin-bottom:2px">Asset Roll Forward</div>
           <div style="font-size:11px;color:#64748b">Opening → movements → closing balance</div>
         </div>
-        <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;cursor:default;opacity:.6">
+        <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer" onclick="showReport('trialbalance')" id="reportCard-trialbalance">
           <div style="font-size:13px;font-weight:500;color:#334155;margin-bottom:2px">Trial Balance</div>
-          <div style="font-size:11px;color:#94a3b8">Coming soon</div>
+          <div style="font-size:11px;color:#94a3b8">All accounts, debits & credits</div>
         </div>
         <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;cursor:default;opacity:.6">
           <div style="font-size:13px;font-weight:500;color:#334155;margin-bottom:2px">GL Detail</div>
@@ -683,7 +683,7 @@
       </div>
 
       <!-- Roll Forward Report -->
-      <div id="reportContent">
+      <div id="reportContent-rollforward">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
           <h3 style="font-size:16px;font-weight:600">Asset Roll Forward</h3>
           <button class="export-btn" onclick="exportRollForward()">
@@ -725,6 +725,34 @@
 
         <div id="rollForwardTable"></div>
       </div>
+
+      <!-- Trial Balance Report -->
+      <div id="reportContent-trialbalance" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h3 style="font-size:16px;font-weight:600">Trial Balance</h3>
+          <button class="export-btn" onclick="exportTrialBalance()">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+            Export CSV
+          </button>
+        </div>
+        <div class="filter-bar" style="margin-bottom:16px">
+          <div class="filter-group">
+            <label>Wallet</label>
+            <select id="tbWallet" onchange="renderTrialBalance()">
+              <option value="all">All wallets</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Chain</label>
+            <select id="tbChain" onchange="renderTrialBalance()">
+              <option value="all">All</option>
+              <option value="base">Base</option>
+              <option value="solana">Solana</option>
+            </select>
+          </div>
+        </div>
+        <div id="trialBalanceTable"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -750,10 +778,10 @@
             <div style="flex:1">
               <div style="font-size:12px;font-weight:500;color:#334155;margin-bottom:4px">Confidence threshold</div>
               <div style="display:flex;gap:6px">
-                <button class="ob-chip" onclick="setConfThreshold(70,this)" style="font-size:12px;padding:5px 12px">70%</button>
                 <button class="ob-chip" onclick="setConfThreshold(80,this)" style="font-size:12px;padding:5px 12px">80%</button>
                 <button class="ob-chip selected" onclick="setConfThreshold(90,this)" id="confBtn90" style="font-size:12px;padding:5px 12px">90%</button>
                 <button class="ob-chip" onclick="setConfThreshold(95,this)" style="font-size:12px;padding:5px 12px">95%</button>
+                <button class="ob-chip" onclick="setConfThreshold(99,this)" style="font-size:12px;padding:5px 12px">99%</button>
               </div>
               <input type="hidden" id="autoConfThreshold" value="90">
             </div>
@@ -1418,6 +1446,12 @@ function obEditGL(chip){
   input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();save();}});
 }
 function obSaveGL(){
+  var mode=document.getElementById('obGLCreate').classList.contains('selected')?'create':'upload';
+  if(mode==='upload'){
+    // File upload already pushed accounts into GL_OPTIONS via obParseGLFile - don't overwrite
+    logAction('account','Chart of accounts configured (uploaded)',(GL_OPTIONS.length-1)+' accounts');
+    return;
+  }
   var selected=[];
   document.querySelectorAll('#obGLRevChips .ob-chip.selected, #obGLExpChips .ob-chip.selected, #obGLXferChips .ob-chip.selected').forEach(function(el){
     var t=el.querySelector('.gl-text');selected.push(t?t.textContent.trim():el.textContent.trim());
@@ -1441,6 +1475,8 @@ function obParseGLFile(input){
     var lines=text.split('\n').filter(function(l){return l.trim()});
     if(lines.length>1){
       var added=0;
+      // Reset to just Unclassified before importing fresh from file
+      GL_OPTIONS=['Unclassified'];
       for(var i=1;i<lines.length;i++){
         var cols=lines[i].split(',').map(function(c){return c.trim().replace(/"/g,'')});
         if(cols.length>=2){
@@ -1893,8 +1929,7 @@ function onScanComplete(report){
   document.getElementById("scanBtn").textContent="Scan Wallet";
   document.getElementById("progressBar").classList.remove("active");
 
-  scanData=report;
-  txs=report.journals.map(j=>({
+  const newTxs=report.journals.map(j=>({
     hash:j.tx_hash,
     block:j.block_number,
     dir:j.direction,
@@ -1902,32 +1937,64 @@ function onScanComplete(report){
     cp:j.counterparty,
     gas:j.gas_usd||0
   }));
-  mappings={};cpMappings={};
-  activeWalletAddr=report.wallet;
 
-  // Save to persistent store
+  // Merge with existing history - never overwrite past transactions
   const store=getStore(report.wallet);
+  const existingHashes=new Set(store.txs.map(t=>t.hash));
+  let addedCount=0;
+  newTxs.forEach(t=>{
+    if(!existingHashes.has(t.hash)){
+      store.txs.push(t);
+      addedCount++;
+      // Auto-classify if we already know this counterparty
+      if(store.cpMappings[t.cp]){store.mappings[t.hash]=store.cpMappings[t.cp];}
+    }
+  });
+
   store.lastBlock=report.scan_range?report.scan_range.to_block:null;
-  store.txs=[...txs];
-  store.mappings={...mappings};
-  store.cpMappings={...cpMappings};
-  store.scanData=scanData;
   store.scanTime=new Date().toLocaleString();
+
+  // Recompute scanData summary from the FULL merged history, not just this scan
+  const allTx=store.txs;
+  const inTx=allTx.filter(t=>t.dir==='inflow');
+  const outTx=allTx.filter(t=>t.dir==='outflow');
+  store.scanData={
+    wallet:report.wallet,
+    summary:{
+      transfer_count:allTx.length,
+      inflow_count:inTx.length,
+      outflow_count:outTx.length,
+      total_usdc_in:inTx.reduce((s,t)=>s+t.amount,0),
+      total_usdc_out:outTx.reduce((s,t)=>s+t.amount,0),
+      net_usdc:inTx.reduce((s,t)=>s+t.amount,0)-outTx.reduce((s,t)=>s+t.amount,0)
+    },
+    scan_range:report.scan_range
+  };
+
+  // Load merged data into active view
+  scanData=store.scanData;
+  txs=[...store.txs];
+  mappings={...store.mappings};
+  cpMappings={...store.cpMappings};
+  activeWalletAddr=report.wallet;
   selectedWallets.clear();
   selectedWallets.add(report.wallet.toLowerCase());
 
-  // Update ledger badge
+  // Update ledger badge with unclassified count
   const badge=document.getElementById("ledgerBadge");
-  if(badge){badge.style.display="inline";badge.textContent=txs.length;}
+  if(badge){
+    const unc=txs.filter(t=>!mappings[t.hash]||mappings[t.hash]==='Unclassified').length;
+    badge.style.display=unc>0?"inline":"none";
+    badge.textContent=unc;
+  }
 
-  // Save state
-  saveToStore();
   renderWallets();
-  logAction('scan','Wallet scanned',`${addr(report.wallet)} - ${report.summary.transfer_count} transfers found (${report.summary.inflow_count} in, ${report.summary.outflow_count} out)`);
+  logAction('scan','Wallet scanned',`${addr(report.wallet)} - ${addedCount} new transfers (${allTx.length} total on record)`);
 
-  const s=report.summary;
+  const s=store.scanData.summary;
   document.getElementById("resultGrid").innerHTML=`
     <div class="wc-result-item">Transfers<strong>${s.transfer_count}</strong></div>
+    <div class="wc-result-item">New This Scan<strong style="color:#3b82f6">${addedCount}</strong></div>
     <div class="wc-result-item">Total In<strong>${fmtShort(s.total_usdc_in)}</strong></div>
     <div class="wc-result-item">Total Out<strong>${fmtShort(s.total_usdc_out)}</strong></div>`;
   document.getElementById("scanResult").classList.add("active");
@@ -2252,6 +2319,47 @@ function renderTx(){
   else{document.getElementById('aiSuggest').classList.remove('visible');}
 }
 
+async function exportReconciledToERP(){
+  var resultEl=document.getElementById('erpExportResult');
+  if(!qboConnected){
+    if(confirm('QuickBooks is not connected. Connect now?'))connectQBO();
+    return;
+  }
+
+  var journals=[];
+  txs.forEach(function(t){
+    var gl=glOf(t.hash);
+    if(gl==='Unclassified')return;
+    var journal=getJournal(t);
+    journal.forEach(function(line){
+      journals.push({
+        amount:line.dr>0?line.dr:line.cr,
+        type:line.dr>0?'debit':'credit',
+        account_name:line.acct,
+        memo:gl+' - '+addr(t.origHash||t.hash)
+      });
+    });
+  });
+
+  if(!journals.length){alert('No classified transactions to export.');return;}
+
+  resultEl.innerHTML='<div style="font-size:12px;color:#64748b">Pushing '+journals.length+' journal lines to QuickBooks...</div>';
+
+  try{
+    var res=await fetch('/api/qbo/push',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({journals:journals})});
+    var result=await res.json();
+    if(result.success){
+      resultEl.innerHTML='<div style="padding:10px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#166534;display:inline-block">✓ Journal entry created in QuickBooks — ID: '+result.id+'</div>';
+      logAction('account','Exported to QuickBooks',journals.length+' journal lines, ID: '+result.id);
+    } else {
+      resultEl.innerHTML='<div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b;display:inline-block">Error: '+result.message+'</div>';
+    }
+  }catch(e){
+    resultEl.innerHTML='<div style="padding:10px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b;display:inline-block">Push failed: '+e.message+'</div>';
+  }
+}
+
 function renderReconciled(){
   const s=scanData.summary;
 
@@ -2354,9 +2462,17 @@ function renderReconciled(){
       <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Digital Asset Change</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
     </div>
 
-    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;background:#f0fdf4;text-align:center">
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;background:#f0fdf4;text-align:center;margin-bottom:16px">
       <div style="font-size:13px;font-weight:600;color:#166534">On-chain activity fully reconciled to general ledger</div>
       <div style="font-size:11px;color:#3b82f6;margin-top:4px;cursor:pointer" onclick="navTo('auditlog')">View full audit trail &rarr;</div>
+    </div>
+
+    <div style="text-align:center">
+      <button style="font-size:13px;font-weight:600;padding:12px 28px;border-radius:8px;border:none;background:#2CA01C;color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:8px" onclick="exportReconciledToERP()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+        Export to ERP
+      </button>
+      <div id="erpExportResult" style="margin-top:12px"></div>
     </div>
   `;
 }
@@ -2921,7 +3037,127 @@ async function runAutoClassify(){
 }
 
 // ============ REPORTS ============
-function renderReports(){renderRollForward();}
+function renderReports(){renderRollForward();renderTrialBalance();}
+
+function showReport(name){
+  document.querySelectorAll('[id^="reportContent-"]').forEach(function(el){el.style.display='none';});
+  var target=document.getElementById('reportContent-'+name);
+  if(target)target.style.display='block';
+  document.querySelectorAll('[id^="reportCard-"]').forEach(function(el){
+    el.style.border='1px solid #e2e8f0';el.style.background='';
+    var title=el.querySelector('div');if(title){title.style.color='#334155';title.style.fontWeight='500';}
+  });
+  var card=document.getElementById('reportCard-'+name);
+  if(card){card.style.border='2px solid #3b82f6';card.style.background='#eff6ff';
+    var title=card.querySelector('div');if(title){title.style.color='#1d4ed8';title.style.fontWeight='600';}}
+  if(name==='trialbalance')renderTrialBalance();
+  if(name==='rollforward')renderRollForward();
+}
+
+function renderTrialBalance(){
+  var wrap=document.getElementById('trialBalanceTable');
+  if(!wrap)return;
+
+  var wSel=document.getElementById('tbWallet');
+  if(wSel){
+    var cur=wSel.value;
+    wSel.innerHTML='<option value="all">All wallets</option>'+
+      wallets.filter(function(w){var ws=getStore(w.addr);return ws.scanTime||ws.txs.length>0;}).map(function(w){return'<option value="'+w.addr+'">'+w.name+'</option>'}).join('');
+    wSel.value=cur;
+  }
+
+  var walletFilter=(document.getElementById('tbWallet')||{}).value||'all';
+  var chainFilter=(document.getElementById('tbChain')||{}).value||'all';
+
+  // Aggregate debits/credits per GL account across all classified transactions
+  var accounts={}; // code -> {name, type, debit, credit}
+  var totalDebit=0, totalCredit=0;
+
+  wallets.forEach(function(w){
+    if(walletFilter!=='all'&&w.addr.toLowerCase()!==walletFilter.toLowerCase())return;
+    if(chainFilter==='base'&&w.chain!=='Base')return;
+    if(chainFilter==='solana'&&w.chain!=='Solana')return;
+    var s=getStore(w.addr);
+    s.txs.forEach(function(t){
+      var gl=s.mappings[t.hash];
+      if(!gl||gl==='Unclassified')return;
+      var journal=getJournal(t);
+      journal.forEach(function(line){
+        var acctKey=line.acct;
+        if(!accounts[acctKey])accounts[acctKey]={name:acctKey,debit:0,credit:0};
+        accounts[acctKey].debit+=line.dr;
+        accounts[acctKey].credit+=line.cr;
+        totalDebit+=line.dr;
+        totalCredit+=line.cr;
+      });
+    });
+  });
+
+  var rows=Object.values(accounts).sort(function(a,b){return a.name.localeCompare(b.name);});
+
+  if(!rows.length){
+    wrap.innerHTML='<div style="padding:40px;text-align:center;color:#94a3b8;font-size:13px">No classified transactions yet. Classify transactions in the Ledger to populate the trial balance.</div>';
+    return;
+  }
+
+  var balanced=Math.abs(totalDebit-totalCredit)<0.02;
+
+  wrap.innerHTML='<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:13px">'
+    +'<thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">'
+    +'<th style="text-align:left;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Account</th>'
+    +'<th style="text-align:right;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Debit</th>'
+    +'<th style="text-align:right;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Credit</th>'
+    +'</tr></thead><tbody>'
+    +rows.map(function(a){
+      return'<tr style="border-bottom:1px solid #f1f5f9">'
+        +'<td style="padding:10px 16px;color:#334155">'+a.name+'</td>'
+        +'<td style="text-align:right;padding:10px 16px;color:'+(a.debit>0?'#1e293b':'#cbd5e1')+'">'+(a.debit>0?'$'+fmt(a.debit):'—')+'</td>'
+        +'<td style="text-align:right;padding:10px 16px;color:'+(a.credit>0?'#1e293b':'#cbd5e1')+'">'+(a.credit>0?'$'+fmt(a.credit):'—')+'</td>'
+        +'</tr>';
+    }).join('')
+    +'<tr style="background:#f8fafc;border-top:2px solid #cbd5e1"><td style="padding:12px 16px;font-weight:700;color:#0f172a">Total</td>'
+    +'<td style="text-align:right;padding:12px 16px;font-weight:700;color:#0f172a">$'+fmt(totalDebit)+'</td>'
+    +'<td style="text-align:right;padding:12px 16px;font-weight:700;color:#0f172a">$'+fmt(totalCredit)+'</td></tr>'
+    +'</tbody></table></div>'
+    +'<div style="margin-top:8px;padding:10px 14px;border-radius:6px;font-size:12px;font-weight:500;background:'+(balanced?'#f0fdf4':'#fef2f2')+';color:'+(balanced?'#166534':'#991b1b')+'">'
+    +(balanced?'✓ Debits = Credits: Balanced':'⚠ Out of balance by $'+fmt(Math.abs(totalDebit-totalCredit)))+'</div>';
+}
+
+function exportTrialBalance(){
+  var walletFilter=(document.getElementById('tbWallet')||{}).value||'all';
+  var chainFilter=(document.getElementById('tbChain')||{}).value||'all';
+  var accounts={};var totalDebit=0,totalCredit=0;
+
+  wallets.forEach(function(w){
+    if(walletFilter!=='all'&&w.addr.toLowerCase()!==walletFilter.toLowerCase())return;
+    if(chainFilter==='base'&&w.chain!=='Base')return;
+    if(chainFilter==='solana'&&w.chain!=='Solana')return;
+    var s=getStore(w.addr);
+    s.txs.forEach(function(t){
+      var gl=s.mappings[t.hash];
+      if(!gl||gl==='Unclassified')return;
+      var journal=getJournal(t);
+      journal.forEach(function(line){
+        if(!accounts[line.acct])accounts[line.acct]={debit:0,credit:0};
+        accounts[line.acct].debit+=line.dr;accounts[line.acct].credit+=line.cr;
+        totalDebit+=line.dr;totalCredit+=line.cr;
+      });
+    });
+  });
+
+  var rows=[['Trial Balance'],[''],['Account','Debit','Credit']];
+  Object.entries(accounts).sort(function(a,b){return a[0].localeCompare(b[0])}).forEach(function(e){
+    rows.push([e[0],e[1].debit.toFixed(2),e[1].credit.toFixed(2)]);
+  });
+  rows.push(['Total',totalDebit.toFixed(2),totalCredit.toFixed(2)]);
+  rows.push(['','']);rows.push(['Generated',new Date().toLocaleString()]);
+
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+c+'"'}).join(',')}).join('\n');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));
+  a.download='shepherd_trial_balance.csv';a.click();
+  logAction('scan','Export Trial Balance',Object.keys(accounts).length+' accounts');
+}
 
 function renderRollForward(){
   const wrap=document.getElementById('rollForwardTable');
