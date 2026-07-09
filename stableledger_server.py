@@ -14,12 +14,8 @@ import sys
 import time
 import threading
 import ssl
-try:
-    ssl._create_default_https_context = ssl._create_unverified_context
-except Exception:
-    pass
+ssl._create_default_https_context = ssl._create_unverified_context
 import urllib.error
-import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -617,14 +613,6 @@ def run_scan(wallet, lookback, from_block=None):
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        print(f"  [REQUEST] GET {self.path}", flush=True)
-        # Health check
-        if self.path == "/health":
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"ok")
-            return
-
         if self.path == "/" or self.path == "/index.html":
             html_path = Path(__file__).parent / "stableledger_demo.html"
             if html_path.exists():
@@ -819,10 +807,8 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8090))
-    print(f"Shepherd server v2.2 starting on http://localhost:{port}", flush=True)
-    print(f"Open that URL in your browser.", flush=True)
-    html_check = Path(__file__).parent / "stableledger_demo.html"
-    print(f"HTML file: {html_check} exists={html_check.exists()} size={html_check.stat().st_size if html_check.exists() else 0}", flush=True)
+    print(f"Shepherd server starting on http://localhost:{port}")
+    print(f"Open that URL in your browser.")
     if AI_PROVIDER == "gemini" and GEMINI_API_KEY:
         print(f"AI classification: Gemini Flash (enabled)")
     elif AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
