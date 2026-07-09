@@ -1694,7 +1694,9 @@ const pfx=g=>g.split(" - ")[0];
 // ============ SCREEN MANAGEMENT ============
 function showScreen(id){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));document.getElementById("screen-"+id).classList.add("active");}
 function navTo(id){
-  saveToStore();// save current state before switching
+  // Only save ledger state when leaving the ledger page
+  var currentScreen=document.querySelector('.screen.active');
+  if(currentScreen&&currentScreen.id==='screen-ledger')saveToStore();
   showScreen(id);
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   document.getElementById("nav-"+id).classList.add("active");
