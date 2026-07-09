@@ -1469,27 +1469,50 @@ function obSaveGL(){
 }
 function obParseGLFile(input){
   if(!input.files||!input.files[0])return;
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var text=e.target.result;
-    var lines=text.split('\n').filter(function(l){return l.trim()});
-    if(lines.length>1){
-      var added=0;
-      // Reset to just Unclassified before importing fresh from file
-      GL_OPTIONS=['Unclassified'];
-      for(var i=1;i<lines.length;i++){
-        var cols=lines[i].split(',').map(function(c){return c.trim().replace(/"/g,'')});
-        if(cols.length>=2){
-          var code=cols[0];var name=cols[1];var type=cols.length>2?cols[2].toLowerCase():'expense';
-          var entry=code+' - '+name;
-          if(!GL_OPTIONS.includes(entry)){GL_OPTIONS.push(entry);GL_TYPE[code]=type;added++;}
-        }
-      }
-      alert('Imported '+added+' accounts from file');
-      logAction('account','GL imported from file',added+' accounts');
-    }
-  };
-  reader.readAsText(input.files[0]);
+  var file=input.files[0];
+  var isExcel=file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls');
+
+  if(isExcel){
+    if(typeof XLSX==='undefined'){alert('Excel parser still loading, try again in a moment or use CSV.');return;}
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var data=new Uint8Array(e.target.result);
+        var wb=XLSX.read(data,{type:'array'});
+        var sheet=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+        importGLRows(rows);
+      }catch(err){alert('Could not read Excel file: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    var reader2=new FileReader();
+    reader2.onload=function(e){
+      var text=e.target.result;
+      var lines=text.split('\n').filter(function(l){return l.trim()});
+      var rows=lines.map(function(l){return l.split(',').map(function(c){return c.trim().replace(/^"|"$/g,'')})});
+      importGLRows(rows);
+    };
+    reader2.readAsText(file);
+  }
+}
+
+function importGLRows(rows){
+  if(rows.length<2){alert('File needs a header row plus at least one account.');return;}
+  var added=0;
+  GL_OPTIONS=['Unclassified'];
+  for(var i=1;i<rows.length;i++){
+    var cols=rows[i];
+    if(!cols||cols.length<2)continue;
+    var code=String(cols[0]||'').trim();
+    var name=String(cols[1]||'').trim();
+    var type=cols.length>2?String(cols[2]||'').trim().toLowerCase():'expense';
+    if(!code||!name)continue;
+    var entry=code+' - '+name;
+    if(!GL_OPTIONS.includes(entry)){GL_OPTIONS.push(entry);GL_TYPE[code]=type||'expense';added++;}
+  }
+  alert('Imported '+added+' accounts from file');
+  logAction('account','GL imported from file',added+' accounts');
 }
 let obWallets=[];
 function obAddWallet(){
