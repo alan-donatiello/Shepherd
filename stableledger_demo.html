@@ -424,13 +424,17 @@
                 <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Email
                   <span class="help-icon" onclick="toggleHelpPopup('obEmailHelp',event)">?
                     <div class="help-popup" id="obEmailHelp">
-                      <div class="hp-title">Email via Gmail SMTP</div>
-                      Use a Gmail address and an <strong>App Password</strong> — not your normal login password. Generate one at <a href="https://myaccount.google.com/apppasswords" target="_blank" onclick="event.stopPropagation()">myaccount.google.com/apppasswords</a> (requires 2-step verification enabled). Daily updates will be sent from this address.
+                      <div class="hp-title">Email via SMTP</div>
+                      Works with Gmail, Outlook/Office 365, or any custom SMTP server — just leave the server field blank for Gmail, or enter your own. Gmail/Outlook need an <strong>app password</strong>, not your normal login password.
                     </div>
                   </span>
                 </span>
                 <input type="email" id="obEmailAddr" placeholder="team@company.com" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;flex:1">
                 <input type="password" id="obEmailPass" placeholder="App password" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;width:110px">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span style="font-size:11px;color:#64748b;width:70px"></span>
+                <input type="text" id="obEmailSmtpHost" placeholder="SMTP server (leave blank for Gmail)" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;flex:1">
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Slack
@@ -1163,11 +1167,11 @@
                 <svg width="18" height="18" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
               </div>
               <div>
-                <div style="font-size:13px;font-weight:500;color:#0f172a;display:flex;align-items:center;gap:5px">Email (Gmail SMTP)
+                <div style="font-size:13px;font-weight:500;color:#0f172a;display:flex;align-items:center;gap:5px">Email
                   <span class="help-icon" onclick="toggleHelpPopup('autoEmailHelp',event)">?
                     <div class="help-popup" id="autoEmailHelp">
-                      <div class="hp-title">Email via Gmail SMTP</div>
-                      Use a Gmail address and an <strong>App Password</strong> — not your normal login password. Generate one at <a href="https://myaccount.google.com/apppasswords" target="_blank" onclick="event.stopPropagation()">myaccount.google.com/apppasswords</a> (requires 2-step verification enabled).
+                      <div class="hp-title">Email via SMTP</div>
+                      Works with Gmail, Outlook/Office 365, or any custom SMTP server. Gmail and Outlook require an <strong>app password</strong>, not your normal login password — Gmail: <a href="https://myaccount.google.com/apppasswords" target="_blank" onclick="event.stopPropagation()">myaccount.google.com/apppasswords</a>. Outlook: Security → App Passwords in account settings.
                     </div>
                   </span>
                 </div>
@@ -1175,16 +1179,28 @@
               </div>
             </div>
             <div id="emailForm">
+              <div style="margin-bottom:8px">
+                <select id="emailProvider" onchange="onEmailProviderChange()" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;width:100%">
+                  <option value="gmail">Gmail (smtp.gmail.com)</option>
+                  <option value="outlook">Outlook / Office 365 (smtp.office365.com)</option>
+                  <option value="yahoo">Yahoo Mail (smtp.mail.yahoo.com)</option>
+                  <option value="custom">Custom SMTP server...</option>
+                </select>
+              </div>
+              <div id="customSmtpFields" style="display:none;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
+                <input type="text" id="emailSmtpHost" placeholder="smtp.yourcompany.com" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+                <input type="number" id="emailSmtpPort" placeholder="Port (587)" value="587" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+              </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-                <input type="email" id="emailUser" placeholder="your@gmail.com" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
-                <input type="password" id="emailPass" placeholder="App password" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+                <input type="email" id="emailUser" placeholder="you@company.com" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+                <input type="password" id="emailPass" placeholder="Password / app password" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <input type="email" id="emailTo" placeholder="Send updates to..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
                 <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectEmail()">Connect</button>
                 <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testEmail()">Send Test</button>
               </div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:6px">Gmail users: generate an app password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#3b82f6">myaccount.google.com/apppasswords</a></div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:6px" id="emailProviderHint">Gmail users: generate an app password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#3b82f6">myaccount.google.com/apppasswords</a></div>
             </div>
           </div>
           <!-- Slack -->
@@ -1482,16 +1498,23 @@ function renderObRulesPreview(){
 function obSaveAutomation(){
   var emailAddr=(document.getElementById('obEmailAddr')||{}).value||'';
   var emailPass=(document.getElementById('obEmailPass')||{}).value||'';
+  var smtpHost=((document.getElementById('obEmailSmtpHost')||{}).value||'').trim();
   var slack=(document.getElementById('obSlack')||{}).value||'';
 
   if(emailAddr&&emailPass){
-    emailConfig={smtp_host:'smtp.gmail.com',smtp_port:587,smtp_user:emailAddr,smtp_pass:emailPass,to:emailAddr};
-    document.getElementById('emailStatus').innerHTML='<span style="color:#16a34a">Connected: '+emailAddr+'</span>';
+    var host=smtpHost||'smtp.gmail.com';
+    emailConfig={smtp_host:host,smtp_port:587,smtp_user:emailAddr,smtp_pass:emailPass,to:emailAddr};
+    document.getElementById('emailStatus').innerHTML='<span style="color:#16a34a">Connected: '+emailAddr+' via '+host+'</span>';
     // Pre-fill automations page fields
     var eu=document.getElementById('emailUser');if(eu)eu.value=emailAddr;
     var ep=document.getElementById('emailPass');if(ep)ep.value=emailPass;
     var et=document.getElementById('emailTo');if(et)et.value=emailAddr;
-    logAction('account','Email connected (onboarding)',emailAddr);
+    if(smtpHost){
+      var provSel=document.getElementById('emailProvider');if(provSel)provSel.value='custom';
+      var customFields=document.getElementById('customSmtpFields');if(customFields)customFields.style.display='grid';
+      var smtpHostField=document.getElementById('emailSmtpHost');if(smtpHostField)smtpHostField.value=smtpHost;
+    }
+    logAction('account','Email connected (onboarding)',emailAddr+' via '+host);
   }
   if(slack&&slack.startsWith('https://hooks.slack.com/')){
     slackConfig={webhook_url:slack};
@@ -2733,17 +2756,20 @@ function toggleHelpPopup(id,event){
   var wasOpen=popup.classList.contains('open');
   document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open');p.classList.remove('flip-up')});
   if(!wasOpen){
-    // Decide open direction based on available space below the icon
+    popup.classList.remove('flip-up');
+    popup.classList.add('open'); // renders now (display:block) so we can measure real size
     var icon=event.currentTarget||event.target.closest('.help-icon');
     if(icon){
-      var rect=icon.getBoundingClientRect();
-      var spaceBelow=window.innerHeight-rect.bottom;
-      var popupHeight=popup.scrollHeight||140; // estimate before it's visible
-      if(spaceBelow<popupHeight+20){
+      var iconRect=icon.getBoundingClientRect();
+      var popupRect=popup.getBoundingClientRect();
+      var popupHeight=popupRect.height;
+      var spaceBelow=window.innerHeight-iconRect.bottom;
+      var spaceAbove=iconRect.top;
+      // Open upward only if there's not enough room below AND there IS enough room above
+      if(spaceBelow<popupHeight+16 && spaceAbove>=popupHeight+16){
         popup.classList.add('flip-up');
       }
     }
-    popup.classList.add('open');
     var close=function(e){if(!popup.contains(e.target)){popup.classList.remove('open');popup.classList.remove('flip-up');document.removeEventListener('click',close);}};
     setTimeout(function(){document.addEventListener('click',close)},0);
   }
@@ -3029,14 +3055,43 @@ function setConfThreshold(val,el){
   el.classList.add('selected');
 }
 
+var EMAIL_PROVIDERS={
+  gmail:{host:'smtp.gmail.com',port:587,hint:'Gmail users: generate an app password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#3b82f6">myaccount.google.com/apppasswords</a>'},
+  outlook:{host:'smtp.office365.com',port:587,hint:'Outlook/Office 365: create an app password under Security → App Passwords in your Microsoft account settings.'},
+  yahoo:{host:'smtp.mail.yahoo.com',port:587,hint:'Yahoo Mail: generate an app password under Account Security → Generate app password.'},
+  custom:{host:'',port:587,hint:'Enter your organization\\'s SMTP server details. Check with your IT team if unsure.'}
+};
+
+function onEmailProviderChange(){
+  var provider=document.getElementById('emailProvider').value;
+  var customFields=document.getElementById('customSmtpFields');
+  var hint=document.getElementById('emailProviderHint');
+  var cfg=EMAIL_PROVIDERS[provider];
+  customFields.style.display=provider==='custom'?'grid':'none';
+  if(hint)hint.innerHTML=cfg.hint;
+}
+
 function connectEmail(){
   var user=document.getElementById('emailUser').value.trim();
   var pass=document.getElementById('emailPass').value.trim();
   var to=document.getElementById('emailTo').value.trim();
   if(!user||!pass||!to){alert('Fill in all email fields');return;}
-  emailConfig={smtp_host:'smtp.gmail.com',smtp_port:587,smtp_user:user,smtp_pass:pass,to:to};
-  document.getElementById('emailStatus').innerHTML='<span style="color:#16a34a">Connected: '+to+'</span>';
-  logAction('account','Email connected',to);
+
+  var providerEl=document.getElementById('emailProvider');
+  var provider=providerEl?providerEl.value:'gmail';
+  var host,port;
+  if(provider==='custom'){
+    host=document.getElementById('emailSmtpHost').value.trim();
+    port=parseInt(document.getElementById('emailSmtpPort').value)||587;
+    if(!host){alert('Enter your SMTP server address');return;}
+  } else {
+    host=EMAIL_PROVIDERS[provider].host;
+    port=EMAIL_PROVIDERS[provider].port;
+  }
+
+  emailConfig={smtp_host:host,smtp_port:port,smtp_user:user,smtp_pass:pass,to:to};
+  document.getElementById('emailStatus').innerHTML='<span style="color:#16a34a">Connected: '+to+' via '+host+'</span>';
+  logAction('account','Email connected',to+' via '+host);
   updateDailyPreview();
 }
 
