@@ -475,20 +475,94 @@ def qbo_refresh_access_token():
         print(f"  [QBO] Token refresh error: {e}")
         return False
 
+def qbo_get_accounts():
+    """Fetch the chart of accounts from QBO to map names to IDs."""
+    if not qbo_tokens["access_token"] or not qbo_tokens["realm_id"]:
+        return {"success": False, "message": "QuickBooks not connected"}
+    try:
+        query = "SELECT Id, Name, AccountType FROM Account MAXRESULTS 1000"
+        url = f"{qbo_base_url()}/v3/company/{qbo_tokens['realm_id']}/query?query={urllib.parse.quote(query)}&minorversion=65"
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Bearer {qbo_tokens['access_token']}",
+            "Accept": "application/json"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode())
+        accounts = result.get("QueryResponse", {}).get("Account", [])
+        return {"success": True, "accounts": [{"id": a["Id"], "name": a["Name"], "type": a.get("AccountType", "")} for a in accounts]}
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else str(e)
+        return {"success": False, "message": f"QBO Error {e.code}: {error_body[:200]}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)[:200]}
+
+def qbo_create_account(name, acct_type):
+    """Create a new account in QBO's chart of accounts."""
+    qbo_type_map = {
+        "revenue": "Income",
+        "expense": "Expense",
+        "transfer": "Other Current Asset"
+    }
+    payload = {
+        "Name": name,
+        "AccountType": qbo_type_map.get(acct_type, "Expense")
+    }
+    try:
+        url = f"{qbo_base_url()}/v3/company/{qbo_tokens['realm_id']}/account?minorversion=65"
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {qbo_tokens['access_token']}",
+            "Accept": "application/json"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode())
+        return result.get("Account", {}).get("Id")
+    except Exception as e:
+        print(f"  [QBO] Could not create account '{name}': {e}")
+        return None
+
 def qbo_push_journal_entry(journals, memo="Shepherd Auto-Generated"):
     if not qbo_tokens["access_token"] or not qbo_tokens["realm_id"]:
         return {"success": False, "message": "QuickBooks not connected"}
+
+    acct_result = qbo_get_accounts()
+    if not acct_result.get("success"):
+        return {"success": False, "message": "Could not fetch QBO accounts: " + acct_result.get("message", "")}
+
+    qbo_accounts = acct_result["accounts"]
+    name_to_id = {a["name"].lower(): a["id"] for a in qbo_accounts}
+
     lines = []
+    created = []
     for j in journals:
+        acct_name = j.get("account_name", "")
+        acct_id = name_to_id.get(acct_name.lower())
+
+        if not acct_id:
+            # Auto-create the missing account in QBO so it matches Shepherd's chart exactly
+            gl_type = j.get("gl_type", "expense")
+            new_id = qbo_create_account(acct_name, gl_type)
+            if new_id:
+                acct_id = new_id
+                name_to_id[acct_name.lower()] = new_id
+                created.append(acct_name)
+
+        if not acct_id:
+            continue
+
         lines.append({
             "DetailType": "JournalEntryLineDetail",
             "Amount": round(j["amount"], 2),
             "Description": j.get("memo", memo),
             "JournalEntryLineDetail": {
                 "PostingType": "Debit" if j["type"] == "debit" else "Credit",
-                "AccountRef": {"name": j["account_name"]}
+                "AccountRef": {"value": acct_id}
             }
         })
+
+    if not lines:
+        return {"success": False, "message": "No accounts could be matched or created in QBO."}
+
     payload = {"Line": lines, "TxnDate": datetime.now().strftime("%Y-%m-%d"), "PrivateNote": memo}
     try:
         url = f"{qbo_base_url()}/v3/company/{qbo_tokens['realm_id']}/journalentry?minorversion=65"
@@ -499,10 +573,13 @@ def qbo_push_journal_entry(journals, memo="Shepherd Auto-Generated"):
         })
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read().decode())
-        return {"success": True, "id": result.get("JournalEntry", {}).get("Id"), "message": "Journal entry created"}
+        msg = "Journal entry created"
+        if created:
+            msg += f" ({len(created)} new account(s) created in QBO: {', '.join(set(created))})"
+        return {"success": True, "id": result.get("JournalEntry", {}).get("Id"), "message": msg}
     except urllib.error.HTTPError as e:
         error_body = e.read().decode() if e.fp else str(e)
-        return {"success": False, "message": f"QBO Error {e.code}: {error_body[:200]}"}
+        return {"success": False, "message": f"QBO Error {e.code}: {error_body[:300]}"}
     except Exception as e:
         return {"success": False, "message": str(e)[:200]}
 
@@ -688,6 +765,15 @@ def run_scan(wallet, lookback, from_block=None):
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/api/qbo/accounts":
+            result = qbo_get_accounts()
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
         if self.path == "/api/qbo/status":
             connected = bool(qbo_tokens["access_token"] and qbo_tokens["realm_id"])
             self.send_response(200)

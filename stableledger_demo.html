@@ -2355,10 +2355,15 @@ async function exportReconciledToERP(){
     if(gl==='Unclassified')return;
     var journal=getJournal(t);
     journal.forEach(function(line){
+      var lineType='transfer';
+      var acctPrefix=(line.acct.split(' ')[0]||'');
+      if(GL_TYPE[acctPrefix])lineType=GL_TYPE[acctPrefix];
+      else if(line.acct.toLowerCase().includes('usdc')||line.acct.toLowerCase().includes('eth')||line.acct.toLowerCase().includes('sol'))lineType='transfer';
       journals.push({
         amount:line.dr>0?line.dr:line.cr,
         type:line.dr>0?'debit':'credit',
         account_name:line.acct,
+        gl_type:lineType,
         memo:gl+' - '+addr(t.origHash||t.hash)
       });
     });
@@ -2616,10 +2621,14 @@ async function pushToQBO(){
     if(gl==='Unclassified')return;
     var journal=getJournal(t);
     journal.forEach(function(line){
+      var lineType='transfer';
+      var acctPrefix=(line.acct.split(' ')[0]||'');
+      if(GL_TYPE[acctPrefix])lineType=GL_TYPE[acctPrefix];
       journals.push({
         amount:line.dr>0?line.dr:line.cr,
         type:line.dr>0?'debit':'credit',
         account_name:line.acct,
+        gl_type:lineType,
         memo:gl+' - '+addr(t.origHash||t.hash),
         date:new Date().toISOString().split('T')[0]
       });
