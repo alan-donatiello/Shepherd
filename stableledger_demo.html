@@ -226,9 +226,11 @@
   /* Help tooltip icons */
   .help-icon{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:700;font-style:normal;cursor:pointer;flex-shrink:0;position:relative;user-select:none}
   .help-icon:hover{background:#3b82f6;color:#fff}
-  .help-popup{display:none;position:absolute;z-index:200;bottom:calc(100% + 8px);left:0;width:260px;background:#0f172a;color:#f1f5f9;font-size:12px;font-weight:400;line-height:1.6;padding:12px 14px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:left}
+  .help-popup{display:none;position:absolute;z-index:200;top:calc(100% + 8px);left:0;width:260px;background:#0f172a;color:#f1f5f9;font-size:12px;font-weight:400;line-height:1.6;padding:12px 14px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:left}
+  .help-popup.flip-up{top:auto;bottom:calc(100% + 8px)}
+  .help-popup.flip-up::before{top:100%;bottom:auto;border-top-color:#0f172a;border-bottom-color:transparent}
   .help-popup.open{display:block}
-  .help-popup::before{content:'';position:absolute;top:100%;left:8px;border:6px solid transparent;border-top-color:#0f172a}
+  .help-popup::before{content:'';position:absolute;bottom:100%;left:8px;border:6px solid transparent;border-bottom-color:#0f172a}
   .help-popup a{color:#93c5fd}
   .help-popup .hp-title{font-weight:600;color:#fff;margin-bottom:4px;font-size:12px}
   @keyframes obSpin{to{transform:rotate(360deg)}}
@@ -2729,10 +2731,20 @@ function toggleHelpPopup(id,event){
   event.stopPropagation();
   var popup=document.getElementById(id);
   var wasOpen=popup.classList.contains('open');
-  document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open')});
+  document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open');p.classList.remove('flip-up')});
   if(!wasOpen){
+    // Decide open direction based on available space below the icon
+    var icon=event.currentTarget||event.target.closest('.help-icon');
+    if(icon){
+      var rect=icon.getBoundingClientRect();
+      var spaceBelow=window.innerHeight-rect.bottom;
+      var popupHeight=popup.scrollHeight||140; // estimate before it's visible
+      if(spaceBelow<popupHeight+20){
+        popup.classList.add('flip-up');
+      }
+    }
     popup.classList.add('open');
-    var close=function(e){if(!popup.contains(e.target)){popup.classList.remove('open');document.removeEventListener('click',close);}};
+    var close=function(e){if(!popup.contains(e.target)){popup.classList.remove('open');popup.classList.remove('flip-up');document.removeEventListener('click',close);}};
     setTimeout(function(){document.addEventListener('click',close)},0);
   }
 }
