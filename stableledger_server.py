@@ -765,6 +765,28 @@ def run_scan(wallet, lookback, from_block=None):
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith("/api/fairvalue/prices"):
+            import urllib.parse as _up
+            qs = _up.urlparse(self.path).query
+            params = _up.parse_qs(qs)
+            symbols = params.get("symbols", [""])[0]  # comma-separated coingecko ids e.g. "ethereum,solana,bitcoin"
+            if not symbols:
+                symbols = "ethereum,solana,bitcoin"
+            try:
+                url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbols}&vs_currencies=usd"
+                req = urllib.request.Request(url, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    prices = json.loads(resp.read().decode())
+                result = {"success": True, "prices": prices, "as_of": datetime.now(timezone.utc).isoformat()}
+            except Exception as e:
+                result = {"success": False, "message": str(e)[:200]}
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
         if self.path == "/api/qbo/accounts":
             result = qbo_get_accounts()
             self.send_response(200)
@@ -787,7 +809,10 @@ class Handler(SimpleHTTPRequestHandler):
             debug_info = {
                 "QBO_CLIENT_ID_set": bool(QBO_CLIENT_ID),
                 "QBO_CLIENT_ID_len": len(QBO_CLIENT_ID) if QBO_CLIENT_ID else 0,
+                "QBO_CLIENT_ID_preview": (QBO_CLIENT_ID[:6] + "..." + QBO_CLIENT_ID[-4:]) if len(QBO_CLIENT_ID) > 10 else QBO_CLIENT_ID,
                 "QBO_CLIENT_SECRET_set": bool(QBO_CLIENT_SECRET),
+                "QBO_CLIENT_SECRET_len": len(QBO_CLIENT_SECRET) if QBO_CLIENT_SECRET else 0,
+                "QBO_CLIENT_SECRET_preview": (QBO_CLIENT_SECRET[:4] + "..." + QBO_CLIENT_SECRET[-4:]) if len(QBO_CLIENT_SECRET) > 8 else QBO_CLIENT_SECRET,
                 "QBO_REDIRECT_URI": QBO_REDIRECT_URI,
                 "ANTHROPIC_KEY_set": bool(ANTHROPIC_API_KEY),
             }
