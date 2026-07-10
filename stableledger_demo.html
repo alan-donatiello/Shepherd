@@ -226,13 +226,14 @@
   /* Help tooltip icons */
   .help-icon{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:11px;font-weight:700;font-style:normal;cursor:pointer;flex-shrink:0;position:relative;user-select:none}
   .help-icon:hover{background:#3b82f6;color:#fff}
-  .help-popup{display:none;position:absolute;z-index:200;top:calc(100% + 8px);left:0;width:260px;background:#0f172a;color:#f1f5f9;font-size:12px;font-weight:400;line-height:1.6;padding:12px 14px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:left}
-  .help-popup.flip-up{top:auto;bottom:calc(100% + 8px)}
-  .help-popup.flip-up::before{top:100%;bottom:auto;border-top-color:#0f172a;border-bottom-color:transparent}
+  .help-popup{display:none;position:fixed;z-index:300;top:50%;left:50%;transform:translate(-50%,-50%);width:340px;max-width:90vw;max-height:80vh;overflow-y:auto;background:#0f172a;color:#f1f5f9;font-size:13px;font-weight:400;line-height:1.6;padding:16px 18px;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
   .help-popup.open{display:block}
-  .help-popup::before{content:'';position:absolute;bottom:100%;left:8px;border:6px solid transparent;border-bottom-color:#0f172a}
+  .help-popup-backdrop{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.35);z-index:299}
+  .help-popup-backdrop.open{display:block}
+  .help-popup .hp-close{position:absolute;top:10px;right:12px;color:#94a3b8;cursor:pointer;font-size:16px;line-height:1}
+  .help-popup .hp-close:hover{color:#fff}
   .help-popup a{color:#93c5fd}
-  .help-popup .hp-title{font-weight:600;color:#fff;margin-bottom:4px;font-size:12px}
+  .help-popup .hp-title{font-weight:600;color:#fff;margin-bottom:6px;font-size:14px}
   @keyframes obSpin{to{transform:rotate(360deg)}}
   .ob-ai-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#7c3aed;background:#f5f3ff;padding:3px 8px;border-radius:4px;font-weight:500;margin-left:6px}
 
@@ -423,7 +424,7 @@
               <div style="display:flex;gap:8px;align-items:center">
                 <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Email
                   <span class="help-icon" onclick="toggleHelpPopup('obEmailHelp',event)">?
-                    <div class="help-popup" id="obEmailHelp">
+                    <div class="help-popup" id="obEmailHelp"><span class="hp-close" onclick="closeHelpPopup('obEmailHelp')">&times;</span>
                       <div class="hp-title">Email via SMTP</div>
                       Works with Gmail, Outlook/Office 365, or any custom SMTP server — just leave the server field blank for Gmail, or enter your own. Gmail/Outlook need an <strong>app password</strong>, not your normal login password.
                     </div>
@@ -439,7 +440,7 @@
               <div style="display:flex;gap:8px;align-items:center">
                 <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Slack
                   <span class="help-icon" onclick="toggleHelpPopup('obSlackHelp',event)">?
-                    <div class="help-popup" id="obSlackHelp">
+                    <div class="help-popup" id="obSlackHelp"><span class="hp-close" onclick="closeHelpPopup('obSlackHelp')">&times;</span>
                       <div class="hp-title">Slack Incoming Webhook</div>
                       Create a webhook URL at <a href="https://api.slack.com/messaging/webhooks" target="_blank" onclick="event.stopPropagation()">api.slack.com/messaging/webhooks</a> — create a Slack app, enable "Incoming Webhooks," and pick the channel to post updates to. Paste the generated URL here.
                     </div>
@@ -1169,7 +1170,7 @@
               <div>
                 <div style="font-size:13px;font-weight:500;color:#0f172a;display:flex;align-items:center;gap:5px">Email
                   <span class="help-icon" onclick="toggleHelpPopup('autoEmailHelp',event)">?
-                    <div class="help-popup" id="autoEmailHelp">
+                    <div class="help-popup" id="autoEmailHelp"><span class="hp-close" onclick="closeHelpPopup('autoEmailHelp')">&times;</span>
                       <div class="hp-title">Email via SMTP</div>
                       Works with Gmail, Outlook/Office 365, or any custom SMTP server. Gmail and Outlook require an <strong>app password</strong>, not your normal login password — Gmail: <a href="https://myaccount.google.com/apppasswords" target="_blank" onclick="event.stopPropagation()">myaccount.google.com/apppasswords</a>. Outlook: Security → App Passwords in account settings.
                     </div>
@@ -1212,7 +1213,7 @@
               <div>
                 <div style="font-size:13px;font-weight:500;color:#0f172a;display:flex;align-items:center;gap:5px">Slack (Incoming Webhook)
                   <span class="help-icon" onclick="toggleHelpPopup('autoSlackHelp',event)">?
-                    <div class="help-popup" id="autoSlackHelp">
+                    <div class="help-popup" id="autoSlackHelp"><span class="hp-close" onclick="closeHelpPopup('autoSlackHelp')">&times;</span>
                       <div class="hp-title">Slack Incoming Webhook</div>
                       Create a webhook URL at <a href="https://api.slack.com/messaging/webhooks" target="_blank" onclick="event.stopPropagation()">api.slack.com/messaging/webhooks</a> — create a Slack app, enable "Incoming Webhooks," and pick the channel to post updates to. Paste the generated URL here.
                     </div>
@@ -2754,25 +2755,21 @@ function toggleHelpPopup(id,event){
   event.stopPropagation();
   var popup=document.getElementById(id);
   var wasOpen=popup.classList.contains('open');
-  document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open');p.classList.remove('flip-up')});
+  document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open')});
+  closeHelpBackdrop();
   if(!wasOpen){
-    popup.classList.remove('flip-up');
-    popup.classList.add('open'); // renders now (display:block) so we can measure real size
-    var icon=event.currentTarget||event.target.closest('.help-icon');
-    if(icon){
-      var iconRect=icon.getBoundingClientRect();
-      var popupRect=popup.getBoundingClientRect();
-      var popupHeight=popupRect.height;
-      var spaceBelow=window.innerHeight-iconRect.bottom;
-      var spaceAbove=iconRect.top;
-      // Open upward only if there's not enough room below AND there IS enough room above
-      if(spaceBelow<popupHeight+16 && spaceAbove>=popupHeight+16){
-        popup.classList.add('flip-up');
-      }
-    }
-    var close=function(e){if(!popup.contains(e.target)){popup.classList.remove('open');popup.classList.remove('flip-up');document.removeEventListener('click',close);}};
-    setTimeout(function(){document.addEventListener('click',close)},0);
+    popup.classList.add('open');
+    var backdrop=document.getElementById('helpPopupBackdrop');
+    if(backdrop)backdrop.classList.add('open');
   }
+}
+function closeHelpBackdrop(){
+  var backdrop=document.getElementById('helpPopupBackdrop');
+  if(backdrop)backdrop.classList.remove('open');
+}
+function closeHelpPopup(id){
+  document.getElementById(id).classList.remove('open');
+  closeHelpBackdrop();
 }
 
 function showToast(msg){
@@ -3926,5 +3923,6 @@ window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
     </div>
   </div>
 </div>
+<div class="help-popup-backdrop" id="helpPopupBackdrop" onclick="document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open')});closeHelpBackdrop()"></div>
 </body>
 </html>
