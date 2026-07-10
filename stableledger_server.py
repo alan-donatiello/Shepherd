@@ -783,6 +783,20 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"connected": connected, "realm_id": qbo_tokens.get("realm_id")}).encode())
             return
 
+        if self.path == "/debug/env":
+            debug_info = {
+                "QBO_CLIENT_ID_set": bool(QBO_CLIENT_ID),
+                "QBO_CLIENT_ID_len": len(QBO_CLIENT_ID) if QBO_CLIENT_ID else 0,
+                "QBO_CLIENT_SECRET_set": bool(QBO_CLIENT_SECRET),
+                "QBO_REDIRECT_URI": QBO_REDIRECT_URI,
+                "ANTHROPIC_KEY_set": bool(ANTHROPIC_API_KEY),
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(debug_info, indent=2).encode())
+            return
+
         if self.path.startswith("/qbo/auth"):
             if not QBO_CLIENT_ID:
                 self.send_response(200)
