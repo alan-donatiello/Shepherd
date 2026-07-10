@@ -837,6 +837,13 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_header("Content-Type", "text/html")
                     self.end_headers()
                     self.wfile.write(b"<html><body><h2>QuickBooks Connected!</h2><p>You can close this tab.</p><script>window.opener&&window.opener.postMessage(\'qbo_connected\',\'*\');setTimeout(()=>window.close(),2000)</script></body></html>")
+                except urllib.error.HTTPError as e:
+                    error_body = e.read().decode() if e.fp else str(e)
+                    print(f"  [QBO] Token exchange failed: {e.code} {error_body}")
+                    self.send_response(500)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    self.wfile.write(f"<h3>OAuth Error {e.code}</h3><pre>{error_body}</pre><p>redirect_uri used: {QBO_REDIRECT_URI}</p>".encode())
                 except Exception as e:
                     self.send_response(500)
                     self.send_header("Content-Type", "text/html")
