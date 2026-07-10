@@ -222,6 +222,17 @@
   .filter-btn{font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;transition:all .15s}
   .filter-btn:hover{border-color:#93c5fd;background:#f0f7ff;color:#3b82f6}
   .filter-btn.active{border-color:#3b82f6;background:#eff6ff;color:#3b82f6;font-weight:600}
+
+  /* Help tooltip icons */
+  .help-icon{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:10px;font-weight:700;font-style:normal;cursor:pointer;flex-shrink:0;position:relative;user-select:none}
+  .help-icon:hover{background:#3b82f6;color:#fff}
+  .help-popup{display:none;position:absolute;z-index:200;top:calc(100% + 8px);left:50%;transform:translateX(-50%);width:260px;background:#0f172a;color:#f1f5f9;font-size:12px;font-weight:400;line-height:1.6;padding:12px 14px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);text-align:left}
+  .help-popup.open{display:block}
+  .help-popup::before{content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#0f172a}
+  .help-popup a{color:#93c5fd}
+  .help-popup .hp-title{font-weight:600;color:#fff;margin-bottom:4px;font-size:12px}
+  body.dark .help-icon{background:#334155;color:#94a3b8}
+  body.dark .help-icon:hover{background:#3b82f6;color:#fff}
   body.dark .filter-btn{background:#1e293b;border-color:#334155;color:#94a3b8}
   body.dark .filter-btn:hover{border-color:#3b82f6;background:#1e3a5f;color:#93c5fd}
   body.dark .filter-btn.active{border-color:#3b82f6;background:#1e3a5f;color:#93c5fd}
@@ -482,12 +493,26 @@
           <div style="padding:12px 14px">
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
               <div style="display:flex;gap:8px;align-items:center">
-                <span style="font-size:11px;color:#64748b;width:70px">Email</span>
+                <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Email
+                  <span class="help-icon" onclick="toggleHelpPopup('obEmailHelp',event)">?
+                    <div class="help-popup" id="obEmailHelp">
+                      <div class="hp-title">Email via Gmail SMTP</div>
+                      Use a Gmail address and an <strong>App Password</strong> — not your normal login password. Generate one at <a href="https://myaccount.google.com/apppasswords" target="_blank" onclick="event.stopPropagation()">myaccount.google.com/apppasswords</a> (requires 2-step verification enabled). Daily updates will be sent from this address.
+                    </div>
+                  </span>
+                </span>
                 <input type="email" id="obEmailAddr" placeholder="team@company.com" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;flex:1">
                 <input type="password" id="obEmailPass" placeholder="App password" style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;width:110px">
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <span style="font-size:11px;color:#64748b;width:70px">Slack</span>
+                <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Slack
+                  <span class="help-icon" onclick="toggleHelpPopup('obSlackHelp',event)">?
+                    <div class="help-popup" id="obSlackHelp">
+                      <div class="hp-title">Slack Incoming Webhook</div>
+                      Create a webhook URL at <a href="https://api.slack.com/messaging/webhooks" target="_blank" onclick="event.stopPropagation()">api.slack.com/messaging/webhooks</a> — create a Slack app, enable "Incoming Webhooks," and pick the channel to post updates to. Paste the generated URL here.
+                    </div>
+                  </span>
+                </span>
                 <input type="text" id="obSlack" placeholder="https://hooks.slack.com/services/..." style="font-size:12px;padding:5px 8px;border:1px solid #e2e8f0;border-radius:5px;flex:1">
               </div>
             </div>
@@ -698,7 +723,7 @@
       
 
       <!-- Report selector -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px" id="reportCards">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px" id="reportCards">
         <div style="padding:16px;border:2px solid #3b82f6;border-radius:8px;background:#eff6ff;cursor:pointer" onclick="showReport('rollforward')" id="reportCard-rollforward">
           <div style="font-size:13px;font-weight:600;color:#1d4ed8;margin-bottom:2px">Asset Roll Forward</div>
           <div style="font-size:11px;color:#64748b">Opening → movements → closing balance</div>
@@ -710,10 +735,6 @@
         <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer" onclick="showReport('fairvalue')" id="reportCard-fairvalue">
           <div style="font-size:13px;font-weight:500;color:#334155;margin-bottom:2px">Fair Value (ASC 820)</div>
           <div style="font-size:11px;color:#94a3b8">Period-end remeasurement</div>
-        </div>
-        <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;cursor:default;opacity:.6">
-          <div style="font-size:13px;font-weight:500;color:#334155;margin-bottom:2px">Tax Basis Report</div>
-          <div style="font-size:11px;color:#94a3b8">Coming soon</div>
         </div>
       </div>
 
@@ -963,74 +984,6 @@
         </div>
       </div>
 
-      <!-- Integrations -->
-      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">
-        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0">
-          <div style="font-size:14px;font-weight:600;color:#0f172a">Notifications</div>
-          
-        </div>
-        <div style="padding:18px 20px">
-          <!-- Email -->
-          <div style="padding:14px 0;border-bottom:1px solid #f1f5f9">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-              <div style="width:36px;height:36px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center">
-                <svg width="18" height="18" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
-              </div>
-              <div>
-                <div style="font-size:13px;font-weight:500;color:#0f172a">Email (Gmail SMTP)</div>
-                <div style="font-size:11px;color:#94a3b8" id="emailStatus">Not connected</div>
-              </div>
-            </div>
-            <div id="emailForm">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-                <input type="email" id="emailUser" placeholder="your@gmail.com" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
-                <input type="password" id="emailPass" placeholder="App password" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
-              </div>
-              <div style="display:flex;gap:8px;align-items:center">
-                <input type="email" id="emailTo" placeholder="Send updates to..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
-                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectEmail()">Connect</button>
-                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testEmail()">Send Test</button>
-              </div>
-              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Gmail users: generate an app password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#3b82f6">myaccount.google.com/apppasswords</a></div>
-            </div>
-          </div>
-          <!-- Slack -->
-          <div style="padding:14px 0">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-              <div style="width:36px;height:36px;border-radius:8px;background:#fce7f3;display:flex;align-items:center;justify-content:center">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#e11d48"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
-              </div>
-              <div>
-                <div style="font-size:13px;font-weight:500;color:#0f172a">Slack (Incoming Webhook)</div>
-                <div style="font-size:11px;color:#94a3b8" id="slackStatus">Not connected</div>
-              </div>
-            </div>
-            <div id="slackForm">
-              <div style="display:flex;gap:8px;align-items:center">
-                <input type="text" id="slackWebhook" placeholder="https://hooks.slack.com/services/T.../B.../..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
-                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectSlack()">Connect</button>
-                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testSlack()">Send Test</button>
-              </div>
-              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Create a webhook at <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:#3b82f6">api.slack.com/messaging/webhooks</a></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Notification Preview -->
-      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
-        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0">
-          <div style="font-size:14px;font-weight:600;color:#0f172a">Daily Update Preview</div>
-          
-        </div>
-        <div style="padding:18px 20px;background:#f8fafc" id="notificationPreview">
-          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 18px;font-size:13px;color:#475569;line-height:1.8">
-            <div style="font-weight:600;color:#0f172a;font-size:14px;margin-bottom:8px">🐕 Shepherd Daily Update</div>
-            <div id="dailyPreviewContent">Connect wallets and classify transactions to see a preview of daily updates.</div>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>
@@ -1038,27 +991,11 @@
 <!-- SCREEN: CONNECTIONS -->
 <div class="screen active" id="screen-config">
   <div class="wc-center">
-    <div class="wc-title">Wallet Scanner</div>
-    <div class="wc-sub">Scan any Base or Solana wallet for USDC transfers and generate journal entries.</div>
-
-    <div class="wc-field">
-      <label>Wallet Address</label>
-      <input class="mono" id="walletInput" placeholder="0x..." spellcheck="false">
-    </div>
-    <div class="wc-row2">
-      <div class="wc-field">
-        <label>Label</label>
-        <input id="nameInput" placeholder="e.g. Treasury, Payroll, Revenue">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <div class="wc-title" style="margin-bottom:0">Connections</div>
       </div>
-      <div class="wc-field">
-        <label>Lookback Blocks</label>
-        <input id="blocksInput" type="number" value="1000" min="100" max="100000">
-      </div>
-    </div>
-
-    <div class="wc-actions">
-      <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Scan Wallet</button>
-      
+      <button class="btn btn-primary" onclick="openAddWalletModal()">+ Add Wallet</button>
     </div>
 
     <div class="wc-progress" id="progressBar">
@@ -1086,6 +1023,45 @@
         </div>
         <button style="font-size:11px;padding:6px 14px;border-radius:4px;border:none;background:#2CA01C;color:#fff;cursor:pointer" onclick="connectQBO()">Connect</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Wallet -->
+<div class="custom-overlay" id="addWalletOverlay" onclick="if(event.target===this)closeAddWalletModal()">
+  <div class="custom-modal" style="max-width:420px">
+    <h3>Add Wallet</h3>
+    <div class="cm-field">
+      <label>Wallet Address</label>
+      <input class="mono" id="walletInput" placeholder="0x... (Base) or Solana address" spellcheck="false">
+    </div>
+    <div class="cm-field">
+      <label>Label</label>
+      <input id="nameInput" placeholder="e.g. Treasury, Payroll, Revenue">
+    </div>
+    <div class="cm-field">
+      <label>Lookback Blocks</label>
+      <input id="blocksInput" type="number" value="1000" min="100" max="100000">
+    </div>
+    <div class="cm-actions">
+      <button style="background:#f1f5f9;color:#475569" onclick="closeAddWalletModal()">Cancel</button>
+      <button class="btn btn-primary" id="scanBtn" onclick="startScan()">Scan Wallet</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Rescan Lookback -->
+<div class="custom-overlay" id="rescanOverlay" onclick="if(event.target===this)closeRescanModal()">
+  <div class="custom-modal" style="max-width:360px">
+    <h3>Rescan Wallet</h3>
+    <div style="font-size:12px;color:#64748b;margin-bottom:4px" id="rescanWalletLabel"></div>
+    <div class="cm-field">
+      <label>How many blocks back should Shepherd look?</label>
+      <input id="rescanBlocksInput" type="number" value="1000" min="100" max="100000">
+    </div>
+    <div class="cm-actions">
+      <button style="background:#f1f5f9;color:#475569" onclick="closeRescanModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmRescan()">Rescan</button>
     </div>
   </div>
 </div>
@@ -1238,10 +1214,10 @@
 <!-- SCREEN: SETTINGS -->
 <div class="screen" id="screen-settings">
   <div class="container">
-    <div style="max-width:640px;margin:40px auto">
+    <div style="max-width:720px;margin:40px auto">
       <h2 style="font-size:20px;font-weight:600;margin-bottom:8px">Settings</h2>
       
-      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:20px">
         <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:13px;font-weight:500">Dark Mode</div></div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -1254,6 +1230,86 @@
         <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:13px;font-weight:500">Team Access</div><div style="font-size:11px;color:#94a3b8">Invite team members and manage permissions</div></div>
           <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:20px">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:14px;font-weight:600;color:#0f172a">Notifications</div>
+        </div>
+        <div style="padding:18px 20px">
+          <!-- Email -->
+          <div style="padding:14px 0;border-bottom:1px solid #f1f5f9">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center">
+                <svg width="18" height="18" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:#0f172a;display:flex;align-items:center;gap:5px">Email (Gmail SMTP)
+                  <span class="help-icon" onclick="toggleHelpPopup('autoEmailHelp',event)">?
+                    <div class="help-popup" id="autoEmailHelp">
+                      <div class="hp-title">Email via Gmail SMTP</div>
+                      Use a Gmail address and an <strong>App Password</strong> — not your normal login password. Generate one at <a href="https://myaccount.google.com/apppasswords" target="_blank" onclick="event.stopPropagation()">myaccount.google.com/apppasswords</a> (requires 2-step verification enabled).
+                    </div>
+                  </span>
+                </div>
+                <div style="font-size:11px;color:#94a3b8" id="emailStatus">Not connected</div>
+              </div>
+            </div>
+            <div id="emailForm">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <input type="email" id="emailUser" placeholder="your@gmail.com" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+                <input type="password" id="emailPass" placeholder="App password" style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="email" id="emailTo" placeholder="Send updates to..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectEmail()">Connect</button>
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testEmail()">Send Test</button>
+              </div>
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Gmail users: generate an app password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#3b82f6">myaccount.google.com/apppasswords</a></div>
+            </div>
+          </div>
+          <!-- Slack -->
+          <div style="padding:14px 0">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fce7f3;display:flex;align-items:center;justify-content:center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#e11d48"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.122 2.521a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zm-1.268 0a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zm-2.523 10.122a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zm0-1.268a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:#0f172a;display:flex;align-items:center;gap:5px">Slack (Incoming Webhook)
+                  <span class="help-icon" onclick="toggleHelpPopup('autoSlackHelp',event)">?
+                    <div class="help-popup" id="autoSlackHelp">
+                      <div class="hp-title">Slack Incoming Webhook</div>
+                      Create a webhook URL at <a href="https://api.slack.com/messaging/webhooks" target="_blank" onclick="event.stopPropagation()">api.slack.com/messaging/webhooks</a> — create a Slack app, enable "Incoming Webhooks," and pick the channel to post updates to. Paste the generated URL here.
+                    </div>
+                  </span>
+                </div>
+                <div style="font-size:11px;color:#94a3b8" id="slackStatus">Not connected</div>
+              </div>
+            </div>
+            <div id="slackForm">
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" id="slackWebhook" placeholder="https://hooks.slack.com/services/T.../B.../..." style="font-size:12px;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;flex:1">
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="connectSlack()">Connect</button>
+                <button style="font-size:12px;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap" onclick="testSlack()">Send Test</button>
+              </div>
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Create a webhook at <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:#3b82f6">api.slack.com/messaging/webhooks</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notification Preview -->
+      <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+        <div style="padding:18px 20px;border-bottom:1px solid #e2e8f0">
+          <div style="font-size:14px;font-weight:600;color:#0f172a">Daily Update Preview</div>
+        </div>
+        <div style="padding:18px 20px;background:#f8fafc" id="notificationPreview">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 18px;font-size:13px;color:#475569;line-height:1.8">
+            <div style="font-weight:600;color:#0f172a;font-size:14px;margin-bottom:8px">🐕 Shepherd Daily Update</div>
+            <div id="dailyPreviewContent">Connect wallets and classify transactions to see a preview of daily updates.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1889,6 +1945,7 @@ function navTo(id){
   if(id==='reports')renderReports();
   if(id==='automations')renderAutomations();
   if(id==='auditlog')renderAuditLog();
+  if(id==='settings')updateDailyPreview();
 }
 function showConfig(){navTo('config');}
 function openLedger(){if(!txs.length)return;idx=0;ledgerView='single';if(activeWalletAddr)selectedWallets.add(activeWalletAddr.toLowerCase());navTo('ledger');}
@@ -1978,6 +2035,34 @@ function onRefreshComplete(report){
 }
 
 // ============ WALLET MANAGEMENT ============
+function openAddWalletModal(){
+  document.getElementById('walletInput').value='';
+  document.getElementById('nameInput').value='';
+  document.getElementById('blocksInput').value='1000';
+  document.getElementById('addWalletOverlay').classList.add('open');
+}
+function closeAddWalletModal(){document.getElementById('addWalletOverlay').classList.remove('open');}
+
+var rescanIndex=null;
+function openRescanModal(i){
+  rescanIndex=i;
+  var w=wallets[i];
+  document.getElementById('rescanWalletLabel').textContent=w.name+' · '+addr(w.addr);
+  document.getElementById('rescanBlocksInput').value='1000';
+  document.getElementById('rescanOverlay').classList.add('open');
+}
+function closeRescanModal(){document.getElementById('rescanOverlay').classList.remove('open');rescanIndex=null;}
+function confirmRescan(){
+  if(rescanIndex===null)return;
+  var w=wallets[rescanIndex];
+  var blocks=parseInt(document.getElementById('rescanBlocksInput').value)||1000;
+  document.getElementById('walletInput').value=w.addr;
+  document.getElementById('nameInput').value=w.name;
+  document.getElementById('blocksInput').value=blocks;
+  closeRescanModal();
+  startScan();
+}
+
 function saveWallet(){
   const a=document.getElementById("walletInput").value.trim();
   const n=document.getElementById("nameInput").value.trim()||addr(a);
@@ -2017,7 +2102,7 @@ function renderWallets(){
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         ${hasData?`<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger(${i})">Open Ledger</button>`:""}
-        <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="document.getElementById('walletInput').value='${w.addr}';document.getElementById('nameInput').value='${w.name}';startScan()">${hasData?"Rescan":"Scan"}</button>
+        <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="${hasData?`openRescanModal(${i})`:`document.getElementById('walletInput').value='${w.addr}';document.getElementById('nameInput').value='${w.name}';startScan()`}">${hasData?"Rescan":"Scan"}</button>
         <button style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer" onclick="removeWallet(${i},event)">&times;</button>
       </div>
     </div>`;
@@ -2031,6 +2116,7 @@ async function startScan(){
   if(!wallet.startsWith("0x")&&wallet.length<32||wallet.startsWith("0x")&&wallet.length!==42)return alert("Enter a valid wallet address (0x... for Base, or Solana address)");
 
   saveWallet();
+  closeAddWalletModal();
   const btn=document.getElementById("scanBtn");
   btn.disabled=true;btn.textContent="Scanning...";
   const pb=document.getElementById("progressBar");pb.classList.add("active");
@@ -2726,6 +2812,18 @@ function connectQBO(){
       window.removeEventListener('message',handler);
     }
   });
+}
+
+function toggleHelpPopup(id,event){
+  event.stopPropagation();
+  var popup=document.getElementById(id);
+  var wasOpen=popup.classList.contains('open');
+  document.querySelectorAll('.help-popup.open').forEach(function(p){p.classList.remove('open')});
+  if(!wasOpen){
+    popup.classList.add('open');
+    var close=function(e){if(!popup.contains(e.target)){popup.classList.remove('open');document.removeEventListener('click',close);}};
+    setTimeout(function(){document.addEventListener('click',close)},0);
+  }
 }
 
 function showToast(msg){
