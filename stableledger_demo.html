@@ -948,6 +948,12 @@
     </div>
 
     <div class="wc-saved-section">
+      <div class="wc-saved-title">Connected Bank Accounts</div>
+      <div id="bankCards"></div>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="launchPlaidLink()">+ Connect Bank Account</button>
+    </div>
+
+    <div class="wc-saved-section">
       <div class="wc-saved-title">ERP Integration</div>
       <div style="border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
         <div style="display:flex;align-items:center;gap:12px">
@@ -1644,7 +1650,7 @@ function obRenderWallets(){
   if(!obWallets.length){el.innerHTML='<div style="color:#94a3b8;font-size:12px">No wallets added yet.</div>';return;}
   el.innerHTML=obWallets.map((w,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;margin-bottom:4px">
     <span style="font-size:12px;font-weight:500;color:#1e293b">${w.name}</span>
-    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${w.chain==='Base'?'#dbeafe':'#e0e7ff'};color:${w.chain==='Base'?'#1d4ed8':'#4338ca'}">${w.chain}</span>
+    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${w.chain==='Base'?'#dbeafe':w.chain==='Bank'?'#dcfce7':'#e0e7ff'};color:${w.chain==='Base'?'#1d4ed8':w.chain==='Bank'?'#166534':'#4338ca'}">${w.chain}</span>
     <span class="mono" style="font-size:11px;color:#94a3b8;flex:1">${w.addr.slice(0,12)}...${w.addr.slice(-6)}</span>
     <span style="font-size:11px;color:#94a3b8">${w.lookback} blocks</span>
     <span style="color:#cbd5e1;cursor:pointer" onclick="obRemoveWallet(${i})">&times;</span>
@@ -1706,7 +1712,7 @@ function renderTxTable(){
 
   wrap.innerHTML=`<div class="tx-table-wrap"><table class="tx-table">
     <thead><tr>
-      <th style="width:30px"><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain</th><th>Block</th><th>Status</th><th>GL Code</th>
+      <th style="width:30px"><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain</th><th>Block / Date</th><th>Status</th><th>GL Code</th>
     </tr></thead>
     <tbody>${filtered.map(t=>{const txid=t.walletAddr.toLowerCase()+'::'+t.hash;const chk=selectedTxIds.has(txid)?'checked':'';return`<tr>
       <td><input type="checkbox" class="tx-row-cb" data-txid="${txid}" ${chk} onchange="toggleTxSelect('${txid}',this)"></td>
@@ -1714,8 +1720,8 @@ function renderTxTable(){
       <td class="mono" style="font-weight:500;color:${t.dir==='inflow'?'#16a34a':'#ea580c'}">${t.dir==='inflow'?'+':'-'}$${fmt(t.amount)}</td>
       <td class="mono" style="font-size:11px">${addr(t.cp)}</td>
       <td style="font-size:11px">${t.wallet}</td>
-      <td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${t.chain==='Base'?'#dbeafe':'#e0e7ff'};color:${t.chain==='Base'?'#1d4ed8':'#4338ca'}">${t.chain}</span></td>
-      <td style="font-size:11px;color:#94a3b8">${(t.block||0).toLocaleString()}</td>
+      <td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${t.chain==='Base'?'#dbeafe':t.chain==='Bank'?'#dcfce7':'#e0e7ff'};color:${t.chain==='Base'?'#1d4ed8':t.chain==='Bank'?'#166534':'#4338ca'}">${t.chain}</span></td>
+      <td style="font-size:11px;color:#94a3b8">${t.source==='bank'?(t.date||'—'):(t.block||0).toLocaleString()}</td>
       <td><span class="status-pill ${t.gl==='Unclassified'?'unclassified':'classified'}">${t.gl==='Unclassified'?'Pending':'Classified'}</span></td>
       <td style="font-size:11px;color:${t.gl==='Unclassified'?'#d97706':'#334155'}">${t.gl==='Unclassified'?'—':t.gl}</td>
     </tr>`}).join('')}</tbody>
@@ -1732,7 +1738,7 @@ let GL_OPTIONS=["Unclassified","6110 - Payroll","6200 - Software & SaaS","6300 -
 const GL_TYPE={"6110":"expense","6200":"expense","6300":"expense","6420":"expense","6500":"expense","6600":"expense","7100":"transfer","4100":"revenue","4200":"revenue","4300":"revenue","1200":"transfer"};
 const COLORS=["#3b82f6","#8b5cf6","#06b6d4","#f59e0b"];
 const GL_MAP={"6110":"pnl-payroll","6200":"pnl-software","6300":"pnl-cloud","6420":"pnl-marketing","6500":"pnl-profsvc","6600":"pnl-ops","4100":"pnl-revsvc","4200":"pnl-revprod","4300":"pnl-revsvc","7100":"bs-usdc","1200":"bs-usdc"};
-const OPENING={revSvc:1450000,revProd:380000,expPay:620000,expSw:85000,expCloud:142000,expMkt:215000,expProf:67000,expOps:38000,expGas:1.80,cash:2450000,usdc:1800000,eth:12500,ar:340000,ap:285000,accrued:125000,equity:3500000,re:692500};
+const OPENING={revSvc:1450000,revProd:380000,expPay:620000,expSw:85000,expCloud:142000,expMkt:215000,expProf:67000,expOps:38000,expGas:1.80,cash:2450000,usdc:1800000,eth:12500,bank:0,ar:340000,ap:285000,accrued:125000,equity:3500000,re:692500};
 
 let wallets=[],activeWalletAddr=null,scanData=null,txs=[],idx=0,mappings={};
 let ledgerView='single'; // 'single' or 'all'
@@ -1855,7 +1861,12 @@ function renderWalletChips(){
 }
 const fmt=n=>Math.abs(n)<.01&&n!==0?n.toFixed(4):n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtShort=n=>{if(Math.abs(n)>=1e6)return"$"+(n/1e6).toFixed(1)+"M";if(Math.abs(n)>=1e3)return"$"+(n/1e3).toFixed(1)+"K";return"$"+fmt(n)};
-const addr=a=>(a&&a.length>=10)?a.slice(0,6)+"..."+a.slice(-4):a;
+const addr=a=>{
+  if(!a)return a;
+  const looksLikeAddress=/^0x[0-9a-fA-F]{10,}$/.test(a)||/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a);
+  if(!looksLikeAddress)return a;
+  return a.length>=10?a.slice(0,6)+"..."+a.slice(-4):a;
+};
 const glOf=h=>mappings[h]||"Unclassified";
 const pfx=g=>g.split(" - ")[0];
 
@@ -2022,8 +2033,10 @@ function viewWalletLedger(i){
 }
 function renderWallets(){
   const el=document.getElementById("walletCards");
-  if(!wallets.length){el.innerHTML='<div class="wc-empty" style="padding:20px 0">No wallets connected yet. Add a wallet above to get started.</div>';return;}
-  el.innerHTML=wallets.map((w,i)=>{
+  const cryptoWallets=wallets.filter(w=>w.chain!=='Bank');
+  if(!cryptoWallets.length){el.innerHTML='<div class="wc-empty" style="padding:20px 0">No wallets connected yet. Add a wallet above to get started.</div>';renderBankCards();return;}
+  el.innerHTML=cryptoWallets.map((w)=>{
+    const i=wallets.indexOf(w);
     const s=getStore(w.addr);
     const hasData=s.scanTime||s.txs.length>0;
     const classified=hasData?s.txs.filter(t=>s.mappings[t.hash]&&s.mappings[t.hash]!=="Unclassified").length:0;
@@ -2044,6 +2057,7 @@ function renderWallets(){
       </div>
     </div>`;
   }).join("");
+  renderBankCards();
 }
 
 // ============ SCANNING ============
@@ -2267,26 +2281,31 @@ function getTarget(g,fallback){
 
 function getJournal(tx){
   const g=glOf(tx.hash),label=g==="Unclassified"?(tx.dir==="outflow"?"AP / Expense (unclassified)":"AR / Revenue (unclassified)"):g;
+  const isBank=tx.source==="bank";
+  const assetAcct=isBank?"Bank - Checking":"Digital Asset - USDC";
+  const assetTarget=isBank?"bs-bank":"bs-usdc";
   if(tx.dir==="outflow"){
-    const l=[{n:1,acct:label,dr:tx.amount,cr:0,t:getTarget(g,"expense")},{n:2,acct:"Digital Asset - USDC",dr:0,cr:tx.amount,t:"bs-usdc"}];
+    const l=[{n:1,acct:label,dr:tx.amount,cr:0,t:getTarget(g,"expense")},{n:2,acct:assetAcct,dr:0,cr:tx.amount,t:assetTarget}];
     if(tx.gas>0){l.push({n:3,acct:"Expense - Network Fees",dr:tx.gas,cr:0,t:"pnl-gas"});l.push({n:4,acct:"Digital Asset - ETH",dr:0,cr:tx.gas,t:"bs-eth"});}
     return l;
   }
-  return[{n:1,acct:"Digital Asset - USDC",dr:tx.amount,cr:0,t:"bs-usdc"},{n:2,acct:label,dr:0,cr:tx.amount,t:getTarget(g,"revenue")}];
+  return[{n:1,acct:assetAcct,dr:tx.amount,cr:0,t:assetTarget},{n:2,acct:label,dr:0,cr:tx.amount,t:getTarget(g,"revenue")}];
 }
 
 function computeTotals(){
-  const o=OPENING;let im={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,usdcChg:0,ethChg:0,uncIn:0,uncOut:0,classified:0};
+  const o=OPENING;let im={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,usdcChg:0,ethChg:0,bankChg:0,uncIn:0,uncOut:0,classified:0};
   txs.forEach(tx=>{const g=glOf(tx.hash),p=pfx(g);im.expGas+=tx.gas;
     if(g==="Unclassified"){if(tx.dir==="inflow")im.uncIn+=tx.amount;else im.uncOut+=tx.amount;}
     else{im.classified++;if(p==="4100")im.revSvc+=tx.amount;else if(p==="4200")im.revProd+=tx.amount;
       else if(p==="6110")im.expPay+=tx.amount;else if(p==="6200")im.expSw+=tx.amount;else if(p==="6300")im.expCloud+=tx.amount;
       else if(p==="6420")im.expMkt+=tx.amount;else if(p==="6500")im.expProf+=tx.amount;else if(p==="6600")im.expOps+=tx.amount;}
-    if(tx.dir==="inflow")im.usdcChg+=tx.amount;else{im.usdcChg-=tx.amount;im.ethChg-=tx.gas;}
+    const isBank=tx.source==="bank";
+    if(tx.dir==="inflow"){if(isBank)im.bankChg+=tx.amount;else im.usdcChg+=tx.amount;}
+    else{if(isBank)im.bankChg-=tx.amount;else{im.usdcChg-=tx.amount;im.ethChg-=tx.gas;}}
   });
   const totRev=(o.revSvc+im.revSvc)+(o.revProd+im.revProd)+im.uncIn;
   const totExp=(o.expPay+im.expPay)+(o.expSw+im.expSw)+(o.expCloud+im.expCloud)+(o.expMkt+im.expMkt)+(o.expProf+im.expProf)+(o.expOps+im.expOps)+(o.expGas+im.expGas)+im.uncOut;
-  return{im,totRev,totExp,ni:totRev-totExp,cUsdc:o.usdc+im.usdcChg,cEth:o.eth+im.ethChg};
+  return{im,totRev,totExp,ni:totRev-totExp,cUsdc:o.usdc+im.usdcChg,cEth:o.eth+im.ethChg,cBank:o.bank+im.bankChg};
 }
 
 function renderLedger(){
@@ -2345,7 +2364,7 @@ function renderTx(){
     <span class="tx-amt mono ${tx.dir==='inflow'?'in':'out'}">${tx.dir==='inflow'?'+':'-'}$${fmt(tx.amount)}</span>
     <span class="tx-cp">Counterparty: <strong class="mono">${addr(tx.cp)}</strong></span>
     ${tx.walletName?`<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#f1f5f9;color:#64748b">${tx.walletName}</span>`:''}
-    <span class="tx-meta mono">${addr(tx.origHash||tx.hash)} &middot; Block ${(tx.block||0).toLocaleString()}</span>`;
+    <span class="tx-meta mono">${addr(tx.origHash||tx.hash)} &middot; ${tx.source==='bank'?(tx.date||'—'):'Block '+(tx.block||0).toLocaleString()}</span>`;
 
   // Journal
   const tDr=journal.reduce((s,l)=>s+l.dr,0),tCr=journal.reduce((s,l)=>s+l.cr,0);
@@ -2361,7 +2380,7 @@ function renderTx(){
   // Financial statements — cumulative from zero, only classified transactions
   // Compute cumulative totals across ALL classified transactions
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
-    usdcIn:0,usdcOut:0,gasSpent:0,inCount:0,outCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+    usdcIn:0,usdcOut:0,bankIn:0,bankOut:0,gasSpent:0,inCount:0,outCount:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
   txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
@@ -2370,8 +2389,9 @@ function renderTx(){
     else if(tp==="7100"||tp==="1200"||tp==="4300")cum.xferNet+=(t.dir==="inflow"?1:-1)*t.amount;
     else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
     else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
-    if(t.dir==="inflow"){cum.usdcIn+=t.amount;cum.inCount++;}
-    else{cum.usdcOut+=t.amount;cum.outCount++;cum.gasSpent+=t.gas;}
+    const isBank=t.source==="bank";
+    if(t.dir==="inflow"){if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}else{cum.usdcIn+=t.amount;cum.inCount++;}}
+    else{if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}else{cum.usdcOut+=t.amount;cum.gasSpent+=t.gas;cum.outCount++;}}
     cum.expGas+=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
@@ -2380,7 +2400,8 @@ function renderTx(){
   const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
   const ni=totRev-totExp;
   const netUsdc=cum.usdcIn-cum.usdcOut;
-  const netAssets=netUsdc-cum.gasSpent;
+  const netBank=cum.bankIn-cum.bankOut;
+  const netAssets=netUsdc-cum.gasSpent+netBank;
 
   const chg=(v,isExp)=>{if(Math.abs(v)<.001)return'';return`<span class="chg ${isExp?(v>0?'neg':'pos'):(v>0?'pos':'neg')}">$${fmt(Math.abs(v))}</span>`};
   const hc=id=>hitTargets.includes(id)?'hit':'';
@@ -2460,6 +2481,7 @@ function renderTx(){
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
       <div class="fs-line indent clickable ${hc('bs-usdc')}" id="fs-bs-usdc" style="grid-template-columns:1fr 100px;${hb('bs-usdc')}" onclick="openAudit('usdc','USDC')"><div>USDC</div><div style="text-align:right;color:${netUsdc>=0?'#16a34a':'#ea580c'}">$${fmt(netUsdc)}${incLabel('bs-usdc')}</div></div>
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent clickable ${hc('bs-eth')}" id="fs-bs-eth" style="grid-template-columns:1fr 100px;${hb('bs-eth')}" onclick="openAudit('gas','Network Fees')"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${incLabel('bs-eth')}</div></div>`:`<div id="fs-bs-eth"></div>`}
+      ${(cum.bankIn>0||cum.bankOut>0)?`<div class="fs-line indent clickable ${hc('bs-bank')}" id="fs-bs-bank" style="grid-template-columns:1fr 100px;${hb('bs-bank')}" onclick="openAudit('bank','Bank Checking')"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}${incLabel('bs-bank')}</div></div>`:`<div id="fs-bs-bank"></div>`}
       <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Equity</div><div></div></div>
       <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
@@ -2476,8 +2498,10 @@ function renderTx(){
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Add: Non-cash gas fees</div><div style="text-align:right">$${fmt(cum.gasSpent)}</div></div>`:''}
       <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Cash from Operations</div><div style="text-align:right;font-weight:600">$${fmt(ni+cum.gasSpent)}</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Digital Asset Flows</div><div></div></div>
-      ${cum.inCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}${tx.dir==='inflow'&&isMapped?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
-      ${cum.outCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})${tx.dir==='outflow'&&isMapped?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
+      ${cum.inCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}${tx.dir==='inflow'&&isMapped&&tx.source!=='bank'?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
+      ${cum.outCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})${tx.dir==='outflow'&&isMapped&&tx.source!=='bank'?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
+      ${cum.bankInCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Deposits (${cum.bankInCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.bankIn)}${tx.dir==='inflow'&&isMapped&&tx.source==='bank'?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
+      ${cum.bankOutCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Withdrawals (${cum.bankOutCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.bankOut)})${tx.dir==='outflow'&&isMapped&&tx.source==='bank'?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${tx.gas>0&&isMapped?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.gas)})</span>`:''}</div></div>`:''}
       <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Digital Asset Change</div><div style="text-align:right;font-weight:700;color:${netAssets>=0?'#16a34a':'#ea580c'}">$${fmt(netAssets)}</div></div>
     </div>
@@ -2540,7 +2564,7 @@ function renderReconciled(){
 
   // Compute cumulative from zero
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
-    usdcIn:0,usdcOut:0,gasSpent:0,inCount:0,outCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+    usdcIn:0,usdcOut:0,bankIn:0,bankOut:0,gasSpent:0,inCount:0,outCount:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
   txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
@@ -2549,8 +2573,9 @@ function renderReconciled(){
     else if(tp==="7100"||tp==="1200"||tp==="4300")cum.xferNet+=(t.dir==="inflow"?1:-1)*t.amount;
     else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
     else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
-    if(t.dir==="inflow"){cum.usdcIn+=t.amount;cum.inCount++;}
-    else{cum.usdcOut+=t.amount;cum.outCount++;cum.gasSpent+=t.gas;}
+    const isBank=t.source==="bank";
+    if(t.dir==="inflow"){if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}else{cum.usdcIn+=t.amount;cum.inCount++;}}
+    else{if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}else{cum.usdcOut+=t.amount;cum.gasSpent+=t.gas;cum.outCount++;}}
     cum.expGas+=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
@@ -2559,7 +2584,8 @@ function renderReconciled(){
   const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
   const ni=totRev-totExp;
   const netUsdc=cum.usdcIn-cum.usdcOut;
-  const netAssets=netUsdc-cum.gasSpent;
+  const netBank=cum.bankIn-cum.bankOut;
+  const netAssets=netUsdc-cum.gasSpent+netBank;
 
   // Update summary cards
   if(scanData){
@@ -2616,6 +2642,7 @@ function renderReconciled(){
         <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Assets</div>
         <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('usdc','USDC')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>USDC</div><div style="text-align:right;color:${netUsdc>=0?'#16a34a':'#ea580c'}">$${fmt(netUsdc)}</div></div>
         ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('gas','Network Fees')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
+        ${(cum.bankIn>0||cum.bankOut>0)?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('bank','Bank Checking')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}</div></div>`:''}
         <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
         <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Equity</div>
         <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
@@ -2634,7 +2661,12 @@ function renderReconciled(){
       <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}</div></div>
       <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})</div></div>
       ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
-      <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Digital Asset Change</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
+      <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Digital Asset Change</div><div style="text-align:right">$${fmt(netUsdc-cum.gasSpent)}</div></div>
+      ${(cum.bankInCount>0||cum.bankOutCount>0)?`
+      <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Bank Cash Flows</div>
+      ${cum.bankInCount>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Bank Deposits (${cum.bankInCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.bankIn)}</div></div>`:''}
+      ${cum.bankOutCount>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Bank Withdrawals (${cum.bankOutCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.bankOut)})</div></div>`:''}
+      <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netBank>=0?'#16a34a':'#ea580c'}"><div>Net Bank Cash Change</div><div style="text-align:right">$${fmt(netBank)}</div></div>`:''}
     </div>
 
     <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;background:#f0fdf4;text-align:center;margin-bottom:16px">
@@ -2692,10 +2724,10 @@ async function requestAiClassification(tx){
   const reqId=Date.now();aiPending=reqId;
 
   try{
-    const chain=(tx.walletAddr||activeWalletAddr||'').startsWith('0x')?'Base':'Solana';
+    const chain=tx.source==='bank'?'Bank (fiat)':(tx.walletAddr||activeWalletAddr||'').startsWith('0x')?'Base':'Solana';
     const res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        transaction:{direction:tx.dir,amount:tx.amount,counterparty:tx.cp,chain:chain,block:tx.block},
+        transaction:{direction:tx.dir,amount:tx.amount,counterparty:tx.cp,chain:chain,block:tx.source==='bank'?tx.date:tx.block,source:tx.source||'blockchain'},
         chart_of_accounts:GL_OPTIONS,
         prior_classifications:buildPriorContext(),
         client_profile:{
@@ -2732,6 +2764,156 @@ function acceptAiSuggestion(glCode){
   logAction('classification','AI suggestion accepted',`${glCode} for ${addr(txs[idx].hash)}`);
   classify(glCode);
 }
+
+// ============ PLAID (FIAT BANKING) ============
+var plaidItems=[]; // {item_id, institution_name, accounts:[...]}
+var plaidConnected=false;
+
+async function launchPlaidLink(){
+  try{
+    var res=await fetch('/api/plaid/create_link_token',{method:'POST'});
+    var data=await res.json();
+    if(!data.success){
+      alert('Could not start bank connection: '+(data.message||'Unknown error')+'\n\nMake sure PLAID_CLIENT_ID and PLAID_SECRET are set on the server.');
+      return;
+    }
+    var linkToken=data.data.link_token;
+    var handler=Plaid.create({
+      token:linkToken,
+      onSuccess:async function(public_token,metadata){
+        await onPlaidSuccess(public_token,metadata);
+      },
+      onExit:function(err,metadata){
+        if(err)console.log('Plaid Link exited with error:',err);
+      }
+    });
+    handler.open();
+  }catch(e){
+    alert('Bank connection failed: '+e.message);
+  }
+}
+
+async function onPlaidSuccess(public_token,metadata){
+  try{
+    var res=await fetch('/api/plaid/exchange_token',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({public_token:public_token})});
+    var data=await res.json();
+    if(!data.success){alert('Token exchange failed: '+data.message);return;}
+    var itemId=data.item_id;
+    var institutionName=(metadata.institution&&metadata.institution.name)||'Bank';
+
+    // Fetch accounts for this item
+    var acctRes=await fetch('/api/plaid/accounts',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({item_id:itemId})});
+    var acctData=await acctRes.json();
+    if(!acctData.success){alert('Could not fetch accounts: '+acctData.message);return;}
+
+    var accounts=acctData.accounts;
+    plaidItems.push({item_id:itemId,institution_name:institutionName,accounts:accounts});
+
+    // Register each account as a pseudo-wallet so it flows through the existing pipeline
+    accounts.forEach(function(a){
+      if(!wallets.find(function(w){return w.addr===a.id})){
+        wallets.push({addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId});
+      }
+    });
+
+    // Fetch initial transactions for this item
+    await syncPlaidTransactions(itemId);
+
+    renderBankCards();
+    logAction('account','Bank connected',institutionName+' - '+accounts.length+' account(s)');
+    showToast(institutionName+' connected successfully');
+  }catch(e){
+    alert('Error completing bank connection: '+e.message);
+  }
+}
+
+async function syncPlaidTransactions(itemId){
+  try{
+    var res=await fetch('/api/plaid/transactions',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({item_id:itemId})});
+    var data=await res.json();
+    if(!data.success){console.log('Plaid transaction sync failed:',data.message);return;}
+
+    var item=plaidItems.find(function(p){return p.item_id===itemId});
+    if(!item)return;
+
+    data.added.forEach(function(t){
+      var acctId=t.account_id;
+      var store=getStore(acctId);
+      var hash='plaid_'+t.transaction_id;
+      if(store.txs.find(function(existing){return existing.hash===hash}))return; // dedupe
+
+      // Plaid convention: positive amount = money OUT of account, negative = money IN
+      var dir=t.amount>0?'outflow':'inflow';
+      var amount=Math.abs(t.amount);
+      var cp=t.merchant_name||t.name||'Unknown';
+      var dateSort=new Date(t.date).getTime();
+
+      store.txs.push({
+        hash:hash,
+        block:dateSort, // used for sorting; displayed as date for bank txs
+        date:t.date,
+        dir:dir,
+        amount:amount,
+        cp:cp,
+        gas:0,
+        source:'bank'
+      });
+
+      // Auto-classify if counterparty already known
+      if(store.cpMappings[cp]){store.mappings[hash]=store.cpMappings[cp];}
+    });
+
+    store_setScanTime(itemId);
+  }catch(e){console.log('Sync error:',e);}
+}
+
+function store_setScanTime(itemId){
+  var item=plaidItems.find(function(p){return p.item_id===itemId});
+  if(!item)return;
+  item.accounts.forEach(function(a){
+    var s=getStore(a.id);
+    s.scanTime=new Date().toLocaleString();
+  });
+}
+
+async function checkPlaidStatus(){
+  try{
+    var res=await fetch('/api/plaid/status');
+    var data=await res.json();
+    plaidConnected=data.connected;
+  }catch(e){}
+}
+
+function renderBankCards(){
+  var wrap=document.getElementById('bankCards');
+  if(!wrap)return;
+  var bankWallets=wallets.filter(function(w){return w.chain==='Bank'});
+  if(!bankWallets.length){
+    wrap.innerHTML='<div style="color:#94a3b8;font-size:12px">No bank accounts connected yet.</div>';
+    return;
+  }
+  wrap.innerHTML=bankWallets.map(function(w){
+    var s=getStore(w.addr);
+    var hasData=s.scanTime||s.txs.length>0;
+    var classified=s.txs.filter(function(t){return s.mappings[t.hash]&&s.mappings[t.hash]!=='Unclassified'}).length;
+    return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:8px">'+w.name
+      +'<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#dcfce7;color:#166534">Bank</span></div>'
+      +(hasData?'<div style="font-size:11px;color:#64748b;margin-top:4px">'+s.txs.length+' transactions &middot; '+classified+' classified &middot; Last sync: '+s.scanTime+'</div>':'<div style="font-size:11px;color:#94a3b8;margin-top:4px">Not synced yet</div>')
+      +'</div>'
+      +'<div style="display:flex;gap:8px">'
+      +(hasData?'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger('+wallets.indexOf(w)+')">Open Ledger</button>':'')
+      +'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="syncPlaidTransactions(\''+w.plaidItemId+'\').then(function(){renderBankCards()})">Sync</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+setTimeout(checkPlaidStatus,1000);
 
 // ============ QUICKBOOKS INTEGRATION ============
 var qboConnected=false;
@@ -3217,6 +3399,7 @@ async function runAutoClassify(){
     var task=tasks[i];
     var t=task.tx;var w=task.wallet;var s=task.store;
     var chain=w.chain||'Unknown';
+    if(chain==='Bank')chain='Bank (fiat)';
 
     resultEl.innerHTML='<div style="font-size:12px;color:#64748b">Classifying '+(i+1)+' of '+total+'... <span style="color:#16a34a">'+autoClassified+' auto-classified</span></div>'
       +'<div style="background:#e2e8f0;border-radius:3px;height:4px;margin-top:6px"><div style="background:linear-gradient(90deg,#7c3aed,#3b82f6);height:100%;border-radius:3px;width:'+Math.round(((i+1)/total)*100)+'%;transition:width .3s"></div></div>';
@@ -3236,7 +3419,7 @@ async function runAutoClassify(){
 
       var res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          transaction:{direction:t.dir,amount:t.amount,counterparty:t.cp,chain:chain,block:t.block},
+          transaction:{direction:t.dir,amount:t.amount,counterparty:t.cp,chain:chain,block:t.source==='bank'?t.date:t.block,source:t.source||'blockchain'},
           chart_of_accounts:GL_OPTIONS,
           prior_classifications:prior,
           client_profile:{business_type:clientProfile.bizType,typical_transactions:clientProfile.txTypes,notes:clientProfile.notes}
@@ -3787,6 +3970,7 @@ function glSelectHtml(g){
 // ============ AUDIT TRAIL ============
 function explorerUrl(tx){
   const h=tx.origHash||tx.hash;
+  if(tx.source==='bank')return null;
   if(h&&h.startsWith("0x"))return"https://basescan.org/tx/"+h;
   return"https://solscan.io/tx/"+h;
 }
@@ -3818,10 +4002,10 @@ function openAudit(glCode,label){
     ${matching.map(t=>`<div class="audit-row">
       <div><span class="dir-badge ${t.dir==='inflow'?'in':'out'}">${t.dir==='inflow'?'IN':'OUT'}</span></div>
       <div>
-        <a class="tx-link" href="${explorerUrl(t)}" target="_blank" rel="noopener">${addr(t.hash)}</a>
+        ${t.source==='bank'?`<span class="mono">${addr(t.hash)}</span>`:`<a class="tx-link" href="${explorerUrl(t)}" target="_blank" rel="noopener">${addr(t.hash)}</a>`}
         <div style="font-size:11px;color:#94a3b8;margin-top:2px">Counterparty: <span class="mono">${addr(t.cp)}</span></div>
       </div>
-      <div style="font-size:11px;color:#94a3b8">${(t.block||0).toLocaleString()}</div>
+      <div style="font-size:11px;color:#94a3b8">${t.source==='bank'?(t.date||'—'):(t.block||0).toLocaleString()}</div>
       <div class="mono" style="font-weight:500;color:${t.dir==='inflow'?'#16a34a':'#ea580c'}">${t.dir==='inflow'?'+':'-'}$${fmt(t.amount)}</div>
       <div class="mono" style="font-size:11px;color:#94a3b8">${t.gas>.001?'$'+fmt(t.gas):'-'}</div>
     </div>`).join('')}
@@ -3885,6 +4069,7 @@ window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
   </div>
 </div>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <!-- ONBOARDING RULE BUILDER MODAL -->
 <div class="custom-overlay" id="obRuleOverlay" onclick="if(event.target===this)closeObRuleBuilder()" style="z-index:70">
   <div class="custom-modal" style="max-width:480px">

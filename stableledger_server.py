@@ -434,7 +434,89 @@ class SolanaStablecoinLedger:
 
 
 
-# ======================== QUICKBOOKS INTEGRATION ========================
+# ======================== PLAID INTEGRATION (FIAT BANKING) ========================
+PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "")
+PLAID_SECRET = os.environ.get("PLAID_SECRET", "")
+PLAID_ENV = os.environ.get("PLAID_ENV", "sandbox")  # sandbox, development, or production
+
+plaid_items = {}  # access_token keyed by item_id, plus metadata
+
+def plaid_base_url():
+    return f"https://{PLAID_ENV}.plaid.com"
+
+def plaid_request(path, payload):
+    """Make a POST request to Plaid's REST API with client_id/secret injected."""
+    payload = dict(payload)
+    payload["client_id"] = PLAID_CLIENT_ID
+    payload["secret"] = PLAID_SECRET
+    try:
+        url = f"{plaid_base_url()}{path}"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Accept": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return {"success": True, "data": json.loads(resp.read().decode())}
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else str(e)
+        return {"success": False, "message": f"Plaid Error {e.code}: {error_body[:300]}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)[:200]}
+
+def plaid_create_link_token():
+    if not PLAID_CLIENT_ID or not PLAID_SECRET:
+        return {"success": False, "message": "PLAID_CLIENT_ID / PLAID_SECRET not set"}
+    result = plaid_request("/link/token/create", {
+        "user": {"client_user_id": "shepherd-demo-user"},
+        "client_name": "Shepherd",
+        "products": ["transactions"],
+        "country_codes": ["US"],
+        "language": "en"
+    })
+    return result
+
+def plaid_exchange_public_token(public_token):
+    result = plaid_request("/item/public_token/exchange", {"public_token": public_token})
+    if result["success"]:
+        access_token = result["data"]["access_token"]
+        item_id = result["data"]["item_id"]
+        plaid_items[item_id] = {"access_token": access_token}
+        return {"success": True, "item_id": item_id}
+    return result
+
+def plaid_get_accounts(access_token):
+    result = plaid_request("/accounts/get", {"access_token": access_token})
+    if result["success"]:
+        accounts = result["data"].get("accounts", [])
+        return {"success": True, "accounts": [
+            {"id": a["account_id"], "name": a.get("name", "Account"),
+             "official_name": a.get("official_name", ""), "mask": a.get("mask", ""),
+             "type": a.get("type", ""), "subtype": a.get("subtype", ""),
+             "balance": a.get("balances", {}).get("current", 0)}
+            for a in accounts
+        ]}
+    return result
+
+def plaid_sync_transactions(access_token, cursor=None):
+    """Use /transactions/sync for incremental, reliable transaction fetching."""
+    payload = {"access_token": access_token}
+    if cursor:
+        payload["cursor"] = cursor
+    result = plaid_request("/transactions/sync", payload)
+    if result["success"]:
+        d = result["data"]
+        return {
+            "success": True,
+            "added": d.get("added", []),
+            "modified": d.get("modified", []),
+            "removed": d.get("removed", []),
+            "next_cursor": d.get("next_cursor"),
+            "has_more": d.get("has_more", False)
+        }
+    return result
+
+
 QBO_CLIENT_ID = os.environ.get("QBO_CLIENT_ID", "")
 QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "")
 QBO_REDIRECT_URI = os.environ.get("QBO_REDIRECT_URI", "http://localhost:8090/qbo/callback")
@@ -617,7 +699,38 @@ def classify_transaction(tx_data, chart_of_accounts, prior_classifications, clie
         if parts:
             biz_context = "\n".join(parts)
 
-    prompt = f"""You are a crypto accounting transaction classifier for Shepherd, a stablecoin accounting product.
+    is_bank = tx_data.get('source') == 'bank'
+
+    if is_bank:
+        prompt = f"""You are an accounting transaction classifier for Shepherd, a continuous close accounting product covering both crypto and traditional bank activity.
+
+Given a bank transaction and the customer's context, suggest the most likely GL code from their chart of accounts.
+
+CHART OF ACCOUNTS:
+{coa_text}
+
+CLIENT CONTEXT:
+{biz_context if biz_context else "No client context provided."}
+
+PRIOR CLASSIFICATIONS BY THIS CUSTOMER:
+{prior_summary if prior_summary else "No prior classifications yet."}
+
+BANK TRANSACTION TO CLASSIFY:
+- Direction: {tx_data.get('direction', 'unknown')}
+- Amount: ${tx_data.get('amount', 0):,.2f}
+- Merchant / Payee name: {tx_data.get('counterparty', 'unknown')}
+- Date: {tx_data.get('block', 'unknown')}
+
+Consider:
+1. The merchant/payee name is often highly informative for bank transactions (e.g. "AWS", "Gusto Payroll", "Stripe" imply a category directly) — weigh this heavily.
+2. Does the amount/timing match patterns in prior classifications?
+3. Round recurring amounts often suggest payroll, rent, or subscriptions.
+4. Inflows are typically revenue or transfers; outflows are typically expenses.
+
+Respond with ONLY valid JSON, no markdown, no backticks:
+{{"gl_code": "the full GL code string from the chart of accounts", "confidence": 0.0 to 1.0, "reasoning": "one sentence explanation"}}"""
+    else:
+        prompt = f"""You are a crypto accounting transaction classifier for Shepherd, a stablecoin accounting product.
 
 Given a blockchain transaction and the customer's context, suggest the most likely GL code from their chart of accounts.
 
@@ -785,6 +898,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/plaid/status":
+            connected = len(plaid_items) > 0
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"connected": connected, "item_count": len(plaid_items)}).encode())
             return
 
         if self.path == "/api/qbo/accounts":
@@ -1012,6 +1134,60 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode())
             return
 
+
+        if self.path == "/api/plaid/create_link_token":
+            result = plaid_create_link_token()
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/plaid/exchange_token":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode()) if length else {}
+            public_token = body.get("public_token", "")
+            result = plaid_exchange_public_token(public_token)
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/plaid/accounts":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode()) if length else {}
+            item_id = body.get("item_id", "")
+            item = plaid_items.get(item_id)
+            if not item:
+                result = {"success": False, "message": "Unknown item_id"}
+            else:
+                result = plaid_get_accounts(item["access_token"])
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/plaid/transactions":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode()) if length else {}
+            item_id = body.get("item_id", "")
+            cursor = body.get("cursor")
+            item = plaid_items.get(item_id)
+            if not item:
+                result = {"success": False, "message": "Unknown item_id"}
+            else:
+                result = plaid_sync_transactions(item["access_token"], cursor)
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
 
         if self.path == "/api/qbo/push":
             length = int(self.headers.get("Content-Length", 0))
