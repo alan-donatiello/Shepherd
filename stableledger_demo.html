@@ -1389,6 +1389,12 @@ function obComplete(){
   if(!obWallets.length){
     document.getElementById('onboardScreen').style.display='none';
     document.getElementById('appShell').style.display='flex';
+    var allWithData=wallets.filter(function(w){return getStore(w.addr).txs.length>0});
+    if(allWithData.length){
+      selectedWallets.clear();
+      allWithData.forEach(function(w){selectedWallets.add(w.addr.toLowerCase());});
+      loadSelected();
+    }
     navTo('ledger');
     return;
   }
@@ -1460,10 +1466,10 @@ async function obScanAll(){
     document.getElementById('onboardScreen').style.display='none';
     document.getElementById('appShell').style.display='flex';
     navTo('ledger');
-    var firstWithData=wallets.find(function(w){return getStore(w.addr).txs.length>0});
-    if(firstWithData){
+    var allWithData=wallets.filter(function(w){return getStore(w.addr).txs.length>0});
+    if(allWithData.length){
       selectedWallets.clear();
-      selectedWallets.add(firstWithData.addr.toLowerCase());
+      allWithData.forEach(function(w){selectedWallets.add(w.addr.toLowerCase());});
       loadSelected();
       var badge=document.getElementById('ledgerBadge');
       if(badge){var unc=txs.filter(function(t){return !mappings[t.hash]||mappings[t.hash]==='Unclassified'}).length;badge.style.display=unc>0?'inline':'none';badge.textContent=unc;}
