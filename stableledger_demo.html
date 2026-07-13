@@ -466,20 +466,45 @@
       </div>
 
 
-      <!-- Step 5: Connect Wallets -->
+      <!-- Step 5: Connect Wallets & Bank -->
       <div class="ob-step" id="obStep5" style="display:none">
-        <h2>Connect your wallets</h2>
-        <div class="ob-section">
-          <span class="ob-label">Wallet address</span>
-          <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base) or Solana address" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb">
-          <div style="display:flex;gap:8px">
-            <input class="ob-input" id="obWalletLabel" placeholder="Label (e.g. Treasury, Payroll)" style="flex:1" value="Treasury">
-            <input class="ob-input" id="obLookback" type="number" placeholder="Blocks" style="width:80px;text-align:left" title="Lookback blocks">
-            <button style="font-size:12px;padding:8px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap;height:38px" onclick="obAddWallet()">Add</button>
+        <h2>Connect your accounts</h2>
+
+        <div style="border:1px solid #dbeafe;background:#f8fbff;border-radius:10px;padding:16px 18px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="width:24px;height:24px;border-radius:6px;background:#dbeafe;display:flex;align-items:center;justify-content:center;color:#1d4ed8"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9v3"/></svg></div>
+            <span style="font-size:13px;font-weight:600;color:#0f172a">Crypto wallet</span>
           </div>
-          
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:8px">
+            <div>
+              <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Wallet address</label>
+              <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base) or Solana address" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:end">
+            <div style="width:160px">
+              <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Label</label>
+              <input class="ob-input" id="obWalletLabel" placeholder="e.g. Treasury" value="Treasury">
+            </div>
+            <div style="width:64px">
+              <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Blocks</label>
+              <input class="ob-input" id="obLookback" type="number" placeholder="10" style="width:100%;text-align:left" title="Lookback blocks">
+            </div>
+            <button style="font-size:12px;padding:8px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap;margin-bottom:8px" onclick="obAddWallet()">Add Wallet</button>
+          </div>
           <div id="obWalletList" style="margin-top:12px"></div>
         </div>
+
+        <div style="border:1px solid #bbf7d0;background:#f7fdf9;border-radius:10px;padding:16px 18px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <div style="width:24px;height:24px;border-radius:6px;background:#dcfce7;display:flex;align-items:center;justify-content:center;color:#166534"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z"/></svg></div>
+            <span style="font-size:13px;font-weight:600;color:#0f172a">Bank account</span>
+          </div>
+          <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Connect via Plaid</label>
+          <button style="font-size:12px;padding:8px 16px;border-radius:8px;border:none;background:#16a34a;color:#fff;cursor:pointer;white-space:nowrap" onclick="launchPlaidLink()">Connect Bank</button>
+          <div id="obBankList" style="margin-top:12px"></div>
+        </div>
+
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(7)">&larr; Back</button>
           <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obComplete()">Scan &amp; Launch &rarr;</button>
@@ -927,9 +952,6 @@
     <div style="max-width:640px;margin:30px auto 30px 0">
       <h2 style="font-size:26px;font-weight:700;margin-bottom:14px">Connections</h2>
       <div style="height:4px;width:100%;margin-bottom:20px;background:linear-gradient(90deg, transparent 0%, #0f172a 8%, #0f172a 92%, transparent 100%);border-radius:50%"></div>
-      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px">
-        <button class="btn btn-primary" onclick="openAddWalletModal()">+ Add Wallet</button>
-      </div>
 
     <div class="wc-progress" id="progressBar">
       <div class="prog-track"><div class="prog-fill" id="progressFill"></div></div>
@@ -945,6 +967,7 @@
     <div class="wc-saved-section">
       <div class="wc-saved-title">Connected Wallets</div>
       <div id="walletCards"></div>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="openAddWalletModal()">+ Add Wallet</button>
     </div>
 
     <div class="wc-saved-section">
@@ -1654,6 +1677,17 @@ function obRenderWallets(){
     <span class="mono" style="font-size:11px;color:#94a3b8;flex:1">${w.addr.slice(0,12)}...${w.addr.slice(-6)}</span>
     <span style="font-size:11px;color:#94a3b8">${w.lookback} blocks</span>
     <span style="color:#cbd5e1;cursor:pointer" onclick="obRemoveWallet(${i})">&times;</span>
+  </div>`).join('');
+}
+function obRenderBankList(){
+  const el=document.getElementById('obBankList');
+  if(!el)return;
+  const bankWallets=wallets.filter(w=>w.chain==='Bank');
+  if(!bankWallets.length){el.innerHTML='<div style="color:#94a3b8;font-size:12px">No bank accounts connected yet.</div>';return;}
+  el.innerHTML=bankWallets.map(w=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;margin-bottom:4px">
+    <span style="font-size:12px;font-weight:500;color:#1e293b">${w.name}</span>
+    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#dcfce7;color:#166534">Bank</span>
+    <span style="font-size:11px;color:#16a34a;flex:1">Connected</span>
   </div>`).join('');
 }
 
@@ -2814,7 +2848,7 @@ async function onPlaidSuccess(public_token,metadata){
     // Register each account as a pseudo-wallet so it flows through the existing pipeline
     accounts.forEach(function(a){
       if(!wallets.find(function(w){return w.addr===a.id})){
-        wallets.push({addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId});
+        wallets.push({addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId,mask:a.mask||''});
       }
     });
 
@@ -2822,6 +2856,7 @@ async function onPlaidSuccess(public_token,metadata){
     await syncPlaidTransactions(itemId);
 
     renderBankCards();
+    obRenderBankList();
     logAction('account','Bank connected',institutionName+' - '+accounts.length+' account(s)');
     showToast(institutionName+' connected successfully');
   }catch(e){
@@ -2892,22 +2927,28 @@ function renderBankCards(){
   if(!wrap)return;
   var bankWallets=wallets.filter(function(w){return w.chain==='Bank'});
   if(!bankWallets.length){
-    wrap.innerHTML='<div style="color:#94a3b8;font-size:12px">No bank accounts connected yet.</div>';
+    wrap.innerHTML='<div class="wc-empty" style="padding:20px 0">No bank accounts connected yet. Connect a bank above to get started.</div>';
     return;
   }
   wrap.innerHTML=bankWallets.map(function(w){
     var s=getStore(w.addr);
+    var i=wallets.indexOf(w);
     var hasData=s.scanTime||s.txs.length>0;
     var classified=s.txs.filter(function(t){return s.mappings[t.hash]&&s.mappings[t.hash]!=='Unclassified'}).length;
-    return '<div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">'
-      +'<div>'
-      +'<div style="font-size:13px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:8px">'+w.name
-      +'<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#dcfce7;color:#166534">Bank</span></div>'
-      +(hasData?'<div style="font-size:11px;color:#64748b;margin-top:4px">'+s.txs.length+' transactions &middot; '+classified+' classified &middot; Last sync: '+s.scanTime+'</div>':'<div style="font-size:11px;color:#94a3b8;margin-top:4px">Not synced yet</div>')
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;transition:background .15s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">'
+      +'<div style="flex:1">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      +'<span style="font-size:13px;font-weight:600;color:#0f172a">'+w.name+'</span>'
+      +'<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#dcfce7;color:#166534">Bank</span>'
       +'</div>'
-      +'<div style="display:flex;gap:8px">'
-      +(hasData?'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger('+wallets.indexOf(w)+')">Open Ledger</button>':'')
+      +'<div class="mono" style="font-size:11px;color:#94a3b8">'+(w.mask?'Account &middot;&middot;'+w.mask:w.addr)+'</div>'
+      +(hasData?'<div style="font-size:11px;color:#64748b;margin-top:4px">'+s.txs.length+' transactions &middot; '+classified+' classified &middot; Last sync: '+s.scanTime+'</div>'
+        :'<div style="font-size:11px;color:#94a3b8;margin-top:4px">Not synced yet</div>')
+      +'</div>'
+      +'<div style="display:flex;gap:6px;align-items:center">'
+      +(hasData?'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger('+i+')">Open Ledger</button>':'')
       +'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="syncPlaidTransactions(\''+w.plaidItemId+'\').then(function(){renderBankCards()})">Sync</button>'
+      +'<button style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer" onclick="removeWallet('+i+',event)">&times;</button>'
       +'</div>'
       +'</div>';
   }).join('');
