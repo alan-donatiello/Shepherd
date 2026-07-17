@@ -72,6 +72,14 @@ class BaseStablecoinLedger:
     def latest_block(self):
         return int(self._rpc("eth_blockNumber", []), 16)
 
+    def get_current_usdc_balance(self, address):
+        """Query the live on-chain USDC balance for a wallet via balanceOf(address)."""
+        addr_padded = address.lower().replace("0x", "").rjust(64, "0")
+        data = "0x70a08231" + addr_padded  # balanceOf(address) selector
+        result = self._rpc("eth_call", [{"to": self.USDC_CONTRACT, "data": data}, "latest"])
+        raw = int(result, 16) if result and result != "0x" else 0
+        return raw / (10 ** self.USDC_DECIMALS)
+
     def _get_logs_chunked(self, from_block, to_block, topics, label=""):
         out = []
         cur = from_block
@@ -240,6 +248,25 @@ class SolanaStablecoinLedger:
                 last_err = e
                 time.sleep(1.0 * (2 ** attempt))
         raise RuntimeError(f"Solana RPC failed after {retries} retries: {last_err}")
+
+    def get_current_usdc_balance(self, address=None):
+        """Query the live on-chain USDC balance for a wallet via getTokenAccountsByOwner."""
+        wallet = address or self.watched_wallet
+        result = self._rpc("getTokenAccountsByOwner", [
+            wallet,
+            {"mint": self.USDC_MINT},
+            {"encoding": "jsonParsed"}
+        ])
+        if not result or not result.get("value"):
+            return 0.0
+        total = 0.0
+        for acct in result["value"]:
+            try:
+                amt = acct["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"]
+                total += float(amt or 0)
+            except (KeyError, TypeError):
+                continue
+        return total
 
     def scan_usdc_transfers(self):
         self.progress = {"phase": "Fetching signatures", "pct": 2, "found": 0}
@@ -435,9 +462,9 @@ class SolanaStablecoinLedger:
 
 
 # ======================== PLAID INTEGRATION (FIAT BANKING) ========================
-PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "")
-PLAID_SECRET = os.environ.get("PLAID_SECRET", "")
-PLAID_ENV = os.environ.get("PLAID_ENV", "sandbox")  # sandbox, development, or production
+PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "").strip()
+PLAID_SECRET = os.environ.get("PLAID_SECRET", "").strip()
+PLAID_ENV = os.environ.get("PLAID_ENV", "sandbox").strip()  # sandbox, development, or production
 
 plaid_items = {}  # access_token keyed by item_id, plus metadata
 
@@ -517,10 +544,206 @@ def plaid_sync_transactions(access_token, cursor=None):
     return result
 
 
-QBO_CLIENT_ID = os.environ.get("QBO_CLIENT_ID", "")
-QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "")
-QBO_REDIRECT_URI = os.environ.get("QBO_REDIRECT_URI", "http://localhost:8090/qbo/callback")
-QBO_ENVIRONMENT = os.environ.get("QBO_ENVIRONMENT", "sandbox")
+# ======================== BILL.COM INTEGRATION ========================
+BILLCOM_DEV_KEY = os.environ.get("BILLCOM_DEV_KEY", "").strip()
+BILLCOM_ORG_ID = os.environ.get("BILLCOM_ORG_ID", "").strip()
+BILLCOM_USERNAME = os.environ.get("BILLCOM_USERNAME", "").strip()
+BILLCOM_PASSWORD = os.environ.get("BILLCOM_PASSWORD", "").strip()
+BILLCOM_ENV = os.environ.get("BILLCOM_ENV", "sandbox").strip()  # sandbox or production
+
+billcom_session = {"sessionId": None, "expires_at": 0}
+
+def billcom_gateway_url():
+    if BILLCOM_ENV == "production":
+        return "https://gateway.bill.com/connect/v3/login"
+    return "https://gateway.stage.bill.com/connect/v3/login"
+
+def billcom_api_base():
+    if BILLCOM_ENV == "production":
+        return "https://api.bill.com/v3"
+    return "https://api-stage.bill.com/v3"
+
+def billcom_login():
+    if not (BILLCOM_DEV_KEY and BILLCOM_ORG_ID and BILLCOM_USERNAME and BILLCOM_PASSWORD):
+        return {"success": False, "message": "Bill.com credentials not fully configured (devKey/orgId/username/password)"}
+    try:
+        payload = {
+            "username": BILLCOM_USERNAME,
+            "password": BILLCOM_PASSWORD,
+            "organizationId": BILLCOM_ORG_ID,
+            "devKey": BILLCOM_DEV_KEY
+        }
+        req = urllib.request.Request(
+            billcom_gateway_url(),
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+        billcom_session["sessionId"] = data.get("sessionId")
+        billcom_session["expires_at"] = time.time() + 30 * 60  # session idles out at 35 min, refresh a bit early
+        return {"success": True, "organizationId": data.get("organizationId"), "userId": data.get("userId")}
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else str(e)
+        return {"success": False, "message": f"Bill.com login error {e.code}: {error_body[:300]}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)[:200]}
+
+def billcom_ensure_session():
+    if billcom_session["sessionId"] and time.time() < billcom_session["expires_at"]:
+        return True
+    result = billcom_login()
+    return result.get("success", False)
+
+def billcom_get_bills():
+    if not billcom_ensure_session():
+        return {"success": False, "message": "Could not establish Bill.com session"}
+    try:
+        url = f"{billcom_api_base()}/bills?max=100"
+        req = urllib.request.Request(url, headers={
+            "sessionId": billcom_session["sessionId"],
+            "devKey": BILLCOM_DEV_KEY,
+            "Accept": "application/json"
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+        bills = data.get("results", data if isinstance(data, list) else [])
+        parsed = []
+        for b in bills:
+            parsed.append({
+                "id": b.get("id", ""),
+                "vendor": b.get("vendorName", b.get("vendorId", "Unknown vendor")),
+                "invoiceNumber": b.get("invoiceNumber", ""),
+                "amount": float(b.get("amount", 0) or 0),
+                "invoiceDate": b.get("invoiceDate", ""),
+                "dueDate": b.get("dueDate", ""),
+                "description": b.get("description", "")
+            })
+        return {"success": True, "bills": parsed}
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else str(e)
+        return {"success": False, "message": f"Bill.com error {e.code}: {error_body[:300]}"}
+    except Exception as e:
+        return {"success": False, "message": str(e)[:200]}
+
+
+# ======================== EMAIL INVOICE INGESTION ========================
+IMAP_HOSTS = {
+    "smtp.gmail.com": "imap.gmail.com",
+    "smtp.office365.com": "outlook.office365.com",
+    "smtp.mail.yahoo.com": "imap.mail.yahoo.com"
+}
+
+def scan_email_invoices(smtp_host, email_user, email_pass, days_back=14):
+    """Connect via IMAP (reusing the same app-password credentials as SMTP), find
+    recent messages with PDF attachments, and use Claude to extract bill data from each."""
+    import imaplib
+    import email as email_lib
+    from email.header import decode_header
+    from datetime import timedelta
+
+    imap_host = IMAP_HOSTS.get(smtp_host, smtp_host.replace("smtp.", "imap."))
+
+    try:
+        mail = imaplib.IMAP4_SSL(imap_host, 993)
+        mail.login(email_user, email_pass)
+        mail.select("INBOX")
+    except Exception as e:
+        return {"success": False, "message": f"IMAP connection failed: {str(e)[:200]}"}
+
+    try:
+        since_date = (datetime.now() - timedelta(days=days_back)).strftime("%d-%b-%Y")
+        status, msg_ids = mail.search(None, f'(SINCE {since_date})')
+        if status != "OK":
+            return {"success": False, "message": "IMAP search failed"}
+
+        ids = msg_ids[0].split()
+        ids = ids[-30:]  # cap at most recent 30 messages to keep this fast
+        extracted_bills = []
+
+        for msg_id in ids:
+            status, msg_data = mail.fetch(msg_id, "(RFC822)")
+            if status != "OK":
+                continue
+            raw = msg_data[0][1]
+            msg = email_lib.message_from_bytes(raw)
+
+            subject = ""
+            if msg["Subject"]:
+                parts = decode_header(msg["Subject"])
+                subject = "".join([p[0].decode(p[1] or "utf-8") if isinstance(p[0], bytes) else p[0] for p in parts])
+
+            sender = msg.get("From", "")
+
+            # Look for PDF attachments
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                filename = part.get_filename()
+                if content_type == "application/pdf" or (filename and filename.lower().endswith(".pdf")):
+                    pdf_bytes = part.get_payload(decode=True)
+                    if not pdf_bytes or len(pdf_bytes) < 100:
+                        continue
+                    extraction = extract_invoice_from_pdf(pdf_bytes, subject, sender)
+                    if extraction:
+                        extraction["source_subject"] = subject
+                        extraction["source_sender"] = sender
+                        extraction["source_filename"] = filename or "invoice.pdf"
+                        extracted_bills.append(extraction)
+
+        mail.close()
+        mail.logout()
+        return {"success": True, "bills": extracted_bills, "scanned_messages": len(ids)}
+    except Exception as e:
+        return {"success": False, "message": f"Email scan error: {str(e)[:200]}"}
+
+def extract_invoice_from_pdf(pdf_bytes, subject, sender):
+    """Use Claude's document understanding to pull structured bill data from a PDF attachment."""
+    if not ANTHROPIC_API_KEY:
+        return None
+    try:
+        pdf_b64 = base64.b64encode(pdf_bytes).decode()
+        payload = {
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 500,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_b64}},
+                    {"type": "text", "text": f"""This PDF was attached to an email with subject "{subject}" from {sender}.
+
+If this is an invoice or bill, extract the following as JSON only, no markdown:
+{{"is_invoice": true, "vendor": "vendor/company name", "amount": 0.00, "invoice_number": "", "invoice_date": "YYYY-MM-DD or empty", "due_date": "YYYY-MM-DD or empty", "description": "brief description of goods/services"}}
+
+If this is NOT an invoice or bill (e.g. a receipt confirmation, newsletter, or unrelated document), respond with exactly: {{"is_invoice": false}}"""}
+                ]
+            }]
+        }
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
+        text = result.get("content", [{}])[0].get("text", "")
+        text = text.strip().replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(text)
+        if not parsed.get("is_invoice"):
+            return None
+        return parsed
+    except Exception as e:
+        print(f"  [Invoice Extraction] Error: {e}")
+        return None
+
+
+QBO_CLIENT_ID = os.environ.get("QBO_CLIENT_ID", "").strip()
+QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "").strip()
+QBO_REDIRECT_URI = os.environ.get("QBO_REDIRECT_URI", "http://localhost:8090/qbo/callback").strip()
+QBO_ENVIRONMENT = os.environ.get("QBO_ENVIRONMENT", "sandbox").strip()
 
 qbo_tokens = {"access_token": None, "refresh_token": None, "realm_id": None, "expires_at": 0}
 
@@ -562,7 +785,7 @@ def qbo_get_accounts():
     if not qbo_tokens["access_token"] or not qbo_tokens["realm_id"]:
         return {"success": False, "message": "QuickBooks not connected"}
     try:
-        query = "SELECT Id, Name, AccountType FROM Account MAXRESULTS 1000"
+        query = "SELECT Id, Name, AccountType, CurrentBalance FROM Account MAXRESULTS 1000"
         url = f"{qbo_base_url()}/v3/company/{qbo_tokens['realm_id']}/query?query={urllib.parse.quote(query)}&minorversion=65"
         req = urllib.request.Request(url, headers={
             "Authorization": f"Bearer {qbo_tokens['access_token']}",
@@ -571,7 +794,7 @@ def qbo_get_accounts():
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read().decode())
         accounts = result.get("QueryResponse", {}).get("Account", [])
-        return {"success": True, "accounts": [{"id": a["Id"], "name": a["Name"], "type": a.get("AccountType", "")} for a in accounts]}
+        return {"success": True, "accounts": [{"id": a["Id"], "name": a["Name"], "type": a.get("AccountType", ""), "balance": float(a.get("CurrentBalance", 0) or 0)} for a in accounts]}
     except urllib.error.HTTPError as e:
         error_body = e.read().decode() if e.fp else str(e)
         return {"success": False, "message": f"QBO Error {e.code}: {error_body[:200]}"}
@@ -583,7 +806,8 @@ def qbo_create_account(name, acct_type):
     qbo_type_map = {
         "revenue": "Income",
         "expense": "Expense",
-        "transfer": "Other Current Asset"
+        "transfer": "Other Current Asset",
+        "bank": "Bank"
     }
     payload = {
         "Name": name,
@@ -668,9 +892,9 @@ def qbo_push_journal_entry(journals, memo="Shepherd Auto-Generated"):
 # ======================== HTTP SERVER ========================
 
 # Configure AI provider: "claude" or "gemini"
-AI_PROVIDER = os.environ.get("AI_PROVIDER", "claude")  # toggle here
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "claude").strip()  # toggle here
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 
 def classify_transaction(tx_data, chart_of_accounts, prior_classifications, client_profile=None):
     """Use AI to suggest a GL classification for an unknown transaction."""
@@ -907,6 +1131,38 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"connected": connected, "item_count": len(plaid_items)}).encode())
+            return
+
+        if self.path.startswith("/api/reconcile/chain_balance"):
+            query = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(query)
+            address = params.get("address", [""])[0]
+            chain = params.get("chain", [""])[0].lower()
+            try:
+                if chain == "base":
+                    ledger = BaseStablecoinLedger(address)
+                    balance = ledger.get_current_usdc_balance(address)
+                elif chain == "solana":
+                    ledger = SolanaStablecoinLedger(address)
+                    balance = ledger.get_current_usdc_balance(address)
+                else:
+                    raise ValueError(f"Unknown chain: {chain}")
+                result = {"success": True, "balance": balance, "address": address, "chain": chain}
+            except Exception as e:
+                result = {"success": False, "message": str(e)[:200]}
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/billcom/status":
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"connected": bool(billcom_session["sessionId"])}).encode())
             return
 
         if self.path == "/api/qbo/accounts":
@@ -1182,6 +1438,42 @@ class Handler(SimpleHTTPRequestHandler):
                 result = {"success": False, "message": "Unknown item_id"}
             else:
                 result = plaid_sync_transactions(item["access_token"], cursor)
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/billcom/connect":
+            result = billcom_login()
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/billcom/bills":
+            result = billcom_get_bills()
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/email/scan_invoices":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length).decode()) if length else {}
+            smtp_host = body.get("smtp_host", "smtp.gmail.com")
+            email_user = body.get("email_user", "")
+            email_pass = body.get("email_pass", "")
+            days_back = int(body.get("days_back", 14))
+            print(f"  [Email Invoices] Scanning inbox for {email_user} (last {days_back} days)...")
+            result = scan_email_invoices(smtp_host, email_user, email_pass, days_back)
+            if result.get("success"):
+                print(f"  [Email Invoices] Found {len(result.get('bills', []))} invoice(s) in {result.get('scanned_messages', 0)} messages")
             self.send_response(200)
             self._cors()
             self.send_header("Content-Type", "application/json")
