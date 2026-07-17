@@ -2016,7 +2016,7 @@ function exportAuditLog(){
 }
 // Per-wallet persistent storage
 const walletStore={};
-function getStore(addr){const k=addr.toLowerCase();if(!walletStore[k])walletStore[k]={scanData:null,txs:[],mappings:{},cpMappings:{},lastBlock:null,scanTime:null};return walletStore[k];}
+function getStore(addr){const k=addr.toLowerCase();if(!walletStore[k])walletStore[k]={scanData:null,txs:[],mappings:{},cpMappings:{},lastBlock:null,scanTime:null,reconcileBaseline:null};return walletStore[k];}
 function saveToStore(){
   if(selectedWallets.size===1){
     const addr=[...selectedWallets][0];
@@ -4119,13 +4119,6 @@ async function runChainReconciliation(){
   for(var i=0;i<cryptoWallets.length;i++){
     var w=cryptoWallets[i];
     var s=getStore(w.addr);
-    // Shepherd's calculated balance for this wallet specifically
-    var calcIn=0,calcOut=0,calcGas=0;
-    s.txs.forEach(function(t){
-      if(t.dir==='inflow')calcIn+=t.amount;
-      else{calcOut+=t.amount;calcGas+=(t.gas||0);}
-    });
-    var calcBalance=calcIn-calcOut;
 
     var liveBalance=null,error=null;
     try{
@@ -4135,17 +4128,41 @@ async function runChainReconciliation(){
       else error=data.message;
     }catch(e){error=e.message;}
 
-    var variance=liveBalance!==null?Math.abs(calcBalance-liveBalance):null;
-    var reconciled=variance!==null&&variance<0.01;
+    if(error){
+      rows.push({wallet:w,error:error});
+      continue;
+    }
 
-    rows.push({wallet:w,calcBalance:calcBalance,liveBalance:liveBalance,variance:variance,reconciled:reconciled,error:error});
+    if(!s.reconcileBaseline){
+      // First reconciliation for this wallet: establish a checkpoint. Nothing to compare yet.
+      s.reconcileBaseline={balance:liveBalance,setAt:new Date().toLocaleString(),txCountAtBaseline:s.txs.length};
+      rows.push({wallet:w,isNewBaseline:true,liveBalance:liveBalance});
+      continue;
+    }
+
+    // Net activity recorded SINCE the baseline was set (txs are append-only, so this slice is safe)
+    var txsSinceBaseline=s.txs.slice(s.reconcileBaseline.txCountAtBaseline);
+    var netSinceBaseline=0;
+    txsSinceBaseline.forEach(function(t){
+      if(t.dir==='inflow')netSinceBaseline+=t.amount;
+      else netSinceBaseline-=(t.amount+(t.gas||0));
+    });
+
+    var expectedBalance=s.reconcileBaseline.balance+netSinceBaseline;
+    var variance=Math.abs(expectedBalance-liveBalance);
+    var reconciled=variance<0.01;
+
+    rows.push({
+      wallet:w,liveBalance:liveBalance,expectedBalance:expectedBalance,variance:variance,reconciled:reconciled,
+      baselineSetAt:s.reconcileBaseline.setAt,newTxCount:txsSinceBaseline.length
+    });
   }
 
   wrap.innerHTML='<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">'
     +'<table style="width:100%;border-collapse:collapse;font-size:13px">'
     +'<thead><tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">'
     +'<th style="text-align:left;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Wallet</th>'
-    +'<th style="text-align:right;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Shepherd Balance</th>'
+    +'<th style="text-align:right;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Expected Balance</th>'
     +'<th style="text-align:right;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">On-Chain Balance</th>'
     +'<th style="text-align:right;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Variance</th>'
     +'<th style="text-align:center;padding:10px 16px;font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:500">Status</th>'
@@ -4155,16 +4172,21 @@ async function runChainReconciliation(){
         return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:10px 16px">'+r.wallet.name+'</td>'
           +'<td colspan="4" style="padding:10px 16px;color:#ea580c;font-size:12px">Error: '+r.error+'</td></tr>';
       }
+      if(r.isNewBaseline){
+        return '<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:10px 16px">'+r.wallet.name+' <span style="font-size:10px;color:#94a3b8">('+r.wallet.chain+')</span></td>'
+          +'<td colspan="3" style="padding:10px 16px;color:#64748b;font-size:12px">Baseline set at $'+fmt(r.liveBalance)+'. Re-run reconciliation after future scans to verify.</td>'
+          +'<td style="text-align:center;padding:10px 16px"><span style="color:#3b82f6;font-weight:600">&#128204; Checkpoint set</span></td></tr>';
+      }
       return '<tr style="border-bottom:1px solid #f1f5f9">'
-        +'<td style="padding:10px 16px">'+r.wallet.name+' <span style="font-size:10px;color:#94a3b8">('+r.wallet.chain+')</span></td>'
-        +'<td style="text-align:right;padding:10px 16px">$'+fmt(r.calcBalance)+'</td>'
+        +'<td style="padding:10px 16px">'+r.wallet.name+' <span style="font-size:10px;color:#94a3b8">('+r.wallet.chain+')</span><div style="font-size:10px;color:#cbd5e1">Since '+r.baselineSetAt+' &middot; '+r.newTxCount+' new tx(s)</div></td>'
+        +'<td style="text-align:right;padding:10px 16px">$'+fmt(r.expectedBalance)+'</td>'
         +'<td style="text-align:right;padding:10px 16px">$'+fmt(r.liveBalance)+'</td>'
         +'<td style="text-align:right;padding:10px 16px;color:'+(r.reconciled?'#94a3b8':'#ea580c')+'">'+(r.reconciled?'—':'$'+fmt(r.variance))+'</td>'
         +'<td style="text-align:center;padding:10px 16px">'+(r.reconciled?'<span style="color:#16a34a;font-weight:600">&#10003; Reconciled</span>':'<span style="color:#ea580c;font-weight:600">&#9888; Variance</span>')+'</td>'
         +'</tr>';
     }).join('')
     +'</tbody></table></div>'
-    +'<div style="font-size:11px;color:#94a3b8;margin-top:8px">Live balances queried directly from Base and Solana RPC nodes at time of run. A variance usually means new activity occurred outside the last scan\'s lookback window — rescan the wallet to pick it up.</div>';
+    +'<div style="font-size:11px;color:#94a3b8;margin-top:8px">Checkpoint-based reconciliation: the first run establishes a baseline balance snapshot. Every run after that verifies (baseline + all activity Shepherd has recorded since) equals the current on-chain balance — the same logic as a bank statement reconciliation. A variance means activity happened that Shepherd didn\'t capture — rescan the wallet, then re-run reconciliation.</div>';
 }
 
 async function runERPReconciliation(){
