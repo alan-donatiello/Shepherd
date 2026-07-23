@@ -26,13 +26,59 @@ from pathlib import Path
 
 # ======================== SCANNER (self-contained) ========================
 
-class BaseStablecoinLedger:
-    USDC_CONTRACT = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
-    USDC_DECIMALS = 6
-    TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-    RPC_URL = "https://base-mainnet.g.alchemy.com/v2/j5z3ffA4ndMffb9Me4jLt"
+TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
-    def __init__(self, watched_wallet, eth_usd_price=1700.00, chunk_size=10):
+# Verified contract addresses (Circle docs + Etherscan, checked live).
+# decimals: USDC/USDT/PYUSD/USDP = 6, DAI/EURC = varies — see per-token entries below.
+EVM_CHAINS = {
+    "base": {
+        "label": "Base",
+        "explorer": "https://basescan.org/tx/",
+        "rpc_url": os.environ.get("BASE_RPC_URL", "https://base-mainnet.g.alchemy.com/v2/j5z3ffA4ndMffb9Me4jLt").strip(),
+        "tokens": {
+            "USDC": {"contract": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", "decimals": 6},
+            "EURC": {"contract": "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42", "decimals": 6},
+        },
+    },
+    "ethereum": {
+        "label": "Ethereum",
+        "explorer": "https://etherscan.io/tx/",
+        "rpc_url": os.environ.get("ETHEREUM_RPC_URL", "https://eth-mainnet.g.alchemy.com/v2/j5z3ffA4ndMffb9Me4jLt").strip(),
+        "tokens": {
+            "USDC": {"contract": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "decimals": 6},
+            "USDT": {"contract": "0xdac17f958d2ee523a2206206994597c13d831ec7", "decimals": 6},
+            "DAI":  {"contract": "0x6b175474e89094c44da98b954eedeac495271d0f", "decimals": 18},
+            "USDP": {"contract": "0x8e870d67f660d95d5be530380d0ec0bd388289e1", "decimals": 18},
+            "PYUSD": {"contract": "0x6c3ea9036406852006290770bedfcaba0e23a0e8", "decimals": 6},
+            "EURC": {"contract": "0x1abaea1f7c830bd89acc67ec4af516284b1bc33c", "decimals": 6},
+        },
+    },
+    "polygon": {
+        "label": "Polygon",
+        "explorer": "https://polygonscan.com/tx/",
+        "rpc_url": os.environ.get("POLYGON_RPC_URL", "https://polygon-mainnet.g.alchemy.com/v2/j5z3ffA4ndMffb9Me4jLt").strip(),
+        "tokens": {
+            "USDC": {"contract": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359", "decimals": 6},
+            "DAI":  {"contract": "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063", "decimals": 18},
+        },
+    },
+}
+
+
+class EVMStablecoinLedger:
+    """Generalized EVM scanner. Works for Base, Ethereum, Polygon (or any EVM chain
+    added to EVM_CHAINS above) and scans every configured stablecoin on that chain
+    in a single pass, tagging each transfer with which token it actually was."""
+
+    TRANSFER_TOPIC = TRANSFER_TOPIC
+
+    def __init__(self, watched_wallet, chain_key="base", eth_usd_price=1700.00, chunk_size=10):
+        if chain_key not in EVM_CHAINS:
+            raise ValueError(f"Unknown EVM chain: {chain_key}")
+        self.chain_key = chain_key
+        self.chain = EVM_CHAINS[chain_key]
+        self.RPC_URL = self.chain["rpc_url"]
+        self.tokens = self.chain["tokens"]
         self.watched_wallet = watched_wallet.lower()
         self.eth_usd_price = eth_usd_price
         self.chunk_size = chunk_size
@@ -72,15 +118,22 @@ class BaseStablecoinLedger:
     def latest_block(self):
         return int(self._rpc("eth_blockNumber", []), 16)
 
-    def get_current_usdc_balance(self, address):
-        """Query the live on-chain USDC balance for a wallet via balanceOf(address)."""
+    def get_current_balance(self, address, token_symbol="USDC"):
+        """Query the live on-chain balance of a given token for a wallet via balanceOf(address)."""
+        token = self.tokens.get(token_symbol)
+        if not token:
+            return 0.0
         addr_padded = address.lower().replace("0x", "").rjust(64, "0")
         data = "0x70a08231" + addr_padded  # balanceOf(address) selector
-        result = self._rpc("eth_call", [{"to": self.USDC_CONTRACT, "data": data}, "latest"])
+        result = self._rpc("eth_call", [{"to": token["contract"], "data": data}, "latest"])
         raw = int(result, 16) if result and result != "0x" else 0
-        return raw / (10 ** self.USDC_DECIMALS)
+        return raw / (10 ** token["decimals"])
 
-    def _get_logs_chunked(self, from_block, to_block, topics, label=""):
+    # Backward-compat alias used by the reconciliation feature
+    def get_current_usdc_balance(self, address):
+        return self.get_current_balance(address, "USDC")
+
+    def _get_logs_chunked(self, from_block, to_block, contract, topics, label=""):
         out = []
         cur = from_block
         total = to_block - from_block + 1
@@ -90,7 +143,7 @@ class BaseStablecoinLedger:
             pct = int(done / total * 100) if total > 0 else 100
             self.progress = {"phase": label, "pct": pct, "found": len(out)}
             logs = self._rpc("eth_getLogs", [{
-                "address": self.USDC_CONTRACT, "topics": topics,
+                "address": contract, "topics": topics,
                 "fromBlock": hex(cur), "toBlock": hex(end),
             }])
             if logs:
@@ -99,27 +152,28 @@ class BaseStablecoinLedger:
         self.progress = {"phase": label, "pct": 100, "found": len(out)}
         return out
 
-    def scan_usdc_transfers(self, from_block, to_block):
+    def scan_token_transfers(self, from_block, to_block, token_symbol):
+        token = self.tokens[token_symbol]
         wallet_topic = self._addr_to_topic(self.watched_wallet)
-        outflows = self._get_logs_chunked(from_block, to_block,
-            topics=[self.TRANSFER_TOPIC, wallet_topic], label="Outflows")
-        inflows = self._get_logs_chunked(from_block, to_block,
-            topics=[self.TRANSFER_TOPIC, None, wallet_topic], label="Inflows")
+        outflows = self._get_logs_chunked(from_block, to_block, token["contract"],
+            topics=[self.TRANSFER_TOPIC, wallet_topic], label=f"{token_symbol} outflows")
+        inflows = self._get_logs_chunked(from_block, to_block, token["contract"],
+            topics=[self.TRANSFER_TOPIC, None, wallet_topic], label=f"{token_symbol} inflows")
         transfers = []
         for log in outflows:
-            transfers.append(self._decode_log(log, "outflow"))
+            transfers.append(self._decode_log(log, "outflow", token_symbol, token["decimals"]))
         for log in inflows:
-            transfers.append(self._decode_log(log, "inflow"))
-        transfers.sort(key=lambda t: (t["block_number"], t["log_index"]))
+            transfers.append(self._decode_log(log, "inflow", token_symbol, token["decimals"]))
         return transfers
 
-    def _decode_log(self, log, direction):
+    def _decode_log(self, log, direction, token_symbol, decimals):
         topics = log["topics"]
         return {
             "direction": direction,
+            "asset": token_symbol,
             "from": self._topic_to_addr(topics[1]),
             "to": self._topic_to_addr(topics[2]),
-            "amount": int(log["data"], 16) / (10 ** self.USDC_DECIMALS),
+            "amount": int(log["data"], 16) / (10 ** decimals),
             "tx_hash": log["transactionHash"],
             "block_number": int(log["blockNumber"], 16),
             "log_index": int(log["logIndex"], 16),
@@ -143,28 +197,31 @@ class BaseStablecoinLedger:
 
     def compile_journal(self, transfer):
         amt = round(transfer["amount"], 2)
+        asset = transfer["asset"]
+        chain_label = self.chain["label"]
+        asset_account = f"Digital Asset - {asset} ({chain_label})"
         counterparty = transfer["to"] if transfer["direction"] == "outflow" else transfer["from"]
         if transfer["direction"] == "outflow":
             gas_eth, gas_usd = self._gas_usd_for_outflow(transfer["tx_hash"])
             lines = [
                 {"line": 1, "account": "AP / Expense (unclassified)", "debit": amt, "credit": 0.0,
-                 "memo": f"USDC out to {counterparty}"},
-                {"line": 2, "account": "Digital Asset - USDC (Base)", "debit": 0.0, "credit": amt,
-                 "memo": "USDC sent"},
+                 "memo": f"{asset} out to {counterparty}"},
+                {"line": 2, "account": asset_account, "debit": 0.0, "credit": amt,
+                 "memo": f"{asset} sent"},
             ]
             if gas_usd > 0:
                 lines += [
                     {"line": 3, "account": "Expense - Network Fees", "debit": gas_usd, "credit": 0.0,
                      "memo": f"Gas {gas_eth:.8f} ETH @ ${self.eth_usd_price}"},
-                    {"line": 4, "account": "Digital Asset - ETH (gas)", "debit": 0.0, "credit": gas_usd,
+                    {"line": 4, "account": f"Digital Asset - ETH (gas, {chain_label})", "debit": 0.0, "credit": gas_usd,
                      "memo": "Gas consumed"},
                 ]
         else:
             lines = [
-                {"line": 1, "account": "Digital Asset - USDC (Base)", "debit": amt, "credit": 0.0,
-                 "memo": f"USDC in from {counterparty}"},
+                {"line": 1, "account": asset_account, "debit": amt, "credit": 0.0,
+                 "memo": f"{asset} in from {counterparty}"},
                 {"line": 2, "account": "AR / Revenue (unclassified)", "debit": 0.0, "credit": amt,
-                 "memo": "USDC received"},
+                 "memo": f"{asset} received"},
             ]
             gas_eth, gas_usd = 0.0, 0.0
 
@@ -174,7 +231,8 @@ class BaseStablecoinLedger:
             "tx_hash": transfer["tx_hash"],
             "block_number": transfer["block_number"],
             "direction": transfer["direction"],
-            "asset": "USDC",
+            "asset": asset,
+            "chain": self.chain_key,
             "amount": amt,
             "counterparty": counterparty,
             "gas_usd": gas_usd,
@@ -185,19 +243,25 @@ class BaseStablecoinLedger:
         }
 
     def build_report(self, from_block, to_block):
-        transfers = self.scan_usdc_transfers(from_block, to_block)
-        self.progress = {"phase": "Building journals", "pct": 50, "found": len(transfers)}
+        all_transfers = []
+        for token_symbol in self.tokens:
+            all_transfers.extend(self.scan_token_transfers(from_block, to_block, token_symbol))
+        all_transfers.sort(key=lambda t: (t["block_number"], t["log_index"]))
+
+        self.progress = {"phase": "Building journals", "pct": 50, "found": len(all_transfers)}
         journals = []
-        for i, t in enumerate(transfers):
+        for i, t in enumerate(all_transfers):
             journals.append(self.compile_journal(t))
-            if len(transfers) > 0:
-                self.progress = {"phase": "Building journals", "pct": 50 + int(50 * i / len(transfers)), "found": len(transfers)}
+            if len(all_transfers) > 0:
+                self.progress = {"phase": "Building journals", "pct": 50 + int(50 * i / len(all_transfers)), "found": len(all_transfers)}
+
         total_in = round(sum(j["amount"] for j in journals if j["direction"] == "inflow"), 2)
         total_out = round(sum(j["amount"] for j in journals if j["direction"] == "outflow"), 2)
         total_gas = round(sum(j["gas_usd"] for j in journals), 6)
-        self.progress = {"phase": "Done", "pct": 100, "found": len(transfers)}
+        self.progress = {"phase": "Done", "pct": 100, "found": len(all_transfers)}
         return {
             "wallet": self.watched_wallet,
+            "chain": self.chain_key,
             "scan_range": {"from_block": from_block, "to_block": to_block},
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "summary": {
@@ -214,17 +278,29 @@ class BaseStablecoinLedger:
         }
 
 
+# Backward-compat: existing code that instantiates BaseStablecoinLedger(wallet) still works,
+# defaulting to the Base chain.
+class BaseStablecoinLedger(EVMStablecoinLedger):
+    def __init__(self, watched_wallet, eth_usd_price=1700.00, chunk_size=10):
+        super().__init__(watched_wallet, chain_key="base", eth_usd_price=eth_usd_price, chunk_size=chunk_size)
+
+
 # ======================== SOLANA SCANNER ========================
 
+SOLANA_TOKENS = {
+    "USDC": {"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "decimals": 6},
+    "EURC": {"mint": "HzwqbKZw8HxMN6bF2yFZNrht3c2iXXzpKcFu7uBEDKtr", "decimals": 6},
+}
+
+
 class SolanaStablecoinLedger:
-    USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-    USDC_DECIMALS = 6
-    RPC_URL = "https://mainnet.helius-rpc.com/?api-key=8344d6de-09ea-425c-a80b-9696150a7c43"
+    RPC_URL = os.environ.get("SOLANA_RPC_URL", "https://mainnet.helius-rpc.com/?api-key=8344d6de-09ea-425c-a80b-9696150a7c43").strip()
     SOL_USD_PRICE = 70
 
     def __init__(self, watched_wallet, tx_limit=50):
         self.watched_wallet = watched_wallet
         self.tx_limit = tx_limit
+        self.tokens = SOLANA_TOKENS
         self.progress = {"phase": "", "pct": 0, "found": 0}
 
     def _rpc(self, method, params, retries=3):
@@ -249,12 +325,15 @@ class SolanaStablecoinLedger:
                 time.sleep(1.0 * (2 ** attempt))
         raise RuntimeError(f"Solana RPC failed after {retries} retries: {last_err}")
 
-    def get_current_usdc_balance(self, address=None):
-        """Query the live on-chain USDC balance for a wallet via getTokenAccountsByOwner."""
+    def get_current_balance(self, address=None, token_symbol="USDC"):
+        """Query the live on-chain balance of a given token for a wallet via getTokenAccountsByOwner."""
         wallet = address or self.watched_wallet
+        token = self.tokens.get(token_symbol)
+        if not token:
+            return 0.0
         result = self._rpc("getTokenAccountsByOwner", [
             wallet,
-            {"mint": self.USDC_MINT},
+            {"mint": token["mint"]},
             {"encoding": "jsonParsed"}
         ])
         if not result or not result.get("value"):
@@ -268,7 +347,11 @@ class SolanaStablecoinLedger:
                 continue
         return total
 
-    def scan_usdc_transfers(self):
+    # Backward-compat alias used by the reconciliation feature
+    def get_current_usdc_balance(self, address=None):
+        return self.get_current_balance(address, "USDC")
+
+    def scan_token_transfers(self):
         self.progress = {"phase": "Fetching signatures", "pct": 2, "found": 0}
 
         # Paginate: Solana caps at 1000 per call
@@ -313,95 +396,93 @@ class SolanaStablecoinLedger:
             if not tx or not tx.get("meta"):
                 continue
 
-            transfer = self._extract_usdc_transfer(tx, sig_info["signature"])
-            if transfer:
-                transfers.append(transfer)
+            transfers.extend(self._extract_token_transfers(tx, sig_info["signature"]))
 
         self.progress = {"phase": "Done", "pct": 100, "found": len(transfers)}
         transfers.sort(key=lambda t: t["slot"])
         return transfers
 
-    def _extract_usdc_transfer(self, tx, signature):
-        """Extract USDC transfer from parsed Solana transaction."""
+    def _extract_token_transfers(self, tx, signature):
+        """Extract stablecoin transfers (any configured mint) from a parsed Solana transaction.
+        Usually one token moves per tx, but this returns a list to handle multi-token txs too."""
         meta = tx["meta"]
         pre_tokens = meta.get("preTokenBalances") or []
         post_tokens = meta.get("postTokenBalances") or []
         slot = tx.get("slot", 0)
 
-        # Build balance maps: {owner: amount} for USDC pre and post
-        def token_map(balances):
-            m = {}
-            for b in balances:
-                if b.get("mint") == self.USDC_MINT:
-                    owner = b.get("owner", "")
-                    amt = float(b.get("uiTokenAmount", {}).get("uiAmount") or 0)
-                    m[owner] = amt
-            return m
-
-        pre = token_map(pre_tokens)
-        post = token_map(post_tokens)
-
-        # Find our wallet's balance change
-        pre_bal = pre.get(self.watched_wallet, 0)
-        post_bal = post.get(self.watched_wallet, 0)
-        delta = round(post_bal - pre_bal, 2)
-
-        if abs(delta) < 0.01:
-            return None  # no meaningful USDC change
-
-        direction = "inflow" if delta > 0 else "outflow"
-        amount = abs(delta)
-
-        # Find counterparty: the other address whose USDC balance changed oppositely
-        counterparty = "unknown"
-        all_owners = set(list(pre.keys()) + list(post.keys()))
-        for owner in all_owners:
-            if owner == self.watched_wallet:
-                continue
-            other_delta = (post.get(owner, 0)) - (pre.get(owner, 0))
-            if (direction == "outflow" and other_delta > 0) or \
-               (direction == "inflow" and other_delta < 0):
-                counterparty = owner
-                break
-
-        # Fee in SOL
+        # Fee in SOL, attributed only if our wallet is the fee payer
         fee_lamports = meta.get("fee", 0)
         fee_sol = fee_lamports / 1e9
         fee_usd = round(fee_sol * self.SOL_USD_PRICE, 6)
-        # Only attribute fee if our wallet sent the tx
         account_keys = []
         msg = tx.get("transaction", {}).get("message", {})
         for ak in msg.get("accountKeys", []):
-            if isinstance(ak, dict):
-                account_keys.append(ak.get("pubkey", ""))
-            else:
-                account_keys.append(ak)
+            account_keys.append(ak.get("pubkey", "") if isinstance(ak, dict) else ak)
         is_signer = len(account_keys) > 0 and account_keys[0] == self.watched_wallet
 
-        return {
-            "direction": direction,
-            "from": self.watched_wallet if direction == "outflow" else counterparty,
-            "to": counterparty if direction == "outflow" else self.watched_wallet,
-            "amount": amount,
-            "tx_hash": signature,
-            "block_number": slot,
-            "slot": slot,
-            "log_index": 0,
-            "fee_sol": fee_sol if is_signer else 0,
-            "fee_usd": fee_usd if is_signer else 0,
-        }
+        results = []
+        for token_symbol, token in self.tokens.items():
+            def token_map(balances, mint=token["mint"]):
+                m = {}
+                for b in balances:
+                    if b.get("mint") == mint:
+                        owner = b.get("owner", "")
+                        amt = float(b.get("uiTokenAmount", {}).get("uiAmount") or 0)
+                        m[owner] = amt
+                return m
+
+            pre = token_map(pre_tokens)
+            post = token_map(post_tokens)
+
+            pre_bal = pre.get(self.watched_wallet, 0)
+            post_bal = post.get(self.watched_wallet, 0)
+            delta = round(post_bal - pre_bal, 2)
+
+            if abs(delta) < 0.01:
+                continue  # no meaningful change for this token in this tx
+
+            direction = "inflow" if delta > 0 else "outflow"
+            amount = abs(delta)
+
+            counterparty = "unknown"
+            all_owners = set(list(pre.keys()) + list(post.keys()))
+            for owner in all_owners:
+                if owner == self.watched_wallet:
+                    continue
+                other_delta = (post.get(owner, 0)) - (pre.get(owner, 0))
+                if (direction == "outflow" and other_delta > 0) or \
+                   (direction == "inflow" and other_delta < 0):
+                    counterparty = owner
+                    break
+
+            results.append({
+                "direction": direction,
+                "asset": token_symbol,
+                "from": self.watched_wallet if direction == "outflow" else counterparty,
+                "to": counterparty if direction == "outflow" else self.watched_wallet,
+                "amount": amount,
+                "tx_hash": signature,
+                "block_number": slot,
+                "slot": slot,
+                "log_index": 0,
+                "fee_sol": fee_sol if is_signer else 0,
+                "fee_usd": fee_usd if is_signer else 0,
+            })
+        return results
 
     def compile_journal(self, transfer):
         amt = round(transfer["amount"], 2)
+        asset = transfer["asset"]
         cp = transfer["to"] if transfer["direction"] == "outflow" else transfer["from"]
         fee_usd = transfer.get("fee_usd", 0)
+        asset_account = f"Digital Asset - {asset} (Solana)"
 
         if transfer["direction"] == "outflow":
             lines = [
                 {"line": 1, "account": "AP / Expense (unclassified)", "debit": amt, "credit": 0.0,
-                 "memo": f"USDC out to {cp[:8]}..."},
-                {"line": 2, "account": "Digital Asset - USDC (Solana)", "debit": 0.0, "credit": amt,
-                 "memo": "USDC sent"},
+                 "memo": f"{asset} out to {cp[:8]}..."},
+                {"line": 2, "account": asset_account, "debit": 0.0, "credit": amt,
+                 "memo": f"{asset} sent"},
             ]
             if fee_usd > 0:
                 lines += [
@@ -412,10 +493,10 @@ class SolanaStablecoinLedger:
                 ]
         else:
             lines = [
-                {"line": 1, "account": "Digital Asset - USDC (Solana)", "debit": amt, "credit": 0.0,
-                 "memo": f"USDC in from {cp[:8]}..."},
+                {"line": 1, "account": asset_account, "debit": amt, "credit": 0.0,
+                 "memo": f"{asset} in from {cp[:8]}..."},
                 {"line": 2, "account": "AR / Revenue (unclassified)", "debit": 0.0, "credit": amt,
-                 "memo": "USDC received"},
+                 "memo": f"{asset} received"},
             ]
             fee_usd = 0
 
@@ -425,7 +506,7 @@ class SolanaStablecoinLedger:
             "tx_hash": transfer["tx_hash"],
             "block_number": transfer.get("slot", 0),
             "direction": transfer["direction"],
-            "asset": "USDC",
+            "asset": asset,
             "amount": amt,
             "counterparty": cp,
             "gas_usd": fee_usd,
@@ -436,7 +517,7 @@ class SolanaStablecoinLedger:
         }
 
     def build_report(self):
-        transfers = self.scan_usdc_transfers()
+        transfers = self.scan_token_transfers()
         journals = [self.compile_journal(t) for t in transfers]
         total_in = round(sum(j["amount"] for j in journals if j["direction"] == "inflow"), 2)
         total_out = round(sum(j["amount"] for j in journals if j["direction"] == "outflow"), 2)
@@ -970,6 +1051,7 @@ PRIOR CLASSIFICATIONS BY THIS CUSTOMER:
 TRANSACTION TO CLASSIFY:
 - Direction: {tx_data.get('direction', 'unknown')}
 - Amount: ${tx_data.get('amount', 0):,.2f}
+- Asset: {tx_data.get('asset', 'USDC')}
 - Counterparty address: {tx_data.get('counterparty', 'unknown')}
 - Chain: {tx_data.get('chain', 'unknown')}
 - Block/Slot: {tx_data.get('block', 'unknown')}
@@ -981,6 +1063,7 @@ Consider:
 4. Round amounts ($5000, $10000) often suggest payroll or planned payments
 5. Small irregular amounts often suggest SaaS or operational costs
 6. Inflows are typically revenue, outflows are typically expenses
+7. If the asset is EURC, the amount is denominated in euros, not dollars — note this in your reasoning if relevant, since it affects how the transaction should be described
 
 Respond with ONLY valid JSON, no markdown, no backticks:
 {{"gl_code": "the full GL code string from the chart of accounts", "confidence": 0.0 to 1.0, "reasoning": "one sentence explanation"}}"""
@@ -1060,8 +1143,12 @@ def _classify_gemini(prompt):
             print(f"  [Gemini] Error: {e}")
             return {"gl_code": None, "confidence": 0, "reasoning": f"Gemini error: {str(e)[:100]}"}
 
-def detect_chain(wallet):
-    """0x + 42 chars = EVM/Base. Otherwise assume Solana (base58)."""
+def detect_chain(wallet, requested_chain=None):
+    """If the caller specifies which chain (needed for EVM chains, since Base/Ethereum/
+    Polygon all share the same 0x address format), use that. Otherwise fall back to
+    format-based detection, defaulting ambiguous 0x addresses to Base for backward compat."""
+    if requested_chain and (requested_chain in EVM_CHAINS or requested_chain == "solana"):
+        return requested_chain
     if wallet.startswith("0x") and len(wallet) == 42:
         return "base"
     return "solana"
@@ -1069,29 +1156,31 @@ def detect_chain(wallet):
 # Global state for active scan
 active_scan = {"running": False, "engine": None, "result": None, "error": None}
 
-def run_scan(wallet, lookback, from_block=None):
+def run_scan(wallet, lookback, from_block=None, requested_chain=None):
     global active_scan
     try:
-        chain = detect_chain(wallet)
-        if chain == "base":
-            engine = BaseStablecoinLedger(wallet)
+        chain = detect_chain(wallet, requested_chain)
+        if chain in EVM_CHAINS:
+            engine = EVMStablecoinLedger(wallet, chain_key=chain)
             active_scan["engine"] = engine
             to_block = engine.latest_block()
             if from_block is not None:
                 scan_from = from_block
             else:
                 scan_from = to_block - lookback
-            print(f"  [Base] Scanning {wallet}, blocks {scan_from:,} -> {to_block:,}")
+            chain_label = EVM_CHAINS[chain]["label"]
+            token_list = ", ".join(engine.tokens.keys())
+            print(f"  [{chain_label}] Scanning {wallet} for {token_list}, blocks {scan_from:,} -> {to_block:,}")
             report = engine.build_report(scan_from, to_block)
         else:
             engine = SolanaStablecoinLedger(wallet, tx_limit=lookback)
             active_scan["engine"] = engine
-            print(f"  [Solana] Scanning {wallet}, last {lookback} transactions")
+            print(f"  [Solana] Scanning {wallet} for {', '.join(SOLANA_TOKENS.keys())}, last {lookback} transactions")
             report = engine.build_report()
 
         active_scan["result"] = report
         active_scan["error"] = None
-        print(f"  Done: {report['summary']['transfer_count']} USDC transfers found")
+        print(f"  Done: {report['summary']['transfer_count']} stablecoin transfers found")
     except Exception as e:
         active_scan["error"] = str(e)
         active_scan["result"] = None
@@ -1138,16 +1227,17 @@ class Handler(SimpleHTTPRequestHandler):
             params = urllib.parse.parse_qs(query)
             address = params.get("address", [""])[0]
             chain = params.get("chain", [""])[0].lower()
+            token_symbol = params.get("token", ["USDC"])[0].upper()
             try:
-                if chain == "base":
-                    ledger = BaseStablecoinLedger(address)
-                    balance = ledger.get_current_usdc_balance(address)
+                if chain in EVM_CHAINS:
+                    ledger = EVMStablecoinLedger(address, chain_key=chain)
+                    balance = ledger.get_current_balance(address, token_symbol)
                 elif chain == "solana":
                     ledger = SolanaStablecoinLedger(address)
-                    balance = ledger.get_current_usdc_balance(address)
+                    balance = ledger.get_current_balance(address, token_symbol)
                 else:
                     raise ValueError(f"Unknown chain: {chain}")
-                result = {"success": True, "balance": balance, "address": address, "chain": chain}
+                result = {"success": True, "balance": balance, "address": address, "chain": chain, "token": token_symbol}
             except Exception as e:
                 result = {"success": False, "message": str(e)[:200]}
             self.send_response(200)
@@ -1155,6 +1245,18 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(result).encode())
+            return
+
+        if self.path == "/api/chains":
+            chains_out = {}
+            for key, cfg in EVM_CHAINS.items():
+                chains_out[key] = {"label": cfg["label"], "tokens": list(cfg["tokens"].keys())}
+            chains_out["solana"] = {"label": "Solana", "tokens": list(SOLANA_TOKENS.keys())}
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"chains": chains_out}).encode())
             return
 
         if self.path == "/api/billcom/status":
@@ -1499,6 +1601,7 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.loads(self.rfile.read(length).decode()) if length else {}
             wallet = body.get("wallet", "").strip()
             lookback = int(body.get("lookback_blocks", 1000))
+            requested_chain = (body.get("chain") or "").strip().lower() or None
 
             is_evm = wallet.startswith("0x") and len(wallet) == 42
             is_solana = not wallet.startswith("0x") and 32 <= len(wallet) <= 44
@@ -1508,6 +1611,13 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": "Invalid wallet address"}).encode())
+                return
+            if requested_chain and requested_chain not in EVM_CHAINS and requested_chain != "solana":
+                self.send_response(400)
+                self._cors()
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": f"Unknown chain: {requested_chain}"}).encode())
                 return
 
             if active_scan["running"]:
@@ -1522,8 +1632,8 @@ class Handler(SimpleHTTPRequestHandler):
             active_scan["result"] = None
             active_scan["error"] = None
             from_block = body.get("from_block")
-            print(f"\n[SCAN] Starting for {wallet}, lookback={lookback}" + (f", from_block={from_block}" if from_block else ""))
-            threading.Thread(target=run_scan, args=(wallet, lookback, from_block), daemon=True).start()
+            print(f"\n[SCAN] Starting for {wallet}, chain={requested_chain or 'auto'}, lookback={lookback}" + (f", from_block={from_block}" if from_block else ""))
+            threading.Thread(target=run_scan, args=(wallet, lookback, from_block, requested_chain), daemon=True).start()
 
             self.send_response(200)
             self._cors()

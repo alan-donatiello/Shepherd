@@ -433,25 +433,25 @@
           <span class="ob-label">Which chains are you on?</span>
           <div class="ob-chips" id="obChains">
             <div class="ob-chip" onclick="obToggle(this,'chains')">Base</div>
+            <div class="ob-chip" onclick="obToggle(this,'chains')">Ethereum</div>
+            <div class="ob-chip" onclick="obToggle(this,'chains')">Polygon</div>
             <div class="ob-chip" onclick="obToggle(this,'chains')">Solana</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Ethereum</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Polygon</div>
             <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Arbitrum</div>
             <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Optimism</div>
           </div>
-          <div class="ob-hint">Base and Solana live. Other chains coming soon.</div>
+          <div class="ob-hint">Base, Ethereum, Polygon, and Solana live. Additional L2s coming soon.</div>
         </div>
         <div class="ob-section">
           <span class="ob-label">Which tokens do you use?</span>
           <div class="ob-chips" id="obTokens">
             <div class="ob-chip" onclick="obToggle(this,'tokens')">USDC</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">USDT</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">DAI</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">PYUSD</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">WETH</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'tokens')">SOL</div>
+            <div class="ob-chip" onclick="obToggle(this,'tokens')">USDT</div>
+            <div class="ob-chip" onclick="obToggle(this,'tokens')">DAI</div>
+            <div class="ob-chip" onclick="obToggle(this,'tokens')">USDP</div>
+            <div class="ob-chip" onclick="obToggle(this,'tokens')">PYUSD</div>
+            <div class="ob-chip" onclick="obToggle(this,'tokens')">EURC</div>
           </div>
-          <div class="ob-hint">USDC scanning live. Multi-token support coming soon.</div>
+          <div class="ob-hint">All major stablecoins scan automatically per chain — no separate setup needed per token.</div>
         </div>
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
@@ -1212,7 +1212,16 @@
     <h3>Add Wallet</h3>
     <div class="cm-field">
       <label>Wallet Address</label>
-      <input class="mono" id="walletInput" placeholder="0x... (Base) or Solana address" spellcheck="false">
+      <input class="mono" id="walletInput" placeholder="0x... (EVM) or Solana address" spellcheck="false" oninput="onWalletInputChange()">
+    </div>
+    <div class="cm-field" id="chainSelectField" style="display:none">
+      <label>Chain</label>
+      <select id="chainSelect" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit" onchange="updateChainTokenNote()">
+        <option value="base">Base</option>
+        <option value="ethereum">Ethereum</option>
+        <option value="polygon">Polygon</option>
+      </select>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px" id="chainTokenNote"></div>
     </div>
     <div class="cm-field">
       <label>Label</label>
@@ -1577,7 +1586,7 @@
         </div>
         <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">
           <div style="font-size:13px;font-weight:500;margin-bottom:6px">Supported chains & tokens</div>
-          <div style="font-size:12px;color:#64748b;line-height:1.6">Base (EVM) and Solana mainnet. USDC transfers only today. Ethereum mainnet and additional stablecoins are on the roadmap.</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.6">Base, Ethereum, Polygon, and Solana mainnet. Each chain scans for all its supported major stablecoins automatically (USDC everywhere; USDT, DAI, USDP, PYUSD, and EURC where they exist on that chain) — no per-token setup needed. Additional L2s are on the roadmap.</div>
         </div>
         <div style="padding:16px 20px">
           <div style="font-size:13px;font-weight:500;margin-bottom:6px">Fiat bank connections</div>
@@ -1956,7 +1965,7 @@ function obRenderWallets(){
   if(!obWallets.length){el.innerHTML='<div style="color:#94a3b8;font-size:12px">No wallets added yet.</div>';return;}
   el.innerHTML=obWallets.map((w,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f8fafc;border-radius:6px;margin-bottom:4px">
     <span style="font-size:12px;font-weight:500;color:#1e293b">${w.name}</span>
-    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${w.chain==='Base'?'#dbeafe':w.chain==='Bank'?'#dcfce7':'#e0e7ff'};color:${w.chain==='Base'?'#1d4ed8':w.chain==='Bank'?'#166534':'#4338ca'}">${w.chain}</span>
+    <span style="font-size:11px;padding:2px 6px;border-radius:3px;${chainBadgeStyle(w.chain)}">${w.chain}</span>
     <span class="mono" style="font-size:11px;color:#94a3b8;flex:1">${w.addr.slice(0,12)}...${w.addr.slice(-6)}</span>
     <span style="font-size:11px;color:#94a3b8">${w.lookback} blocks</span>
     <span style="color:#cbd5e1;cursor:pointer" onclick="obRemoveWallet(${i})">&times;</span>
@@ -2030,7 +2039,7 @@ function renderTxTable(){
 
   wrap.innerHTML=`<div class="tx-table-wrap"><table class="tx-table">
     <thead><tr>
-      <th style="width:30px"><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain</th><th>Block / Date</th><th>Status</th><th>GL Code</th>
+      <th style="width:30px"><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th><th>Direction</th><th>Amount</th><th>Counterparty</th><th>Wallet</th><th>Chain / Token</th><th>Block / Date</th><th>Status</th><th>GL Code</th>
     </tr></thead>
     <tbody>${filtered.map(t=>{const txid=t.walletAddr.toLowerCase()+'::'+t.hash;const chk=selectedTxIds.has(txid)?'checked':'';return`<tr>
       <td><input type="checkbox" class="tx-row-cb" data-txid="${txid}" ${chk} onchange="toggleTxSelect('${txid}',this)"></td>
@@ -2038,7 +2047,7 @@ function renderTxTable(){
       <td class="mono" style="font-weight:500;color:${t.dir==='inflow'?'#16a34a':'#ea580c'}">${t.dir==='inflow'?'+':'-'}$${fmt(t.amount)}</td>
       <td class="mono" style="font-size:11px">${addr(t.cp)}</td>
       <td style="font-size:11px">${t.wallet}</td>
-      <td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:${t.chain==='Base'?'#dbeafe':t.chain==='Bank'?'#dcfce7':'#e0e7ff'};color:${t.chain==='Base'?'#1d4ed8':t.chain==='Bank'?'#166534':'#4338ca'}">${t.chain}</span></td>
+      <td><span style="font-size:11px;padding:2px 6px;border-radius:3px;${chainBadgeStyle(t.chain)}">${t.chain}</span>${t.chain!=='Bank'?' <span class="mono" style="font-size:10px;color:#64748b;font-weight:600">'+(t.asset||'USDC')+'</span>':''}</td>
       <td style="font-size:11px;color:#94a3b8">${isTxBank(t)?(t.date||'—'):(t.block||0).toLocaleString()}</td>
       <td><span class="status-pill ${t.gl==='Unclassified'?'unclassified':'classified'}">${t.gl==='Unclassified'?'Pending':'Classified'}</span></td>
       <td style="font-size:11px;color:${t.gl==='Unclassified'?'#d97706':'#334155'}">${t.gl==='Unclassified'?'—':t.gl}</td>
@@ -2345,16 +2354,49 @@ function confirmRescan(){
   startScan();
 }
 
+var CHAIN_BADGE_COLORS={
+  Base:{bg:'#dbeafe',fg:'#1d4ed8'},
+  Ethereum:{bg:'#e0e7ff',fg:'#4338ca'},
+  Polygon:{bg:'#f3e8ff',fg:'#7e22ce'},
+  Solana:{bg:'#ede9fe',fg:'#6d28d9'},
+  Bank:{bg:'#dcfce7',fg:'#166534'}
+};
+function chainBadgeStyle(chain){
+  var c=CHAIN_BADGE_COLORS[chain]||{bg:'#f1f5f9',fg:'#475569'};
+  return 'background:'+c.bg+';color:'+c.fg;
+}
+
+var CHAIN_LABELS={base:'Base',ethereum:'Ethereum',polygon:'Polygon'};
+var CHAIN_TOKENS={base:['USDC','EURC'],ethereum:['USDC','USDT','DAI','USDP','PYUSD','EURC'],polygon:['USDC','DAI']};
+
+function onWalletInputChange(){
+  var val=document.getElementById('walletInput').value.trim();
+  var field=document.getElementById('chainSelectField');
+  var isEvm=val.startsWith('0x')&&val.length===42;
+  field.style.display=isEvm?'block':'none';
+  if(isEvm)updateChainTokenNote();
+}
+function updateChainTokenNote(){
+  var chain=document.getElementById('chainSelect').value;
+  var note=document.getElementById('chainTokenNote');
+  var tokens=CHAIN_TOKENS[chain]||[];
+  note.textContent='Scans for: '+tokens.join(', ');
+}
+
 function saveWallet(){
   const a=document.getElementById("walletInput").value.trim();
   const n=document.getElementById("nameInput").value.trim()||addr(a);
-  if(!a.startsWith("0x")&&a.length<32||a.startsWith("0x")&&a.length!==42)return alert("Enter a valid wallet address (0x... for Base, or Solana address)");
-  if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){wallets.push({addr:a,name:n,chain:a.startsWith("0x")?"Base":"Solana"});}
+  if(!a.startsWith("0x")&&a.length<32||a.startsWith("0x")&&a.length!==42)return alert("Enter a valid wallet address (0x... for an EVM chain, or Solana address)");
+  var isEvm=a.startsWith('0x');
+  var chainKey=isEvm?document.getElementById('chainSelect').value:'solana';
+  var chainLabel=isEvm?CHAIN_LABELS[chainKey]:'Solana';
+  if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){wallets.push({addr:a,name:n,chain:chainLabel,chainKey:chainKey});}
   renderWallets();
 }
 function loadWallet(i){
   document.getElementById("walletInput").value=wallets[i].addr;
   document.getElementById("nameInput").value=wallets[i].name;
+  onWalletInputChange();
   renderWallets();
 }
 function removeWallet(i,e){
@@ -2406,7 +2448,10 @@ function renderWallets(){
 async function startScan(){
   const wallet=document.getElementById("walletInput").value.trim();
   const blocks=parseInt(document.getElementById("blocksInput").value)||10;
-  if(!wallet.startsWith("0x")&&wallet.length<32||wallet.startsWith("0x")&&wallet.length!==42)return alert("Enter a valid wallet address (0x... for Base, or Solana address)");
+  if(!wallet.startsWith("0x")&&wallet.length<32||wallet.startsWith("0x")&&wallet.length!==42)return alert("Enter a valid wallet address (0x... for an EVM chain, or Solana address)");
+  const isEvm=wallet.startsWith("0x");
+  const chainKey=isEvm?document.getElementById('chainSelect').value:'solana';
+  const chainLabel=isEvm?CHAIN_LABELS[chainKey]:'Solana';
 
   saveWallet();
   closeAddWalletModal();
@@ -2415,12 +2460,12 @@ async function startScan(){
   const pb=document.getElementById("progressBar");pb.classList.add("active");
   document.getElementById("progressFill").style.width="5%";
   document.getElementById("progressFill").style.background="";
-  document.getElementById("progressText").textContent="Connecting to Base...";
+  document.getElementById("progressText").textContent="Connecting to "+chainLabel+"...";
   document.getElementById("scanResult").classList.remove("active");
 
   try{
     const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({wallet,lookback_blocks:blocks})});
+      body:JSON.stringify({wallet,lookback_blocks:blocks,chain:chainKey})});
     const data=await res.json();
     if(data.error)throw new Error(data.error);
 
@@ -2453,7 +2498,8 @@ function onScanComplete(report){
     dir:j.direction,
     amount:j.amount,
     cp:j.counterparty,
-    gas:j.gas_usd||0
+    gas:j.gas_usd||0,
+    asset:j.asset||'USDC'
   }));
 
   // Merge with existing history - never overwrite past transactions
@@ -2634,8 +2680,9 @@ function isTxBank(tx){
 function getJournal(tx){
   const g=glOf(tx.hash),label=g==="Unclassified"?(tx.dir==="outflow"?"AP / Expense (unclassified)":"AR / Revenue (unclassified)"):g;
   const isBank=isTxBank(tx);
-  const assetAcct=isBank?"Bank - Checking":"Digital Asset - USDC";
-  const assetTarget=isBank?"bs-bank":"bs-usdc";
+  const assetSymbol=tx.asset||'USDC';
+  const assetAcct=isBank?"Bank - Checking":("Digital Asset - "+assetSymbol);
+  const assetTarget=isBank?"bs-bank":("bs-"+assetSymbol.toLowerCase());
   if(tx.dir==="outflow"){
     const l=[{n:1,acct:label,dr:tx.amount,cr:0,t:getTarget(g,"expense")},{n:2,acct:assetAcct,dr:0,cr:tx.amount,t:assetTarget}];
     if(tx.gas>0){l.push({n:3,acct:"Expense - Network Fees",dr:tx.gas,cr:0,t:"pnl-gas"});l.push({n:4,acct:"Digital Asset - ETH",dr:0,cr:tx.gas,t:"bs-eth"});}
@@ -2716,6 +2763,7 @@ function renderTx(){
     <span class="tx-amt mono ${tx.dir==='inflow'?'in':'out'}">${tx.dir==='inflow'?'+':'-'}$${fmt(tx.amount)}</span>
     <span class="tx-cp">Counterparty: <strong class="mono">${addr(tx.cp)}</strong></span>
     ${tx.walletName?`<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#f1f5f9;color:#64748b">${tx.walletName}</span>`:''}
+    ${!isTxBank(tx)?`<span class="mono" style="font-size:10px;padding:2px 6px;border-radius:3px;background:#eef2ff;color:#4338ca;font-weight:600">${tx.asset||'USDC'}</span>`:''}
     <span class="tx-meta mono">${addr(tx.origHash||tx.hash)} &middot; ${isTxBank(tx)?(tx.date||'—'):'Block '+(tx.block||0).toLocaleString()}</span>`;
 
   // Journal
@@ -2732,7 +2780,7 @@ function renderTx(){
   // Financial statements — cumulative from zero, only classified transactions
   // Compute cumulative totals across ALL classified transactions
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
-    usdcIn:0,usdcOut:0,bankIn:0,bankOut:0,gasSpent:0,inCount:0,outCount:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+    assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
   txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
@@ -2742,8 +2790,14 @@ function renderTx(){
     else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
     else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
     const isBank=isTxBank(t);
-    if(t.dir==="inflow"){if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}else{cum.usdcIn+=t.amount;cum.inCount++;}}
-    else{if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}else{cum.usdcOut+=t.amount;cum.gasSpent+=t.gas;cum.outCount++;}}
+    const asset=t.asset||'USDC';
+    if(t.dir==="inflow"){
+      if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}
+      else{cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
+    }else{
+      if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}
+      else{cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
+    }
     cum.expGas+=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
@@ -2751,7 +2805,9 @@ function renderTx(){
   const totRev=cum.revSvc+cum.revProd+customRevTotal;
   const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
   const ni=totRev-totExp;
-  const netUsdc=cum.usdcIn-cum.usdcOut;
+  const allAssets=Array.from(new Set([...Object.keys(cum.assetIn),...Object.keys(cum.assetOut)])).sort();
+  const netByAsset={};allAssets.forEach(a=>{netByAsset[a]=(cum.assetIn[a]||0)-(cum.assetOut[a]||0);});
+  const netUsdc=allAssets.reduce((s,a)=>s+netByAsset[a],0);
   const netBank=cum.bankIn-cum.bankOut;
   const netAssets=netUsdc-cum.gasSpent+netBank;
 
@@ -2832,7 +2888,11 @@ function renderTx(){
       <div class="fs-card-title">Balance Sheet<span class="sub">From classified activity</span></div>
       <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Balance</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
-      <div class="fs-line indent clickable ${hc('bs-usdc')}" id="fs-bs-usdc" style="grid-template-columns:1fr 100px;${hb('bs-usdc')}" onclick="openAudit('usdc','USDC')"><div>USDC</div><div style="text-align:right;color:${netUsdc>=0?'#16a34a':'#ea580c'}">$${fmt(netUsdc)}${incLabel('bs-usdc')}</div></div>
+      ${allAssets.map(asset=>{
+        const net=netByAsset[asset];
+        if(Math.abs(net)<0.01)return`<div id="fs-bs-${asset.toLowerCase()}"></div>`;
+        return`<div class="fs-line indent clickable ${hc('bs-'+asset.toLowerCase())}" id="fs-bs-${asset.toLowerCase()}" style="grid-template-columns:1fr 100px;${hb('bs-'+asset.toLowerCase())}" onclick="openAudit('${asset.toLowerCase()}','${asset}')"><div>${asset}</div><div style="text-align:right;color:${net>=0?'#16a34a':'#ea580c'}">$${fmt(net)}${incLabel('bs-'+asset.toLowerCase())}</div></div>`;
+      }).join('')}
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent clickable ${hc('bs-eth')}" id="fs-bs-eth" style="grid-template-columns:1fr 100px;${hb('bs-eth')}" onclick="openAudit('gas','Network Fees')"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${incLabel('bs-eth')}</div></div>`:`<div id="fs-bs-eth"></div>`}
       ${(cum.bankIn>0||cum.bankOut>0)?`<div class="fs-line indent clickable ${hc('bs-bank')}" id="fs-bs-bank" style="grid-template-columns:1fr 100px;${hb('bs-bank')}" onclick="openAudit('bank','Bank Checking')"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}${incLabel('bs-bank')}</div></div>`:`<div id="fs-bs-bank"></div>`}
       <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
@@ -2851,8 +2911,14 @@ function renderTx(){
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Add: Non-cash gas fees</div><div style="text-align:right">$${fmt(cum.gasSpent)}</div></div>`:''}
       <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Cash from Operations</div><div style="text-align:right;font-weight:600">$${fmt(ni+cum.gasSpent)}</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Digital Asset Flows</div><div></div></div>
-      ${cum.inCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}${tx.dir==='inflow'&&isMapped&&tx.source!=='bank'?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
-      ${cum.outCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})${tx.dir==='outflow'&&isMapped&&tx.source!=='bank'?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
+      ${allAssets.map(asset=>{
+        const inCount=cum.assetInCount[asset]||0,outCount=cum.assetOutCount[asset]||0;
+        const inAmt=cum.assetIn[asset]||0,outAmt=cum.assetOut[asset]||0;
+        let rows='';
+        if(inCount>0)rows+=`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>${asset} Inflows (${inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(inAmt)}${tx.dir==='inflow'&&isMapped&&tx.source!=='bank'&&(tx.asset||'USDC')===asset?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`;
+        if(outCount>0)rows+=`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>${asset} Outflows (${outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(outAmt)})${tx.dir==='outflow'&&isMapped&&tx.source!=='bank'&&(tx.asset||'USDC')===asset?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`;
+        return rows;
+      }).join('')}
       ${cum.bankInCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Deposits (${cum.bankInCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.bankIn)}${tx.dir==='inflow'&&isMapped&&isTxBank(tx)?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.bankOutCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Withdrawals (${cum.bankOutCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.bankOut)})${tx.dir==='outflow'&&isMapped&&isTxBank(tx)?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${tx.gas>0&&isMapped?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.gas)})</span>`:''}</div></div>`:''}
@@ -2948,7 +3014,7 @@ function renderReconciled(){
 
   // Compute cumulative from zero
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
-    usdcIn:0,usdcOut:0,bankIn:0,bankOut:0,gasSpent:0,inCount:0,outCount:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+    assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
   txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
@@ -2958,8 +3024,14 @@ function renderReconciled(){
     else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
     else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
     const isBank=isTxBank(t);
-    if(t.dir==="inflow"){if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}else{cum.usdcIn+=t.amount;cum.inCount++;}}
-    else{if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}else{cum.usdcOut+=t.amount;cum.gasSpent+=t.gas;cum.outCount++;}}
+    const asset=t.asset||'USDC';
+    if(t.dir==="inflow"){
+      if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}
+      else{cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
+    }else{
+      if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}
+      else{cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
+    }
     cum.expGas+=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
@@ -2967,7 +3039,9 @@ function renderReconciled(){
   const totRev=cum.revSvc+cum.revProd+customRevTotal;
   const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
   const ni=totRev-totExp;
-  const netUsdc=cum.usdcIn-cum.usdcOut;
+  const allAssets=Array.from(new Set([...Object.keys(cum.assetIn),...Object.keys(cum.assetOut)])).sort();
+  const netByAsset={};allAssets.forEach(a=>{netByAsset[a]=(cum.assetIn[a]||0)-(cum.assetOut[a]||0);});
+  const netUsdc=allAssets.reduce((s,a)=>s+netByAsset[a],0);
   const netBank=cum.bankIn-cum.bankOut;
   const netAssets=netUsdc-cum.gasSpent+netBank;
 
@@ -3024,7 +3098,11 @@ function renderReconciled(){
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
         <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Balance Sheet</div>
         <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Assets</div>
-        <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('usdc','USDC')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>USDC</div><div style="text-align:right;color:${netUsdc>=0?'#16a34a':'#ea580c'}">$${fmt(netUsdc)}</div></div>
+        ${allAssets.map(asset=>{
+          const net=netByAsset[asset];
+          if(Math.abs(net)<0.01)return'';
+          return`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('${asset.toLowerCase()}','${asset}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${asset}</div><div style="text-align:right;color:${net>=0?'#16a34a':'#ea580c'}">$${fmt(net)}</div></div>`;
+        }).join('')}
         ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('gas','Network Fees')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
         ${(cum.bankIn>0||cum.bankOut>0)?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('bank','Bank Checking')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}</div></div>`:''}
         <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
@@ -3042,8 +3120,14 @@ function renderReconciled(){
       ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Add: Non-cash gas fees</div><div style="text-align:right">$${fmt(cum.gasSpent)}</div></div>`:''}
       <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 120px;border-top:1px solid #e2e8f0"><div>Cash from Operations</div><div style="text-align:right">$${fmt(ni+cum.gasSpent)}</div></div>
       <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Digital Asset Flows</div>
-      <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>USDC Inflows (${cum.inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.usdcIn)}</div></div>
-      <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>USDC Outflows (${cum.outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.usdcOut)})</div></div>
+      ${allAssets.map(asset=>{
+        const inCount=cum.assetInCount[asset]||0,outCount=cum.assetOutCount[asset]||0;
+        const inAmt=cum.assetIn[asset]||0,outAmt=cum.assetOut[asset]||0;
+        let rows='';
+        if(inCount>0)rows+=`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>${asset} Inflows (${inCount})</div><div style="text-align:right;color:#16a34a">$${fmt(inAmt)}</div></div>`;
+        if(outCount>0)rows+=`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>${asset} Outflows (${outCount})</div><div style="text-align:right;color:#ea580c">($${fmt(outAmt)})</div></div>`;
+        return rows;
+      }).join('')}
       ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
       <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Digital Asset Change</div><div style="text-align:right">$${fmt(netUsdc-cum.gasSpent)}</div></div>
       ${(cum.bankInCount>0||cum.bankOutCount>0)?`
@@ -3108,10 +3192,11 @@ async function requestAiClassification(tx){
   const reqId=Date.now();aiPending=reqId;
 
   try{
-    const chain=isTxBank(tx)?'Bank (fiat)':(tx.walletAddr||activeWalletAddr||'').startsWith('0x')?'Base':'Solana';
+    const walletForTx=wallets.find(w=>w.addr.toLowerCase()===(tx.walletAddr||activeWalletAddr||'').toLowerCase());
+    const chain=isTxBank(tx)?'Bank (fiat)':(walletForTx?walletForTx.chain:((tx.walletAddr||activeWalletAddr||'').startsWith('0x')?'Base':'Solana'));
     const res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        transaction:{direction:tx.dir,amount:tx.amount,counterparty:tx.cp,chain:chain,block:isTxBank(tx)?tx.date:tx.block,source:isTxBank(tx)?'bank':'blockchain'},
+        transaction:{direction:tx.dir,amount:tx.amount,counterparty:tx.cp,chain:chain,asset:tx.asset||'USDC',block:isTxBank(tx)?tx.date:tx.block,source:isTxBank(tx)?'bank':'blockchain'},
         chart_of_accounts:GL_OPTIONS,
         prior_classifications:buildPriorContext(),
         client_profile:{
@@ -3949,7 +4034,7 @@ async function runAutoClassify(){
 
       var res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          transaction:{direction:t.dir,amount:t.amount,counterparty:t.cp,chain:chain,block:isTxBank(t)?t.date:t.block,source:isTxBank(t)?'bank':'blockchain'},
+          transaction:{direction:t.dir,amount:t.amount,counterparty:t.cp,chain:chain,asset:t.asset||'USDC',block:isTxBank(t)?t.date:t.block,source:isTxBank(t)?'bank':'blockchain'},
           chart_of_accounts:GL_OPTIONS,
           prior_classifications:prior,
           client_profile:{business_type:clientProfile.bizType,typical_transactions:clientProfile.txTypes,notes:clientProfile.notes}
@@ -4693,12 +4778,16 @@ function explorerUrl(tx){
 }
 function openAudit(glCode,label){
   let matching;
+  const knownAssets=['usdc','usdt','dai','usdp','pyusd','eurc'];
   if(glCode==='gas'){
     // Gas: show all classified outflow transactions with gas > 0
     matching=txs.filter(t=>glOf(t.hash)!=="Unclassified"&&t.dir==="outflow"&&t.gas>.001);
-  } else if(glCode==='usdc'){
-    // USDC: show all classified transactions
-    matching=txs.filter(t=>glOf(t.hash)!=="Unclassified");
+  } else if(glCode==='bank'){
+    // Bank: show all classified bank transactions
+    matching=txs.filter(t=>glOf(t.hash)!=="Unclassified"&&isTxBank(t));
+  } else if(knownAssets.includes(glCode)){
+    // Specific stablecoin: show classified transactions in that exact asset
+    matching=txs.filter(t=>glOf(t.hash)!=="Unclassified"&&!isTxBank(t)&&(t.asset||'USDC').toLowerCase()===glCode);
   } else {
     matching=txs.filter(t=>{const g=glOf(t.hash);return g!=="Unclassified"&&pfx(g)===glCode;});
   }
