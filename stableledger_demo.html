@@ -420,43 +420,10 @@
         </div>
         <div class="ob-nav">
           <div></div>
-          <button style="background:#3b82f6;color:#fff" onclick="obNext(2)">Continue &rarr;</button>
-        </div>
-        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
-      </div>
-
-      <!-- Step 2: Chains & Tokens -->
-      <div class="ob-step" id="obStep2" style="display:none">
-        <h2>Chains & Tokens</h2>
-        <div class="ob-section">
-          <span class="ob-label">Which chains are you on?</span>
-          <div class="ob-chips" id="obChains">
-            <div class="ob-chip" onclick="obToggle(this,'chains')">Base</div>
-            <div class="ob-chip" onclick="obToggle(this,'chains')">Ethereum</div>
-            <div class="ob-chip" onclick="obToggle(this,'chains')">Polygon</div>
-            <div class="ob-chip" onclick="obToggle(this,'chains')">Solana</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Arbitrum</div>
-            <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Optimism</div>
-          </div>
-        </div>
-        <div class="ob-section">
-          <span class="ob-label">Which tokens do you use?</span>
-          <div class="ob-chips" id="obTokens">
-            <div class="ob-chip" onclick="obToggle(this,'tokens')">USDC</div>
-            <div class="ob-chip" onclick="obToggle(this,'tokens')">USDT</div>
-            <div class="ob-chip" onclick="obToggle(this,'tokens')">DAI</div>
-            <div class="ob-chip" onclick="obToggle(this,'tokens')">USDP</div>
-            <div class="ob-chip" onclick="obToggle(this,'tokens')">PYUSD</div>
-            <div class="ob-chip" onclick="obToggle(this,'tokens')">EURC</div>
-          </div>
-        </div>
-        <div class="ob-nav">
-          <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
-
 
       <!-- Step 4: Automation -->
       <div class="ob-step" id="obStep4" style="display:none">
@@ -538,10 +505,10 @@
         </div>
 
         <div class="ob-nav">
-          <button style="background:#f1f5f9;color:#475569" onclick="obNext(2)">&larr; Back</button>
+          <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveAutomation();obNext(8);obToggleBillEmail()">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
       <!-- Step 8: Bill Matching -->
@@ -607,7 +574,7 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(4)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveBillMatching();obNext(7)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
 
@@ -654,7 +621,7 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(7)">&larr; Back</button>
           <button style="background:linear-gradient(135deg,#3b82f6,#7c3aed);color:#fff" onclick="obComplete()">Scan &amp; Launch &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div></div>
       </div>
 
 
@@ -722,7 +689,7 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(8)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveGL();obNext(5)">Continue &rarr;</button>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
       </div>
       <!-- Step 6: Scanning -->
       <div class="ob-step" id="obStep6" style="display:none">
@@ -743,7 +710,7 @@
           <div id="obScanProgress" style="margin-bottom:8px"></div>
           <div style="font-size:11px;color:#94a3b8" id="obScanDetail"></div>
         </div>
-        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
+        <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div></div>
       </div>
 
     </div>
