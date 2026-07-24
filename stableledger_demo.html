@@ -428,7 +428,6 @@
       <!-- Step 2: Chains & Tokens -->
       <div class="ob-step" id="obStep2" style="display:none">
         <h2>Chains & Tokens</h2>
-        <div class="ob-sub">Which networks and assets do you transact with?</div>
         <div class="ob-section">
           <span class="ob-label">Which chains are you on?</span>
           <div class="ob-chips" id="obChains">
@@ -439,7 +438,6 @@
             <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Arbitrum</div>
             <div class="ob-chip disabled" onclick="obToggle(this,'chains')">Optimism</div>
           </div>
-          <div class="ob-hint">Base, Ethereum, Polygon, and Solana live. Additional L2s coming soon.</div>
         </div>
         <div class="ob-section">
           <span class="ob-label">Which tokens do you use?</span>
@@ -451,7 +449,6 @@
             <div class="ob-chip" onclick="obToggle(this,'tokens')">PYUSD</div>
             <div class="ob-chip" onclick="obToggle(this,'tokens')">EURC</div>
           </div>
-          <div class="ob-hint">All major stablecoins scan automatically per chain — no separate setup needed per token.</div>
         </div>
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
@@ -927,7 +924,6 @@
             Export CSV
           </button>
         </div>
-        <div style="font-size:12px;color:#64748b;margin-bottom:16px;line-height:1.6">Under ASU 2023-08, in-scope crypto assets are measured at fair value each period per ASC 820, with gains and losses recognized in net income. Stablecoins pegged to fiat with a redemption right are generally treated as near-cash and excluded here — add non-stablecoin holdings (ETH, SOL, BTC, etc.) that your client actually holds at period end.</div>
 
         <!-- Add holding -->
         <div style="border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px">
@@ -980,7 +976,6 @@
             Run Reconciliation
           </button>
         </div>
-        <div style="font-size:12px;color:#64748b;margin-bottom:20px;line-height:1.6">Independently verifies Shepherd's numbers against two outside sources: the blockchain itself (proves scans are complete and accurate) and QuickBooks (proves what was pushed actually landed correctly).</div>
 
         <h4 style="font-size:14px;font-weight:600;margin-bottom:10px">Chain Reconciliation</h4>
         <div id="chainReconcileTable" style="margin-bottom:28px"></div>
