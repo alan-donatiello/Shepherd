@@ -2689,6 +2689,13 @@ function classify(v){
   }
   renderLedger();
   saveToStore();
+
+  const badge=document.getElementById('ledgerBadge');
+  if(badge){
+    const unc=txs.filter(t=>!mappings[t.hash]||mappings[t.hash]==='Unclassified').length;
+    badge.style.display=unc>0?'inline':'none';
+    badge.textContent=unc;
+  }
 }
 
 function getTarget(g,fallback){
