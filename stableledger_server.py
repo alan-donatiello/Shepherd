@@ -989,7 +989,22 @@ def classify_transaction(tx_data, chart_of_accounts, prior_classifications, clie
                 prior_summary += f", {p['pattern']}"
             prior_summary += ")\n"
 
-    coa_text = "\n".join(f"- {code}" for code in chart_of_accounts if code != "Unclassified")
+    # chart_of_accounts may be a flat list of code strings (legacy) or a list of
+    # {code, description} objects — use the description when we have one, since
+    # a one-line description of what an account is FOR is far higher signal than
+    # the bare code+name alone.
+    coa_lines = []
+    for entry in chart_of_accounts:
+        if isinstance(entry, dict):
+            code = entry.get("code", "")
+            desc = entry.get("description", "")
+        else:
+            code = entry
+            desc = ""
+        if code == "Unclassified":
+            continue
+        coa_lines.append(f"- {code}" + (f": {desc}" if desc else ""))
+    coa_text = "\n".join(coa_lines)
 
     # Build client context
     biz_context = ""
@@ -1001,6 +1016,15 @@ def classify_transaction(tx_data, chart_of_accounts, prior_classifications, clie
             parts.append(f"Typical transactions: {', '.join(client_profile['typical_transactions'])}")
         if client_profile.get('notes'):
             parts.append(f"Additional context: {client_profile['notes']}")
+        if client_profile.get('known_vendors'):
+            vendor_lines = []
+            for v in client_profile['known_vendors'][:20]:
+                name = v.get('name', '')
+                gl = v.get('gl_code', '')
+                if name and gl:
+                    vendor_lines.append(f"  - {name} -> {gl}")
+            if vendor_lines:
+                parts.append("Known recurring vendors/counterparties (use as reference patterns, including for similarly-named or similarly-behaving counterparties):\n" + "\n".join(vendor_lines))
         if parts:
             biz_context = "\n".join(parts)
 

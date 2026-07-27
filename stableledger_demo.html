@@ -418,6 +418,16 @@
           <span class="ob-label">Anything else Shepherd should know?</span>
           <textarea class="ob-textarea" id="obNotes" placeholder="e.g. &quot;Biweekly payroll in round amounts&quot; or &quot;Most inflows are from 3 enterprise clients&quot;"></textarea>
         </div>
+        <div class="ob-section">
+          <span class="ob-label">Know any recurring vendors or counterparties already?</span>
+          <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Optional, but this is the highest-signal thing you can give the AI — exact matches classify instantly with no guessing, and similar ones get much sharper reasoning.</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input class="ob-input" id="obVendorName" placeholder="Name or wallet/account (e.g. Gusto, AWS, 0x1234...)" style="flex:1;margin-bottom:0">
+            <select id="obVendorGL" class="ob-input" style="width:200px;margin-bottom:0"></select>
+            <button style="font-size:12px;padding:9px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="obAddVendor()">Add</button>
+          </div>
+          <div id="obVendorList"></div>
+        </div>
         <div class="ob-nav">
           <div></div>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
@@ -590,7 +600,7 @@
           <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:8px">
             <div>
               <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Wallet address</label>
-              <input class="ob-input" id="obWalletAddr" placeholder="0x... (EVM) or Solana address" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" oninput="onObWalletInputChange()">
+              <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base, Ethereum, Polygon) or Solana" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" oninput="onObWalletInputChange()">
             </div>
             <div id="obChainSelectField">
               <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Chain</label>
@@ -1183,7 +1193,7 @@
     <h3>Add Wallet</h3>
     <div class="cm-field">
       <label>Wallet Address</label>
-      <input class="mono" id="walletInput" placeholder="0x... (EVM) or Solana address" spellcheck="false" oninput="onWalletInputChange()">
+      <input class="mono" id="walletInput" placeholder="0x... (Base, Ethereum, Polygon) or Solana" spellcheck="false" oninput="onWalletInputChange()">
     </div>
     <div class="cm-field" id="chainSelectField" style="display:none">
       <label>Chain</label>
@@ -1575,7 +1585,7 @@
 
 <script>
 // ============ ONBOARDING ============
-const clientProfile={bizType:[],volume:'',chains:[],tokens:[],txTypes:[],notes:''};
+const clientProfile={bizType:[],volume:'',chains:[],tokens:[],txTypes:[],notes:'',knownVendors:[]};
 
 function obToggle(el,field){
   el.classList.toggle('selected');
@@ -1586,14 +1596,58 @@ function obSelect(el,field){
   el.classList.add('selected');
   clientProfile[field]=el.textContent;
 }
+
+function populateObVendorGL(){
+  var sel=document.getElementById('obVendorGL');
+  if(!sel)return;
+  sel.innerHTML=GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){return'<option value="'+o+'">'+o+'</option>'}).join('');
+}
+function obAddVendor(){
+  var name=document.getElementById('obVendorName').value.trim();
+  var gl=document.getElementById('obVendorGL').value;
+  if(!name||!gl)return;
+  clientProfile.knownVendors.push({name:name,gl_code:gl});
+  document.getElementById('obVendorName').value='';
+  obRenderVendors();
+}
+function obRemoveVendor(i){
+  clientProfile.knownVendors.splice(i,1);
+  obRenderVendors();
+}
+function obRenderVendors(){
+  var el=document.getElementById('obVendorList');
+  if(!el)return;
+  if(!clientProfile.knownVendors.length){el.innerHTML='';return;}
+  el.innerHTML=clientProfile.knownVendors.map(function(v,i){
+    return'<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#f8fafc;border-radius:6px;margin-bottom:4px">'
+      +'<span style="font-size:12px;font-weight:500;color:#1e293b;flex:1">'+v.name+'</span>'
+      +'<span style="font-size:11px;color:#3b82f6;font-weight:500">'+v.gl_code+'</span>'
+      +'<span style="color:#cbd5e1;cursor:pointer" onclick="obRemoveVendor('+i+')">&times;</span>'
+      +'</div>';
+  }).join('');
+}
 function obNext(step){
   document.querySelectorAll('.ob-step').forEach(s=>s.style.display='none');
   document.getElementById('obStep'+step).style.display='block';
 }
 function obComplete(){
   clientProfile.notes=(document.getElementById('obNotes')||{}).value||'';
+
   var pendingAddr=(document.getElementById('obWalletAddr')||{}).value||'';
   if(pendingAddr.trim())obAddWallet();
+
+  // Seed every wallet's counterparty memory with known vendors so exact matches
+  // classify instantly with no AI call needed at all, and everything else still
+  // benefits from these as few-shot examples in the AI prompt.
+  if(clientProfile.knownVendors.length){
+    wallets.forEach(function(w){
+      var s=getStore(w.addr);
+      clientProfile.knownVendors.forEach(function(v){
+        s.cpMappings[v.name]=v.gl_code;
+      });
+    });
+  }
+
   if(!obWallets.length){
     document.getElementById('onboardScreen').style.display='none';
     document.getElementById('appShell').style.display='flex';
@@ -2036,6 +2090,26 @@ function clearTxFilters(){
 }
 // ============ CONFIG ============
 let GL_OPTIONS=["Unclassified","6110 - Payroll","6200 - Software & SaaS","6300 - Cloud Infrastructure","6420 - Marketing & Ads","6500 - Professional Services","6600 - Office & Operations","7100 - Intercompany Transfer","4100 - Revenue - Services","4200 - Revenue - Product","4300 - Customer Refund","1200 - Treasury Rebalance"];
+let GL_DESCRIPTIONS={
+  "6110":"Employee and contractor wages, salaries, and payroll-related payments. Often recurring, round amounts on a regular schedule.",
+  "6200":"Subscription software and SaaS tools (e.g. hosting dashboards, dev tools, analytics, productivity software). Usually small, recurring, fixed amounts.",
+  "6300":"Cloud infrastructure and hosting costs (e.g. AWS, GCP, Azure, RPC providers). Often usage-based, may vary month to month.",
+  "6420":"Marketing, advertising, and paid promotion spend.",
+  "6500":"Payments to lawyers, accountants, consultants, auditors, and other professional service providers.",
+  "6600":"General office expenses and operational overhead not covered by other categories.",
+  "7100":"Transfers between the company's own wallets or accounts — not a real expense or revenue event.",
+  "4100":"Revenue from services rendered to clients or customers.",
+  "4200":"Revenue from product sales.",
+  "4300":"Refunds issued to customers, recorded as a reduction of revenue.",
+  "1200":"Internal treasury rebalancing between the company's own asset accounts — not a real expense or revenue event."
+};
+function buildEnrichedCOA(){
+  return GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){
+    var code=o.split(' ')[0];
+    return{code:o,description:GL_DESCRIPTIONS[code]||''};
+  });
+}
+populateObVendorGL();
 const GL_TYPE={"6110":"expense","6200":"expense","6300":"expense","6420":"expense","6500":"expense","6600":"expense","7100":"transfer","4100":"revenue","4200":"revenue","4300":"revenue","1200":"transfer"};
 const COLORS=["#3b82f6","#8b5cf6","#06b6d4","#f59e0b"];
 const GL_MAP={"6110":"pnl-payroll","6200":"pnl-software","6300":"pnl-cloud","6420":"pnl-marketing","6500":"pnl-profsvc","6600":"pnl-ops","4100":"pnl-revsvc","4200":"pnl-revprod","4300":"pnl-revsvc","7100":"bs-usdc","1200":"bs-usdc"};
@@ -3191,12 +3265,13 @@ async function requestAiClassification(tx){
     const res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         transaction:{direction:tx.dir,amount:tx.amount,counterparty:tx.cp,chain:chain,asset:tx.asset||'USDC',block:isTxBank(tx)?tx.date:tx.block,source:isTxBank(tx)?'bank':'blockchain'},
-        chart_of_accounts:GL_OPTIONS,
+        chart_of_accounts:buildEnrichedCOA(),
         prior_classifications:buildPriorContext(),
         client_profile:{
           business_type:clientProfile.bizType,
           typical_transactions:clientProfile.txTypes,
-          notes:clientProfile.notes
+          notes:clientProfile.notes,
+          known_vendors:clientProfile.knownVendors
         }
       })
     });
@@ -4028,9 +4103,9 @@ async function runAutoClassify(){
       var res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           transaction:{direction:t.dir,amount:t.amount,counterparty:t.cp,chain:chain,asset:t.asset||'USDC',block:isTxBank(t)?t.date:t.block,source:isTxBank(t)?'bank':'blockchain'},
-          chart_of_accounts:GL_OPTIONS,
+          chart_of_accounts:buildEnrichedCOA(),
           prior_classifications:prior,
-          client_profile:{business_type:clientProfile.bizType,typical_transactions:clientProfile.txTypes,notes:clientProfile.notes}
+          client_profile:{business_type:clientProfile.bizType,typical_transactions:clientProfile.txTypes,notes:clientProfile.notes,known_vendors:clientProfile.knownVendors}
         })
       });
       var suggestion=await res.json();
@@ -4787,16 +4862,18 @@ function removeAccount(full){
 }
 
 function openCustom(){document.getElementById("customOverlay").classList.add("open");setTimeout(()=>document.getElementById("customCode").focus(),100);}
-function closeCustom(){document.getElementById("customOverlay").classList.remove("open");document.getElementById("customCode").value="";document.getElementById("customName").value="";}
+function closeCustom(){document.getElementById("customOverlay").classList.remove("open");document.getElementById("customCode").value="";document.getElementById("customName").value="";document.getElementById("customDescription").value="";}
 function saveCustomAccount(){
   const code=document.getElementById("customCode").value.trim();
   const name=document.getElementById("customName").value.trim();
   const type=document.getElementById("customType").value;
+  const description=document.getElementById("customDescription").value.trim();
   if(!code||!name){alert("Enter both a code and name");return;}
   const glEntry=code+" - "+name;
   if(GL_OPTIONS.includes(glEntry)){alert("Account already exists");return;}
   GL_OPTIONS.push(glEntry);
   GL_TYPE[code]=type;
+  if(description)GL_DESCRIPTIONS[code]=description;
   logAction('account','Account created',`${glEntry} (${type})`);
   closeCustom();
   // If on COA page, re-render. If on ledger, classify current tx.
@@ -4906,6 +4983,10 @@ window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
         <option value="revenue">Revenue</option>
         <option value="transfer">Transfer / Balance Sheet Only</option>
       </select>
+    </div>
+    <div class="cm-field">
+      <label>Description <span style="font-weight:400;color:#94a3b8">(helps the AI classify accurately)</span></label>
+      <input id="customDescription" placeholder="e.g. Payments to our Solana RPC provider, usually monthly and usage-based">
     </div>
     <div class="cm-actions">
       <button style="background:#f1f5f9;color:#475569" onclick="closeCustom()">Cancel</button>
