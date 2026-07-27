@@ -3124,11 +3124,13 @@ function renderReconciled(){
 // ============ AI CLASSIFICATION ============
 let aiPending=null;
 let aiDebounce=null;
-function buildPriorContext(){
-  // Summarize prior classifications for AI context
+function buildPriorContextFrom(txList,mapFn){
+  // Summarize prior classifications for AI context - shared logic so every
+  // caller (Ledger single-tx view, Auto-Classify, etc.) gives the AI the same
+  // real pattern data instead of some getting impoverished placeholders.
   const cpStats={};
-  txs.forEach(t=>{
-    const g=glOf(t.hash);if(g==="Unclassified")return;
+  txList.forEach(t=>{
+    const g=mapFn(t);if(!g||g==="Unclassified")return;
     const cp=t.cp;
     if(!cpStats[cp])cpStats[cp]={counterparty:cp,gl_code:g,count:0,total:0,direction:t.dir,amounts:[]};
     cpStats[cp].count++;cpStats[cp].total+=t.amount;cpStats[cp].amounts.push(t.amount);
@@ -3141,6 +3143,9 @@ function buildPriorContext(){
     direction:s.direction,
     pattern:s.count>2?(s.amounts.every(a=>Math.abs(a-s.amounts[0])<1)?'recurring fixed':'recurring variable'):''
   }));
+}
+function buildPriorContext(){
+  return buildPriorContextFrom(txs,t=>glOf(t.hash));
 }
 async function requestAiClassification(tx){
   const el=document.getElementById('aiSuggest');
@@ -3991,8 +3996,7 @@ async function runAutoClassify(){
 
     // Call AI
     try{
-      var prior=[];
-      Object.entries(s.cpMappings).forEach(function(e){prior.push({counterparty:e[0],gl_code:e[1],count:1,avg_amount:0,direction:'unknown'})});
+      var prior=buildPriorContextFrom(s.txs,function(tx){return s.mappings[tx.hash]||'Unclassified';});
 
       var res=await fetch('/api/classify',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
