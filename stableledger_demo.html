@@ -418,16 +418,6 @@
           <span class="ob-label">Anything else Shepherd should know?</span>
           <textarea class="ob-textarea" id="obNotes" placeholder="e.g. &quot;Biweekly payroll in round amounts&quot; or &quot;Most inflows are from 3 enterprise clients&quot;"></textarea>
         </div>
-        <div class="ob-section">
-          <span class="ob-label">Know any recurring vendors or counterparties already?</span>
-          <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">Optional, but this is the highest-signal thing you can give the AI — exact matches classify instantly with no guessing, and similar ones get much sharper reasoning.</div>
-          <div style="display:flex;gap:8px;margin-bottom:8px">
-            <input class="ob-input" id="obVendorName" placeholder="Name or wallet/account (e.g. Gusto, AWS, 0x1234...)" style="flex:1;margin-bottom:0">
-            <select id="obVendorGL" class="ob-input" style="width:200px;margin-bottom:0"></select>
-            <button style="font-size:12px;padding:9px 16px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer;white-space:nowrap" onclick="obAddVendor()">Add</button>
-          </div>
-          <div id="obVendorList"></div>
-        </div>
         <div class="ob-nav">
           <div></div>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
@@ -1250,6 +1240,7 @@
       <div class="gl-classify">
         <label>Classify:</label>
         <select class="gl-select" id="glSelect" onchange="classify(this.value)"></select>
+        <button id="markVendorBtn" onclick="openMarkVendorModal()" style="font-size:11px;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer;white-space:nowrap;margin-left:8px">Mark as Known Vendor</button>
       </div>
     </div>
     <div class="ai-suggest" id="aiSuggest">
@@ -1597,35 +1588,6 @@ function obSelect(el,field){
   clientProfile[field]=el.textContent;
 }
 
-function populateObVendorGL(){
-  var sel=document.getElementById('obVendorGL');
-  if(!sel)return;
-  sel.innerHTML=GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){return'<option value="'+o+'">'+o+'</option>'}).join('');
-}
-function obAddVendor(){
-  var name=document.getElementById('obVendorName').value.trim();
-  var gl=document.getElementById('obVendorGL').value;
-  if(!name||!gl)return;
-  clientProfile.knownVendors.push({name:name,gl_code:gl});
-  document.getElementById('obVendorName').value='';
-  obRenderVendors();
-}
-function obRemoveVendor(i){
-  clientProfile.knownVendors.splice(i,1);
-  obRenderVendors();
-}
-function obRenderVendors(){
-  var el=document.getElementById('obVendorList');
-  if(!el)return;
-  if(!clientProfile.knownVendors.length){el.innerHTML='';return;}
-  el.innerHTML=clientProfile.knownVendors.map(function(v,i){
-    return'<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#f8fafc;border-radius:6px;margin-bottom:4px">'
-      +'<span style="font-size:12px;font-weight:500;color:#1e293b;flex:1">'+v.name+'</span>'
-      +'<span style="font-size:11px;color:#3b82f6;font-weight:500">'+v.gl_code+'</span>'
-      +'<span style="color:#cbd5e1;cursor:pointer" onclick="obRemoveVendor('+i+')">&times;</span>'
-      +'</div>';
-  }).join('');
-}
 function obNext(step){
   document.querySelectorAll('.ob-step').forEach(s=>s.style.display='none');
   document.getElementById('obStep'+step).style.display='block';
@@ -2109,7 +2071,6 @@ function buildEnrichedCOA(){
     return{code:o,description:GL_DESCRIPTIONS[code]||''};
   });
 }
-populateObVendorGL();
 const GL_TYPE={"6110":"expense","6200":"expense","6300":"expense","6420":"expense","6500":"expense","6600":"expense","7100":"transfer","4100":"revenue","4200":"revenue","4300":"revenue","1200":"transfer"};
 const COLORS=["#3b82f6","#8b5cf6","#06b6d4","#f59e0b"];
 const GL_MAP={"6110":"pnl-payroll","6200":"pnl-software","6300":"pnl-cloud","6420":"pnl-marketing","6500":"pnl-profsvc","6600":"pnl-ops","4100":"pnl-revsvc","4200":"pnl-revprod","4300":"pnl-revsvc","7100":"bs-usdc","1200":"bs-usdc"};
@@ -2123,8 +2084,6 @@ let auditLog=[]; // {timestamp, type, action, detail, user}
 let auditFilter='all';
 function logAction(type,action,detail){
   auditLog.unshift({timestamp:new Date().toLocaleString(),type,action,detail,user:'admin'});
-  const badge=document.getElementById('auditLogBadge');
-  if(badge){badge.style.display='inline';badge.textContent=auditLog.length;}
 }
 function renderAuditLog(){
   const el=document.getElementById('auditLogTable');if(!el)return;
@@ -2369,7 +2328,11 @@ function onRefreshComplete(report){
   }
   
   const badge=document.getElementById("ledgerBadge");
-  if(badge){badge.textContent=txs.length;}
+  if(badge){
+    const unc=txs.filter(t=>!mappings[t.hash]||mappings[t.hash]==='Unclassified').length;
+    badge.style.display=unc>0?"inline":"none";
+    badge.textContent=unc;
+  }
   renderLedger();
 }
 
@@ -4861,6 +4824,31 @@ function removeAccount(full){
   renderCOA();
 }
 
+function openMarkVendorModal(){
+  const tx=txs[idx];
+  if(!tx)return;
+  document.getElementById('markVendorCp').value=tx.cp;
+  const sel=document.getElementById('markVendorGL');
+  sel.innerHTML=GL_OPTIONS.filter(function(o){return o!=='Unclassified'}).map(function(o){return'<option value="'+o+'">'+o+'</option>'}).join('');
+  // Pre-select the AI's current suggestion, if one is showing
+  const aiGl=document.querySelector('#aiSuggestBody .ai-gl');
+  if(aiGl&&GL_OPTIONS.includes(aiGl.textContent))sel.value=aiGl.textContent;
+  document.getElementById('markVendorOverlay').classList.add('open');
+}
+function closeMarkVendorModal(){
+  document.getElementById('markVendorOverlay').classList.remove('open');
+}
+function confirmMarkVendor(){
+  const gl=document.getElementById('markVendorGL').value;
+  const tx=txs[idx];
+  if(!gl||!tx)return;
+  if(!clientProfile.knownVendors.find(function(v){return v.name===tx.cp})){
+    clientProfile.knownVendors.push({name:tx.cp,gl_code:gl});
+  }
+  closeMarkVendorModal();
+  classify(gl);
+  logAction('account','Marked as known vendor',addr(tx.cp)+' -> '+gl);
+}
 function openCustom(){document.getElementById("customOverlay").classList.add("open");setTimeout(()=>document.getElementById("customCode").focus(),100);}
 function closeCustom(){document.getElementById("customOverlay").classList.remove("open");document.getElementById("customCode").value="";document.getElementById("customName").value="";document.getElementById("customDescription").value="";}
 function saveCustomAccount(){
@@ -4962,6 +4950,25 @@ function drawArrows(){
 window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
 </script>
 <!-- CUSTOM ACCOUNT MODAL -->
+<div class="custom-overlay" id="markVendorOverlay" onclick="if(event.target===this)closeMarkVendorModal()">
+  <div class="custom-modal" style="max-width:420px">
+    <h3>Mark as Known Vendor</h3>
+    <div class="cm-sub">Every future transaction from this counterparty will classify instantly, and the AI will use this as a reference pattern for similar ones.</div>
+    <div class="cm-field">
+      <label>Counterparty</label>
+      <input id="markVendorCp" class="mono" readonly style="background:#f8fafc;color:#64748b">
+    </div>
+    <div class="cm-field">
+      <label>Classify as</label>
+      <select id="markVendorGL"></select>
+    </div>
+    <div class="cm-actions">
+      <button style="background:#f1f5f9;color:#475569" onclick="closeMarkVendorModal()">Cancel</button>
+      <button style="background:#3b82f6;color:#fff" onclick="confirmMarkVendor()">Save &amp; Classify</button>
+    </div>
+  </div>
+</div>
+
 <div class="custom-overlay" id="customOverlay" onclick="if(event.target===this)closeCustom()">
   <div class="custom-modal">
     <h3>Create Custom Account</h3>
