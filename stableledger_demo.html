@@ -590,7 +590,16 @@
           <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:8px">
             <div>
               <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Wallet address</label>
-              <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base) or Solana address" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb">
+              <input class="ob-input" id="obWalletAddr" placeholder="0x... (EVM) or Solana address" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" oninput="onObWalletInputChange()">
+            </div>
+            <div id="obChainSelectField">
+              <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Chain</label>
+              <select id="obChainSelect" class="ob-input" style="margin-bottom:0" onchange="updateObChainTokenNote()">
+                <option value="base">Base</option>
+                <option value="ethereum">Ethereum</option>
+                <option value="polygon">Polygon</option>
+              </select>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px" id="obChainTokenNote"></div>
             </div>
           </div>
           <div style="display:flex;gap:8px;align-items:end">
@@ -1620,7 +1629,7 @@ async function obScanAll(){
 
     try{
       var scanRes=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({wallet:w.addr,lookback_blocks:w.lookback||100})});
+        body:JSON.stringify({wallet:w.addr,lookback_blocks:w.lookback||100,chain:w.chainKey||(w.chain==='Solana'?'solana':'base')})});
       var sd=await scanRes.json();
       if(sd.error){console.log('Scan start error:',sd.error);continue;}
 
@@ -1636,7 +1645,7 @@ async function obScanAll(){
       var result=await rRes.json();
       if(result&&!result.error&&result.journals){
         var store=getStore(w.addr);
-        store.txs=result.journals.map(function(j){return{hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0}});
+        store.txs=result.journals.map(function(j){return{hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}});
         store.scanData=result;store.mappings={};store.cpMappings={};
         store.scanTime=new Date().toLocaleString();
         if(result.scan_range)store.lastBlock=result.scan_range.to_block;
@@ -1912,13 +1921,16 @@ function obAddWallet(){
   const n=document.getElementById('obWalletLabel').value.trim()||addr(a);
   const lb=parseInt(document.getElementById('obLookback').value)||10;
   if(!a)return;
-  obWallets.push({addr:a,name:n,chain:a.startsWith('0x')?'Base':'Solana',lookback:lb});
+  const isEvm=a.startsWith('0x');
+  const chainKey=isEvm?document.getElementById('obChainSelect').value:'solana';
+  const chainLabel=isEvm?CHAIN_LABELS[chainKey]:'Solana';
+  obWallets.push({addr:a,name:n,chain:chainLabel,chainKey:chainKey,lookback:lb});
   document.getElementById('obWalletAddr').value='';
   document.getElementById('obWalletLabel').value='';
   obRenderWallets();
   // Also add to main wallet list
   if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){
-    wallets.push({addr:a,name:n,chain:a.startsWith('0x')?'Base':'Solana'});
+    wallets.push({addr:a,name:n,chain:chainLabel,chainKey:chainKey});
   }
 }
 function obRemoveWallet(i){obWallets.splice(i,1);obRenderWallets();}
@@ -2344,6 +2356,21 @@ function updateChainTokenNote(){
   var tokens=CHAIN_TOKENS[chain]||[];
   note.textContent='Scans for: '+tokens.join(', ');
 }
+
+function onObWalletInputChange(){
+  var val=document.getElementById('obWalletAddr').value.trim();
+  var field=document.getElementById('obChainSelectField');
+  var isEvm=val.startsWith('0x')&&val.length===42;
+  field.style.display=isEvm?'block':'none';
+  if(isEvm)updateObChainTokenNote();
+}
+function updateObChainTokenNote(){
+  var chain=document.getElementById('obChainSelect').value;
+  var note=document.getElementById('obChainTokenNote');
+  var tokens=CHAIN_TOKENS[chain]||[];
+  note.textContent='Scans for: '+tokens.join(', ');
+}
+onObWalletInputChange();
 
 function saveWallet(){
   const a=document.getElementById("walletInput").value.trim();
