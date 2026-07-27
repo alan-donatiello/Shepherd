@@ -4252,24 +4252,70 @@ async function runFullReconciliation(){
   logAction('account','Reconciliation run','chain + ERP verification completed');
 }
 
+async function rescanWalletForReconciliation(w){
+  const store=getStore(w.addr);
+  const chainKey=w.chainKey||(w.chain==='Solana'?'solana':(w.chain||'base').toLowerCase());
+  const isEvm=chainKey!=='solana';
+  const body={wallet:w.addr,lookback_blocks:isEvm?2000:200,chain:chainKey};
+  if(isEvm&&store.lastBlock){body.from_block=store.lastBlock+1;}
+
+  const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const startData=await res.json();
+  if(startData.error)throw new Error(startData.error);
+
+  // Poll until this scan completes (server only runs one scan at a time)
+  while(true){
+    await new Promise(r=>setTimeout(r,500));
+    const pr=await fetch("/api/progress");const p=await pr.json();
+    if(!p.running)break;
+  }
+  const rr=await fetch("/api/result");const result=await rr.json();
+  if(result.error)throw new Error(result.error);
+
+  const newTxs=(result.journals||[]).map(j=>({
+    hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,
+    cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'
+  }));
+  const existingHashes=new Set(store.txs.map(t=>t.hash));
+  newTxs.forEach(t=>{
+    if(!existingHashes.has(t.hash)){
+      store.txs.push(t);
+      if(store.cpMappings[t.cp])store.mappings[t.hash]=store.cpMappings[t.cp];
+    }
+  });
+  if(result.scan_range)store.lastBlock=result.scan_range.to_block;
+  store.scanTime=new Date().toLocaleString();
+}
+
 async function runChainReconciliation(){
   var wrap=document.getElementById('chainReconcileTable');
-  var cryptoWallets=wallets.filter(function(w){return w.chain==='Base'||w.chain==='Solana'});
+  var cryptoWallets=wallets.filter(function(w){return w.chain!=='Bank'});
   if(!cryptoWallets.length){
     wrap.innerHTML='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:13px;border:1px dashed #e2e8f0;border-radius:8px">No crypto wallets connected.</div>';
     return;
   }
-
-  wrap.innerHTML='<div style="padding:16px;color:#64748b;font-size:12px">Querying live balances from '+cryptoWallets.length+' wallet(s)...</div>';
 
   var rows=[];
   for(var i=0;i<cryptoWallets.length;i++){
     var w=cryptoWallets[i];
     var s=getStore(w.addr);
 
+    wrap.innerHTML='<div style="padding:16px;color:#64748b;font-size:12px">Syncing '+w.name+' ('+(i+1)+' of '+cryptoWallets.length+')...</div>';
+
+    // Rescan first so the balance comparison and Shepherd's records reflect the same moment in time —
+    // otherwise any activity that happened since the last scan shows up as a false variance.
+    try{
+      await rescanWalletForReconciliation(w);
+    }catch(e){
+      rows.push({wallet:w,error:'Rescan failed: '+e.message});
+      continue;
+    }
+
+    wrap.innerHTML='<div style="padding:16px;color:#64748b;font-size:12px">Querying live balance for '+w.name+' ('+(i+1)+' of '+cryptoWallets.length+')...</div>';
+
     var liveBalance=null,error=null;
     try{
-      var res=await fetch('/api/reconcile/chain_balance?address='+encodeURIComponent(w.addr)+'&chain='+w.chain.toLowerCase());
+      var res=await fetch('/api/reconcile/chain_balance?address='+encodeURIComponent(w.addr)+'&chain='+(w.chainKey||w.chain.toLowerCase()));
       var data=await res.json();
       if(data.success)liveBalance=data.balance;
       else error=data.message;
@@ -4333,7 +4379,7 @@ async function runChainReconciliation(){
         +'</tr>';
     }).join('')
     +'</tbody></table></div>'
-    +'<div style="font-size:11px;color:#94a3b8;margin-top:8px">Checkpoint-based reconciliation: the first run establishes a baseline balance snapshot. Every run after that verifies (baseline + all activity Shepherd has recorded since) equals the current on-chain balance — the same logic as a bank statement reconciliation. A variance means activity happened that Shepherd didn\'t capture — rescan the wallet, then re-run reconciliation.</div>';
+    +'<div style="font-size:11px;color:#94a3b8;margin-top:8px">Checkpoint-based reconciliation: the first run establishes a baseline balance snapshot. Every run after that automatically syncs each wallet first, then verifies (baseline + all activity Shepherd has recorded since) equals the current on-chain balance — the same logic as a bank statement reconciliation. A variance now means something genuinely couldn\'t be captured, not just that a scan was overdue.</div>';
 }
 
 async function runERPReconciliation(){
