@@ -590,16 +590,16 @@
           <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:8px">
             <div>
               <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Wallet address</label>
-              <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base, Ethereum, Polygon) or Solana" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb" oninput="onObWalletInputChange()">
+              <input class="ob-input" id="obWalletAddr" placeholder="0x... (Base, Ethereum, Polygon) or Solana" value="0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb">
             </div>
-            <div id="obChainSelectField">
+            <div>
               <label style="font-size:11px;font-weight:500;color:#64748b;display:block;margin-bottom:4px">Chain</label>
-              <select id="obChainSelect" class="ob-input" style="margin-bottom:0" onchange="updateObChainTokenNote()">
+              <select id="obChainSelect" class="ob-input" style="margin-bottom:0">
                 <option value="base">Base</option>
                 <option value="ethereum">Ethereum</option>
                 <option value="polygon">Polygon</option>
+                <option value="solana">Solana</option>
               </select>
-              <div style="font-size:11px;color:#94a3b8;margin-top:4px" id="obChainTokenNote"></div>
             </div>
           </div>
           <div style="display:flex;gap:8px;align-items:end">
@@ -1183,16 +1183,16 @@
     <h3>Add Wallet</h3>
     <div class="cm-field">
       <label>Wallet Address</label>
-      <input class="mono" id="walletInput" placeholder="0x... (Base, Ethereum, Polygon) or Solana" spellcheck="false" oninput="onWalletInputChange()">
+      <input class="mono" id="walletInput" placeholder="0x... (Base, Ethereum, Polygon) or Solana" spellcheck="false">
     </div>
-    <div class="cm-field" id="chainSelectField" style="display:none">
+    <div class="cm-field">
       <label>Chain</label>
-      <select id="chainSelect" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit" onchange="updateChainTokenNote()">
+      <select id="chainSelect" style="width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit">
         <option value="base">Base</option>
         <option value="ethereum">Ethereum</option>
         <option value="polygon">Polygon</option>
+        <option value="solana">Solana</option>
       </select>
-      <div style="font-size:11px;color:#94a3b8;margin-top:4px" id="chainTokenNote"></div>
     </div>
     <div class="cm-field">
       <label>Label</label>
@@ -1937,9 +1937,8 @@ function obAddWallet(){
   const n=document.getElementById('obWalletLabel').value.trim()||addr(a);
   const lb=parseInt(document.getElementById('obLookback').value)||10;
   if(!a)return;
-  const isEvm=a.startsWith('0x');
-  const chainKey=isEvm?document.getElementById('obChainSelect').value:'solana';
-  const chainLabel=isEvm?CHAIN_LABELS[chainKey]:'Solana';
+  const chainKey=document.getElementById('obChainSelect').value;
+  const chainLabel=CHAIN_LABELS[chainKey];
   obWallets.push({addr:a,name:n,chain:chainLabel,chainKey:chainKey,lookback:lb});
   document.getElementById('obWalletAddr').value='';
   document.getElementById('obWalletLabel').value='';
@@ -2377,52 +2376,22 @@ function chainBadgeStyle(chain){
   return 'background:'+c.bg+';color:'+c.fg;
 }
 
-var CHAIN_LABELS={base:'Base',ethereum:'Ethereum',polygon:'Polygon'};
-var CHAIN_TOKENS={base:['USDC','EURC'],ethereum:['USDC','USDT','DAI','USDP','PYUSD','EURC'],polygon:['USDC','DAI']};
-
-function onWalletInputChange(){
-  var val=document.getElementById('walletInput').value.trim();
-  var field=document.getElementById('chainSelectField');
-  var isEvm=val.startsWith('0x')&&val.length===42;
-  field.style.display=isEvm?'block':'none';
-  if(isEvm)updateChainTokenNote();
-}
-function updateChainTokenNote(){
-  var chain=document.getElementById('chainSelect').value;
-  var note=document.getElementById('chainTokenNote');
-  var tokens=CHAIN_TOKENS[chain]||[];
-  note.textContent='Scans for: '+tokens.join(', ');
-}
-
-function onObWalletInputChange(){
-  var val=document.getElementById('obWalletAddr').value.trim();
-  var field=document.getElementById('obChainSelectField');
-  var isEvm=val.startsWith('0x')&&val.length===42;
-  field.style.display=isEvm?'block':'none';
-  if(isEvm)updateObChainTokenNote();
-}
-function updateObChainTokenNote(){
-  var chain=document.getElementById('obChainSelect').value;
-  var note=document.getElementById('obChainTokenNote');
-  var tokens=CHAIN_TOKENS[chain]||[];
-  note.textContent='Scans for: '+tokens.join(', ');
-}
-onObWalletInputChange();
+var CHAIN_LABELS={base:'Base',ethereum:'Ethereum',polygon:'Polygon',solana:'Solana'};
+var CHAIN_TOKENS={base:['USDC','EURC'],ethereum:['USDC','USDT','DAI','USDP','PYUSD','EURC'],polygon:['USDC','DAI'],solana:['USDC','EURC']};
 
 function saveWallet(){
   const a=document.getElementById("walletInput").value.trim();
   const n=document.getElementById("nameInput").value.trim()||addr(a);
   if(!a.startsWith("0x")&&a.length<32||a.startsWith("0x")&&a.length!==42)return alert("Enter a valid wallet address (0x... for an EVM chain, or Solana address)");
-  var isEvm=a.startsWith('0x');
-  var chainKey=isEvm?document.getElementById('chainSelect').value:'solana';
-  var chainLabel=isEvm?CHAIN_LABELS[chainKey]:'Solana';
+  var chainKey=document.getElementById('chainSelect').value;
+  var chainLabel=CHAIN_LABELS[chainKey];
   if(!wallets.find(w=>w.addr.toLowerCase()===a.toLowerCase())){wallets.push({addr:a,name:n,chain:chainLabel,chainKey:chainKey});}
   renderWallets();
 }
 function loadWallet(i){
   document.getElementById("walletInput").value=wallets[i].addr;
   document.getElementById("nameInput").value=wallets[i].name;
-  onWalletInputChange();
+  if(wallets[i].chainKey)document.getElementById('chainSelect').value=wallets[i].chainKey;
   renderWallets();
 }
 function removeWallet(i,e){
@@ -2475,9 +2444,8 @@ async function startScan(){
   const wallet=document.getElementById("walletInput").value.trim();
   const blocks=parseInt(document.getElementById("blocksInput").value)||10;
   if(!wallet.startsWith("0x")&&wallet.length<32||wallet.startsWith("0x")&&wallet.length!==42)return alert("Enter a valid wallet address (0x... for an EVM chain, or Solana address)");
-  const isEvm=wallet.startsWith("0x");
-  const chainKey=isEvm?document.getElementById('chainSelect').value:'solana';
-  const chainLabel=isEvm?CHAIN_LABELS[chainKey]:'Solana';
+  const chainKey=document.getElementById('chainSelect').value;
+  const chainLabel=CHAIN_LABELS[chainKey];
 
   saveWallet();
   closeAddWalletModal();
