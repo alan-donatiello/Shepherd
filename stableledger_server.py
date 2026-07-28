@@ -96,10 +96,25 @@ class EVMStablecoinLedger:
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     result = json.loads(resp.read().decode())
                 if "error" in result:
+                    err_msg = str(result["error"].get("message", result["error"]))
+                    if "is not enabled for this app" in err_msg:
+                        chain_label = self.chain.get("label", self.chain_key)
+                        raise RuntimeError(
+                            f"{chain_label} isn't enabled on your Alchemy app yet. "
+                            f"Add it in the Alchemy dashboard under this app's Networks settings, "
+                            f"then try again — no code change needed."
+                        )
                     raise RuntimeError(f"RPC error: {result['error']}")
                 return result.get("result")
             except urllib.error.HTTPError as e:
                 err_body = e.read().decode() if hasattr(e, 'read') else ""
+                if "is not enabled for this app" in err_body:
+                    chain_label = self.chain.get("label", self.chain_key)
+                    raise RuntimeError(
+                        f"{chain_label} isn't enabled on your Alchemy app yet. "
+                        f"Add it in the Alchemy dashboard under this app's Networks settings, "
+                        f"then try again — no code change needed."
+                    )
                 last_err = f"HTTP {e.code}: {err_body[:200]}"
                 time.sleep(0.5 * (2 ** attempt))
             except (urllib.error.URLError, TimeoutError) as e:
