@@ -1228,7 +1228,12 @@
 <!-- ===== SCREEN 2: LEDGER ===== -->
 <div class="screen" id="screen-ledger">
   <div class="container">
-    
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button id="refreshBtn" onclick="refreshScan()" style="font-size:12px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+        Scan for new activity
+      </button>
+    </div>
     <div class="summary-cards" id="summaryCards"></div>
     <div id="classifyNotice" style="display:none;font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 14px;margin-bottom:16px;font-weight:500"></div>
     <div class="tx-nav">
@@ -2367,6 +2372,8 @@ function confirmRescan(){
   document.getElementById('walletInput').value=w.addr;
   document.getElementById('nameInput').value=w.name;
   document.getElementById('blocksInput').value=blocks;
+  var chainSel=document.getElementById('chainSelect');
+  if(chainSel&&w.chainKey)chainSel.value=w.chainKey;
   closeRescanModal();
   startScan();
 }
