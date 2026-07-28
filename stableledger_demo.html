@@ -2258,7 +2258,8 @@ async function refreshScan(){
   activeWalletAddr=walletAddr;
   const store=getStore(activeWalletAddr);
   const isBase=activeWalletAddr.startsWith("0x");
-  const chainKey=walletObj?walletObj.chainKey:(isBase?'base':'solana');
+  const CHAIN_KEY_BY_LABEL={Base:'base',Ethereum:'ethereum',Polygon:'polygon',Solana:'solana'};
+  const chainKey=(walletObj&&walletObj.chainKey)||(walletObj&&CHAIN_KEY_BY_LABEL[walletObj.chain])||(isBase?'base':'solana');
   const btn=document.getElementById("refreshBtn");
   btn.disabled=true;btn.innerHTML='Scanning...';
 

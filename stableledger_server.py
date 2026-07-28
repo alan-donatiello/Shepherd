@@ -9,8 +9,10 @@ Then open http://localhost:8090 in your browser.
 """
 
 import base64
+import hashlib
 import json
 import os
+import secrets
 import sys
 import time
 import threading
@@ -24,8 +26,540 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
 
-# ======================== SCANNER (self-contained) ========================
+# ======================== DATABASE (MULTI-TENANT PERSISTENCE) ========================
+# Data model: an Organization is a Shepherd API customer (e.g. a platform embedding
+# Shepherd). Each org has one or more API keys. Wallets belong to an org and, optionally,
+# to one of the org's own end users (identified by an external_id the org provides —
+# no need for them to sync internal UUIDs with us). Everything else (transactions,
+# chart of accounts, rules, audit log) is scoped by org_id so tenants never see each other's data.
 
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+DB_AVAILABLE = False
+db_pool = None
+
+if DATABASE_URL:
+    try:
+        import psycopg2
+        import psycopg2.extras
+        from psycopg2 import pool as pg_pool
+        _db_url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        db_pool = pg_pool.SimpleConnectionPool(1, 10, _db_url)
+        DB_AVAILABLE = True
+    except Exception as e:
+        print(f"  [DB] Could not connect to database: {e}")
+        DB_AVAILABLE = False
+
+
+def db_conn():
+    if not DB_AVAILABLE:
+        return None
+    return db_pool.getconn()
+
+
+def db_release(conn):
+    if DB_AVAILABLE and conn:
+        db_pool.putconn(conn)
+
+
+def db_init_schema():
+    if not DB_AVAILABLE:
+        print("  [DB] No DATABASE_URL configured — running in memory-only mode (no persistence, no API).")
+        return
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS organizations (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                contact_email TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                key_hash TEXT UNIQUE NOT NULL,
+                key_prefix TEXT NOT NULL,
+                label TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                last_used_at TIMESTAMPTZ,
+                revoked BOOLEAN DEFAULT false
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS end_users (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                external_id TEXT NOT NULL,
+                name TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(org_id, external_id)
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS wallets (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                end_user_id INTEGER REFERENCES end_users(id) ON DELETE CASCADE,
+                address TEXT NOT NULL,
+                name TEXT,
+                chain TEXT,
+                lookback INTEGER DEFAULT 1000,
+                last_block BIGINT,
+                last_scan_time TEXT,
+                reconcile_baseline_balance NUMERIC,
+                reconcile_baseline_set_at TEXT,
+                reconcile_baseline_tx_count INTEGER,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(org_id, address, chain)
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transactions (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                wallet_id INTEGER REFERENCES wallets(id) ON DELETE CASCADE,
+                tx_hash TEXT NOT NULL,
+                block_number BIGINT,
+                tx_date TEXT,
+                direction TEXT,
+                amount NUMERIC,
+                counterparty TEXT,
+                gas NUMERIC DEFAULT 0,
+                asset TEXT DEFAULT 'USDC',
+                source TEXT DEFAULT 'blockchain',
+                gl_code TEXT,
+                confidence NUMERIC,
+                classified_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(wallet_id, tx_hash)
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS counterparty_mappings (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                end_user_id INTEGER REFERENCES end_users(id) ON DELETE CASCADE,
+                counterparty TEXT NOT NULL,
+                gl_code TEXT NOT NULL,
+                updated_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(org_id, end_user_id, counterparty)
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chart_of_accounts (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                code TEXT NOT NULL,
+                name TEXT NOT NULL,
+                account_type TEXT,
+                description TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(org_id, code)
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                end_user_id INTEGER REFERENCES end_users(id) ON DELETE CASCADE,
+                log_type TEXT,
+                action TEXT,
+                detail TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+        """)
+        conn.commit()
+        cur.close()
+        print("  [DB] Multi-tenant schema ready.")
+    except Exception as e:
+        print(f"  [DB] Schema init error: {e}")
+        conn.rollback()
+    finally:
+        db_release(conn)
+
+
+# ---------- API key auth ----------
+def generate_api_key():
+    """Returns (full_key, key_hash, key_prefix). Only the hash is stored — the full
+    key is shown to the customer exactly once, the same pattern Stripe/GitHub use."""
+    raw = secrets.token_urlsafe(32)
+    full_key = f"shep_live_{raw}"
+    key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+    key_prefix = full_key[:14]
+    return full_key, key_hash, key_prefix
+
+
+def create_organization(name, contact_email):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("INSERT INTO organizations (name, contact_email) VALUES (%s, %s) RETURNING id",
+                     (name, contact_email))
+        org_id = cur.fetchone()[0]
+        full_key, key_hash, key_prefix = generate_api_key()
+        cur.execute("INSERT INTO api_keys (org_id, key_hash, key_prefix, label) VALUES (%s, %s, %s, %s)",
+                     (org_id, key_hash, key_prefix, "Default key"))
+        conn.commit()
+        cur.close()
+        return {"success": True, "org_id": org_id, "api_key": full_key}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "message": str(e)[:200]}
+    finally:
+        db_release(conn)
+
+
+def get_org_from_api_key(api_key):
+    if not api_key or not DB_AVAILABLE:
+        return None
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT o.id, o.name FROM api_keys k JOIN organizations o ON o.id = k.org_id
+            WHERE k.key_hash = %s AND k.revoked = false
+        """, (key_hash,))
+        row = cur.fetchone()
+        if row:
+            cur.execute("UPDATE api_keys SET last_used_at = now() WHERE key_hash = %s", (key_hash,))
+            conn.commit()
+        cur.close()
+        return dict(row) if row else None
+    finally:
+        db_release(conn)
+
+
+# ---------- Core data operations (all org-scoped) ----------
+def db_get_or_create_end_user(org_id, external_id, name=None):
+    if not external_id:
+        return None
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO end_users (org_id, external_id, name) VALUES (%s, %s, %s)
+            ON CONFLICT (org_id, external_id) DO UPDATE SET name = COALESCE(EXCLUDED.name, end_users.name)
+            RETURNING id
+        """, (org_id, external_id, name))
+        end_user_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return end_user_id
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] get_or_create_end_user error: {e}")
+        return None
+    finally:
+        db_release(conn)
+
+
+def db_save_wallet_v1(org_id, end_user_id, address, name, chain, lookback):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO wallets (org_id, end_user_id, address, name, chain, lookback)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (org_id, address, chain) DO UPDATE SET name = EXCLUDED.name, end_user_id = EXCLUDED.end_user_id
+            RETURNING id
+        """, (org_id, end_user_id, address, name, chain, lookback))
+        wallet_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        return wallet_id
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] save_wallet_v1 error: {e}")
+        return None
+    finally:
+        db_release(conn)
+
+
+def db_get_wallet(org_id, wallet_id):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM wallets WHERE id = %s AND org_id = %s", (wallet_id, org_id))
+        row = cur.fetchone()
+        cur.close()
+        return dict(row) if row else None
+    finally:
+        db_release(conn)
+
+
+def db_list_wallets(org_id, end_user_external_id=None):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if end_user_external_id:
+            cur.execute("""
+                SELECT w.* FROM wallets w JOIN end_users u ON u.id = w.end_user_id
+                WHERE w.org_id = %s AND u.external_id = %s ORDER BY w.created_at
+            """, (org_id, end_user_external_id))
+        else:
+            cur.execute("SELECT * FROM wallets WHERE org_id = %s ORDER BY created_at", (org_id,))
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        return rows
+    finally:
+        db_release(conn)
+
+
+def db_save_transactions_v1(org_id, wallet_id, txs):
+    if not txs:
+        return 0
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        count = 0
+        for t in txs:
+            cur.execute("""
+                INSERT INTO transactions (org_id, wallet_id, tx_hash, block_number, tx_date, direction, amount, counterparty, gas, asset, source)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (wallet_id, tx_hash) DO NOTHING
+            """, (org_id, wallet_id, t.get("hash"), t.get("block"), t.get("date"),
+                  t.get("dir"), t.get("amount"), t.get("cp"), t.get("gas", 0),
+                  t.get("asset", "USDC"), t.get("source", "blockchain")))
+            count += cur.rowcount
+        conn.commit()
+        cur.close()
+        return count
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] save_transactions_v1 error: {e}")
+        return 0
+    finally:
+        db_release(conn)
+
+
+def db_classify_transaction_v1(org_id, transaction_id, gl_code, confidence=None):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE transactions SET gl_code = %s, confidence = %s, classified_at = now()
+            WHERE org_id = %s AND id = %s
+        """, (gl_code, confidence, org_id, transaction_id))
+        updated = cur.rowcount > 0
+        conn.commit()
+        cur.close()
+        return updated
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] classify_v1 error: {e}")
+        return False
+    finally:
+        db_release(conn)
+
+
+def db_list_transactions(org_id, wallet_id=None, end_user_external_id=None, gl_code=None, limit=500):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        query = """
+            SELECT t.*, w.address as wallet_address, w.chain as wallet_chain, u.external_id as end_user_id
+            FROM transactions t
+            JOIN wallets w ON w.id = t.wallet_id
+            LEFT JOIN end_users u ON u.id = w.end_user_id
+            WHERE t.org_id = %s
+        """
+        params = [org_id]
+        if wallet_id:
+            query += " AND t.wallet_id = %s"
+            params.append(wallet_id)
+        if end_user_external_id:
+            query += " AND u.external_id = %s"
+            params.append(end_user_external_id)
+        if gl_code:
+            query += " AND t.gl_code = %s"
+            params.append(gl_code)
+        query += " ORDER BY t.created_at DESC LIMIT %s"
+        params.append(limit)
+        cur.execute(query, params)
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        return rows
+    finally:
+        db_release(conn)
+
+
+DEFAULT_CHART_OF_ACCOUNTS = [
+    {"code": "6110 - Payroll", "description": "Employee and contractor wages, salaries, and payroll-related payments. Often recurring, round amounts on a regular schedule."},
+    {"code": "6200 - Software & SaaS", "description": "Subscription software and SaaS tools. Usually small, recurring, fixed amounts."},
+    {"code": "6300 - Cloud Infrastructure", "description": "Cloud infrastructure and hosting costs. Often usage-based, may vary month to month."},
+    {"code": "6420 - Marketing & Ads", "description": "Marketing, advertising, and paid promotion spend."},
+    {"code": "6500 - Professional Services", "description": "Payments to lawyers, accountants, consultants, auditors, and other professional service providers."},
+    {"code": "6600 - Office & Operations", "description": "General office expenses and operational overhead not covered by other categories."},
+    {"code": "7100 - Intercompany Transfer", "description": "Transfers between the company's own wallets or accounts — not a real expense or revenue event."},
+    {"code": "4100 - Revenue - Services", "description": "Revenue from services rendered to clients or customers."},
+    {"code": "4200 - Revenue - Product", "description": "Revenue from product sales."},
+    {"code": "4300 - Customer Refund", "description": "Refunds issued to customers, recorded as a reduction of revenue."},
+]
+
+
+def db_get_chart_of_accounts(org_id):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT code, name, description FROM chart_of_accounts WHERE org_id = %s", (org_id,))
+        rows = cur.fetchall()
+        cur.close()
+        if not rows:
+            return DEFAULT_CHART_OF_ACCOUNTS
+        return [{"code": f"{r['code']} - {r['name']}", "description": r.get("description", "")} for r in rows]
+    finally:
+        db_release(conn)
+
+
+def db_get_prior_context(org_id, end_user_id, exclude_wallet_id=None):
+    """Build the same {counterparty, gl_code, count, avg_amount, direction, pattern}
+    shape the web app's AI prompt expects, from this org's (or end user's) classified history."""
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT t.counterparty, t.gl_code, t.direction, t.amount
+            FROM transactions t JOIN wallets w ON w.id = t.wallet_id
+            WHERE t.org_id = %s AND t.gl_code IS NOT NULL
+            AND (%s::int IS NULL OR w.end_user_id = %s)
+        """, (org_id, end_user_id, end_user_id))
+        rows = cur.fetchall()
+        cur.close()
+    finally:
+        db_release(conn)
+
+    stats = {}
+    for r in rows:
+        cp = r["counterparty"]
+        if cp not in stats:
+            stats[cp] = {"counterparty": cp, "gl_code": r["gl_code"], "direction": r["direction"], "count": 0, "total": 0.0, "amounts": []}
+        stats[cp]["count"] += 1
+        stats[cp]["total"] += float(r["amount"] or 0)
+        stats[cp]["amounts"].append(float(r["amount"] or 0))
+
+    out = []
+    for cp, s in stats.items():
+        pattern = ""
+        if s["count"] > 2:
+            pattern = "recurring fixed" if all(abs(a - s["amounts"][0]) < 1 for a in s["amounts"]) else "recurring variable"
+        out.append({"counterparty": cp, "gl_code": s["gl_code"], "count": s["count"],
+                     "avg_amount": s["total"] / s["count"], "direction": s["direction"], "pattern": pattern})
+    return out
+
+
+def auto_classify_new_transactions(org_id, wallet_id, end_user_id, chain_label, confidence_threshold=0.80):
+    """Run AI classification over every not-yet-classified transaction on this wallet,
+    auto-applying the GL code when confidence clears the threshold. Always stores the
+    AI's suggestion + confidence even below threshold, so the API consumer can see it."""
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM transactions WHERE org_id = %s AND wallet_id = %s AND gl_code IS NULL", (org_id, wallet_id))
+        pending = [dict(r) for r in cur.fetchall()]
+        cur.close()
+    finally:
+        db_release(conn)
+
+    if not pending:
+        return {"classified": 0, "reviewed": 0}
+
+    coa = db_get_chart_of_accounts(org_id)
+    classified_count = 0
+
+    for t in pending:
+        prior = db_get_prior_context(org_id, end_user_id)
+        tx_data = {
+            "direction": t["direction"], "amount": float(t["amount"] or 0), "asset": t.get("asset", "USDC"),
+            "counterparty": t["counterparty"], "chain": chain_label, "block": t.get("block_number"),
+            "source": t.get("source", "blockchain")
+        }
+        try:
+            result = classify_transaction(tx_data, coa, prior, client_profile=None)
+        except Exception as e:
+            print(f"  [Auto-classify] Error classifying tx {t['id']}: {e}")
+            continue
+        gl_code = result.get("gl_code")
+        confidence = result.get("confidence", 0)
+        if gl_code and confidence >= confidence_threshold:
+            db_classify_transaction_v1(org_id, t["id"], gl_code, confidence)
+            classified_count += 1
+        else:
+            # Store the suggestion + confidence without marking it classified, so the
+            # API consumer can see what Shepherd thinks even when it's not confident enough to auto-apply.
+            conn2 = db_conn()
+            try:
+                cur2 = conn2.cursor()
+                cur2.execute("UPDATE transactions SET confidence = %s WHERE id = %s", (confidence, t["id"]))
+                conn2.commit()
+                cur2.close()
+            except Exception:
+                conn2.rollback()
+            finally:
+                db_release(conn2)
+
+    return {"classified": classified_count, "reviewed": len(pending)}
+
+
+def db_financial_statements(org_id, wallet_id=None, end_user_external_id=None):
+    """Compute a simple P&L summary from classified transactions. Balance sheet /
+    cash flow depth matches the same on-the-fly calculation approach the web app uses,
+    kept intentionally simple here as the v1 API surface."""
+    txs = db_list_transactions(org_id, wallet_id=wallet_id, end_user_external_id=end_user_external_id, limit=10000)
+    revenue = {}
+    expenses = {}
+    unclassified_in = 0.0
+    unclassified_out = 0.0
+    for t in txs:
+        gl = t.get("gl_code")
+        amt = float(t.get("amount") or 0)
+        if not gl:
+            if t["direction"] == "inflow":
+                unclassified_in += amt
+            else:
+                unclassified_out += amt
+            continue
+        bucket = revenue if gl.split(" ")[0].startswith(("4",)) else expenses
+        bucket[gl] = bucket.get(gl, 0) + amt
+    total_revenue = sum(revenue.values())
+    total_expenses = sum(expenses.values())
+    return {
+        "revenue": revenue,
+        "expenses": expenses,
+        "total_revenue": round(total_revenue, 2),
+        "total_expenses": round(total_expenses, 2),
+        "net_income": round(total_revenue - total_expenses, 2),
+        "unclassified_inflow": round(unclassified_in, 2),
+        "unclassified_outflow": round(unclassified_out, 2),
+        "transaction_count": len(txs),
+        "classified_count": sum(1 for t in txs if t.get("gl_code")),
+    }
+
+
+def db_save_audit_entry_v1(org_id, end_user_id, log_type, action, detail):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO audit_log (org_id, end_user_id, log_type, action, detail) VALUES (%s, %s, %s, %s, %s)",
+            (org_id, end_user_id, log_type, action, detail)
+        )
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] audit_log_v1 error: {e}")
+    finally:
+        db_release(conn)
+
+
+db_init_schema()
+
+
+# ======================== SCANNER (self-contained) ========================
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
 # Verified contract addresses (Circle docs + Etherscan, checked live).
@@ -1183,13 +1717,20 @@ def _classify_gemini(prompt):
             return {"gl_code": None, "confidence": 0, "reasoning": f"Gemini error: {str(e)[:100]}"}
 
 def detect_chain(wallet, requested_chain=None):
-    """If the caller specifies which chain (needed for EVM chains, since Base/Ethereum/
-    Polygon all share the same 0x address format), use that. Otherwise fall back to
-    format-based detection, defaulting ambiguous 0x addresses to Base for backward compat."""
+    """If the caller specifies which chain (required for EVM chains, since Base/Ethereum/
+    Polygon all share the same 0x address format), use that. Solana addresses are
+    unambiguous by format alone. An EVM address with no chain specified is a real error,
+    not something safe to guess — silently defaulting to Base would scan the wrong
+    chain's contracts and produce quietly-wrong accounting data with no error at all."""
     if requested_chain and (requested_chain in EVM_CHAINS or requested_chain == "solana"):
         return requested_chain
     if wallet.startswith("0x") and len(wallet) == 42:
-        return "base"
+        if requested_chain:
+            raise ValueError(f"Unknown chain '{requested_chain}' for an EVM address. Must be one of: {', '.join(EVM_CHAINS.keys())}")
+        raise ValueError(
+            "This address could be on Base, Ethereum, or Polygon — they share the same address format, "
+            "so a chain must be specified explicitly. Please select the chain and try again."
+        )
     return "solana"
 
 # Global state for active scan
@@ -1230,6 +1771,54 @@ def run_scan(wallet, lookback, from_block=None, requested_chain=None):
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith("/api/v1/wallets"):
+            org = self._authed_org()
+            if not org:
+                self._send_json(401, {"error": "Invalid or missing API key"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            end_user_id = params.get("end_user_id", [None])[0]
+            wallets = db_list_wallets(org["id"], end_user_external_id=end_user_id)
+            self._send_json(200, {"wallets": wallets})
+            return
+
+        if self.path.startswith("/api/v1/transactions"):
+            org = self._authed_org()
+            if not org:
+                self._send_json(401, {"error": "Invalid or missing API key"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            wallet_id = params.get("wallet_id", [None])[0]
+            end_user_id = params.get("end_user_id", [None])[0]
+            gl_code = params.get("gl_code", [None])[0]
+            txs = db_list_transactions(org["id"], wallet_id=wallet_id, end_user_external_id=end_user_id, gl_code=gl_code)
+            self._send_json(200, {"transactions": txs})
+            return
+
+        if self.path.startswith("/api/v1/financial-statements"):
+            org = self._authed_org()
+            if not org:
+                self._send_json(401, {"error": "Invalid or missing API key"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            qs = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(qs)
+            wallet_id = params.get("wallet_id", [None])[0]
+            end_user_id = params.get("end_user_id", [None])[0]
+            stmt = db_financial_statements(org["id"], wallet_id=wallet_id, end_user_external_id=end_user_id)
+            self._send_json(200, stmt)
+            return
+
         if self.path.startswith("/api/fairvalue/prices"):
             import urllib.parse as _up
             qs = _up.urlparse(self.path).query
@@ -1437,6 +2026,159 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/v1/wallets":
+            org = self._authed_org()
+            if not org:
+                self._send_json(401, {"error": "Invalid or missing API key"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            address = (body.get("address") or "").strip()
+            chain = (body.get("chain") or "").strip().lower()
+            end_user_external_id = body.get("end_user_id")
+            name = body.get("name") or address
+            lookback = int(body.get("lookback_blocks", 2000))
+
+            if not address:
+                self._send_json(400, {"error": "address is required"})
+                return
+            if chain not in EVM_CHAINS and chain != "solana":
+                self._send_json(400, {"error": f"chain must be one of: {', '.join(list(EVM_CHAINS.keys()) + ['solana'])}"})
+                return
+
+            end_user_id = None
+            if end_user_external_id:
+                end_user_id = db_get_or_create_end_user(org["id"], end_user_external_id, body.get("end_user_name"))
+
+            wallet_id = db_save_wallet_v1(org["id"], end_user_id, address, name, chain, lookback)
+            if not wallet_id:
+                self._send_json(500, {"error": "Could not save wallet"})
+                return
+
+            # Run the scan synchronously so the caller gets classified data back in one round trip.
+            # For very large lookback windows this can be slow — v2 should offer an async/webhook mode.
+            try:
+                if chain in EVM_CHAINS:
+                    engine = EVMStablecoinLedger(address, chain_key=chain)
+                    to_block = engine.latest_block()
+                    from_block = to_block - lookback
+                    report = engine.build_report(from_block, to_block)
+                else:
+                    engine = SolanaStablecoinLedger(address, tx_limit=lookback)
+                    report = engine.build_report()
+            except Exception as e:
+                self._send_json(502, {"error": f"Scan failed: {str(e)[:300]}", "wallet_id": wallet_id})
+                return
+
+            txs_to_save = [{
+                "hash": j["tx_hash"], "block": j.get("block_number"), "dir": j["direction"],
+                "amount": j["amount"], "cp": j["counterparty"], "gas": j.get("gas_usd", 0),
+                "asset": j.get("asset", "USDC"), "source": "blockchain"
+            } for j in report.get("journals", [])]
+            saved_count = db_save_transactions_v1(org["id"], wallet_id, txs_to_save)
+
+            chain_label = EVM_CHAINS[chain]["label"] if chain in EVM_CHAINS else "Solana"
+            classify_result = auto_classify_new_transactions(org["id"], wallet_id, end_user_id, chain_label)
+
+            db_save_audit_entry_v1(org["id"], end_user_id, "account", "Wallet connected via API",
+                                    f"{address} ({chain}) — {saved_count} transactions found, {classify_result['classified']} auto-classified")
+
+            self._send_json(201, {
+                "wallet_id": wallet_id,
+                "address": address,
+                "chain": chain,
+                "end_user_id": end_user_external_id,
+                "transactions_found": len(txs_to_save),
+                "transactions_saved": saved_count,
+                "transactions_classified": classify_result["classified"],
+                "transactions_needing_review": classify_result["reviewed"] - classify_result["classified"],
+                "summary": report.get("summary", {})
+            })
+            return
+
+        if self.path.startswith("/api/v1/wallets/") and self.path.endswith("/scan"):
+            org = self._authed_org()
+            if not org:
+                self._send_json(401, {"error": "Invalid or missing API key"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            try:
+                wallet_id = int(self.path.split("/")[4])
+            except (IndexError, ValueError):
+                self._send_json(400, {"error": "Invalid wallet id"})
+                return
+            wallet = db_get_wallet(org["id"], wallet_id)
+            if not wallet:
+                self._send_json(404, {"error": "Wallet not found"})
+                return
+
+            chain = wallet["chain"]
+            address = wallet["address"]
+            lookback = wallet.get("lookback") or 2000
+            try:
+                if chain in EVM_CHAINS:
+                    engine = EVMStablecoinLedger(address, chain_key=chain)
+                    to_block = engine.latest_block()
+                    from_block = (wallet["last_block"] + 1) if wallet.get("last_block") else (to_block - lookback)
+                    report = engine.build_report(from_block, to_block)
+                else:
+                    engine = SolanaStablecoinLedger(address, tx_limit=lookback)
+                    report = engine.build_report()
+            except Exception as e:
+                self._send_json(502, {"error": f"Scan failed: {str(e)[:300]}"})
+                return
+
+            txs_to_save = [{
+                "hash": j["tx_hash"], "block": j.get("block_number"), "dir": j["direction"],
+                "amount": j["amount"], "cp": j["counterparty"], "gas": j.get("gas_usd", 0),
+                "asset": j.get("asset", "USDC"), "source": "blockchain"
+            } for j in report.get("journals", [])]
+            saved_count = db_save_transactions_v1(org["id"], wallet_id, txs_to_save)
+            chain_label = EVM_CHAINS[chain]["label"] if chain in EVM_CHAINS else "Solana"
+            classify_result = auto_classify_new_transactions(org["id"], wallet_id, wallet.get("end_user_id"), chain_label)
+
+            db_save_audit_entry_v1(org["id"], wallet.get("end_user_id"), "scan", "Wallet rescanned via API",
+                                    f"{address} — {saved_count} new transactions, {classify_result['classified']} auto-classified")
+
+            self._send_json(200, {
+                "wallet_id": wallet_id,
+                "transactions_found": len(txs_to_save),
+                "transactions_saved": saved_count,
+                "transactions_classified": classify_result["classified"],
+                "transactions_needing_review": classify_result["reviewed"] - classify_result["classified"],
+                "summary": report.get("summary", {})
+            })
+            return
+
+        if self.path.startswith("/api/v1/transactions/") and self.path.endswith("/classify"):
+            org = self._authed_org()
+            if not org:
+                self._send_json(401, {"error": "Invalid or missing API key"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            try:
+                transaction_id = int(self.path.split("/")[4])
+            except (IndexError, ValueError):
+                self._send_json(400, {"error": "Invalid transaction id"})
+                return
+            body = self._read_json_body()
+            gl_code = body.get("gl_code")
+            if not gl_code:
+                self._send_json(400, {"error": "gl_code is required"})
+                return
+            ok = db_classify_transaction_v1(org["id"], transaction_id, gl_code)
+            if not ok:
+                self._send_json(404, {"error": "Transaction not found"})
+                return
+            self._send_json(200, {"success": True})
+            return
+
         if self.path == "/api/classify":
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode()) if length else {}
@@ -1691,7 +2433,27 @@ class Handler(SimpleHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+    def _authed_org(self):
+        """Extract and validate the API key from Authorization: Bearer <key>."""
+        auth = self.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return None
+        api_key = auth[7:].strip()
+        return get_org_from_api_key(api_key)
+
+    def _send_json(self, code, payload):
+        body = json.dumps(payload, default=str).encode()
+        self.send_response(code)
+        self._cors()
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        return json.loads(self.rfile.read(length).decode()) if length else {}
 
     def log_message(self, format, *args):
         # Quiet down request logging, keep our own prints
@@ -1699,6 +2461,22 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 2 and sys.argv[1] == "create-org":
+        if len(sys.argv) < 4:
+            print("Usage: python3 stableledger_server.py create-org \"Org Name\" \"contact@email.com\"")
+            sys.exit(1)
+        if not DB_AVAILABLE:
+            print("DATABASE_URL is not set or the database isn't reachable — cannot provision an org without persistence configured.")
+            sys.exit(1)
+        result = create_organization(sys.argv[2], sys.argv[3])
+        if result["success"]:
+            print(f"\nOrganization created: {sys.argv[2]} (id={result['org_id']})")
+            print(f"\nAPI key (shown once — store it securely, it cannot be retrieved again):\n")
+            print(f"  {result['api_key']}\n")
+        else:
+            print(f"Error: {result['message']}")
+        sys.exit(0)
+
     port = int(os.environ.get("PORT", 8090))
     print(f"Shepherd server starting on http://localhost:{port}")
     print(f"Open that URL in your browser.")
@@ -1709,6 +2487,10 @@ if __name__ == "__main__":
     else:
         print(f"AI classification: disabled (set ANTHROPIC_API_KEY or GEMINI_API_KEY)")
         print(f"  Current provider: {AI_PROVIDER}")
+    if DB_AVAILABLE:
+        print(f"Persistence + API: enabled (multi-tenant, /api/v1/*)")
+    else:
+        print(f"Persistence + API: disabled (set DATABASE_URL to enable)")
     print()
     server = HTTPServer(("0.0.0.0", port), Handler)
     try:
