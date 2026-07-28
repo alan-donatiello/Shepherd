@@ -2249,16 +2249,22 @@ function openLedger(){if(!txs.length)return;idx=0;ledgerView='single';if(activeW
 
 async function refreshScan(){
   if(selectedWallets.size!==1){alert('Select a single wallet to scan for new activity.');return;}
-  const walletAddr=[...selectedWallets][0];
+  const lowercasedAddr=[...selectedWallets][0];
+  // selectedWallets stores lowercased addresses for case-insensitive bookkeeping — that's
+  // safe for EVM (case-insensitive) but Solana addresses are case-sensitive base58, so we
+  // must look up the ORIGINAL-CASE address before sending anything to the scan API.
+  const walletObj=wallets.find(w=>w.addr.toLowerCase()===lowercasedAddr);
+  const walletAddr=walletObj?walletObj.addr:lowercasedAddr;
   activeWalletAddr=walletAddr;
   const store=getStore(activeWalletAddr);
   const isBase=activeWalletAddr.startsWith("0x");
+  const chainKey=walletObj?walletObj.chainKey:(isBase?'base':'solana');
   const btn=document.getElementById("refreshBtn");
   btn.disabled=true;btn.innerHTML='Scanning...';
 
   try{
-    // For Base: scan from last block. For Solana: scan recent and dedupe
-    const body={wallet:activeWalletAddr,lookback_blocks:isBase?2000:200};
+    // For EVM: scan from last block. For Solana: scan recent and dedupe
+    const body={wallet:activeWalletAddr,lookback_blocks:isBase?2000:200,chain:chainKey};
     if(isBase&&store.lastBlock){body.from_block=store.lastBlock+1;}
 
     const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -2285,7 +2291,7 @@ function onRefreshComplete(report){
   const btn=document.getElementById("refreshBtn");
   btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';
 
-  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0}));
+  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}));
   
   // Deduplicate: only add txs we don't already have
   const existingHashes=new Set(txs.map(t=>t.hash));
