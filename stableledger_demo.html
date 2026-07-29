@@ -370,7 +370,38 @@
 <body>
 
 <!-- ONBOARDING -->
-<div class="onboard-screen active" id="onboardScreen">
+<!-- SCREEN: AUTH (login/signup gate) -->
+<div class="onboard-screen active" id="authScreen" style="align-items:center;justify-content:center">
+  <div style="max-width:380px;width:100%;background:#fff;border-radius:16px;padding:36px 40px;box-shadow:0 24px 48px rgba(0,0,0,.2)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:22px;font-weight:700;color:#0f172a">Shepherd</div>
+      <div style="font-size:13px;color:#64748b;margin-top:2px">Continuous Close Accounting</div>
+    </div>
+
+    <div style="display:flex;gap:4px;background:#f1f5f9;border-radius:8px;padding:3px;margin-bottom:20px">
+      <button id="authTabLogin" onclick="switchAuthTab('login')" style="flex:1;padding:8px;border:none;border-radius:6px;background:#fff;font-size:13px;font-weight:600;color:#0f172a;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.08)">Log In</button>
+      <button id="authTabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:8px;border:none;border-radius:6px;background:transparent;font-size:13px;font-weight:600;color:#64748b;cursor:pointer">Sign Up</button>
+    </div>
+
+    <div id="authFormLogin">
+      <div class="cm-field"><label>Email</label><input type="email" id="loginEmail" placeholder="you@yourfirm.com"></div>
+      <div class="cm-field"><label>Password</label><input type="password" id="loginPassword" placeholder="Password"></div>
+      <button style="width:100%;margin-top:8px;font-size:13px;font-weight:600;padding:11px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="doLogin()">Log In</button>
+    </div>
+
+    <div id="authFormSignup" style="display:none">
+      <div class="cm-field"><label>Firm / Company Name</label><input type="text" id="signupOrgName" placeholder="e.g. Eisner Amper"></div>
+      <div class="cm-field"><label>Your Name</label><input type="text" id="signupName" placeholder="Your name"></div>
+      <div class="cm-field"><label>Email</label><input type="email" id="signupEmail" placeholder="you@yourfirm.com"></div>
+      <div class="cm-field"><label>Password</label><input type="password" id="signupPassword" placeholder="At least 8 characters"></div>
+      <button style="width:100%;margin-top:8px;font-size:13px;font-weight:600;padding:11px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="doSignup()">Create Account</button>
+    </div>
+
+    <div id="authError" style="display:none;margin-top:14px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b"></div>
+  </div>
+</div>
+
+<div class="onboard-screen" id="onboardScreen">
   <div class="onboard-logo-fixed">
     <div class="ob-logo-row">
       <img src="data:image/png;base64,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" width="72" height="48" style="border-radius:4px;object-fit:cover" alt="Shepherd">
@@ -1388,6 +1419,10 @@
       <h2 style="font-size:26px;font-weight:700;margin-bottom:14px">Settings</h2><div style="height:4px;width:100%;margin-bottom:20px;background:linear-gradient(90deg, transparent 0%, #0f172a 8%, #0f172a 92%, transparent 100%);border-radius:50%"></div>
       
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:20px">
+        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Account</div><div style="font-size:11px;color:#94a3b8" id="settingsAccountInfo">—</div></div>
+          <button style="font-size:11px;padding:6px 14px;border-radius:4px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer" onclick="logout()">Log Out</button>
+        </div>
         <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:13px;font-weight:500">Team Access</div><div style="font-size:11px;color:#94a3b8">Invite team members and manage permissions</div></div>
           <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
@@ -1872,6 +1907,7 @@ function obSaveGL(){
   if(mode==='upload'){
     // File upload already pushed accounts into GL_OPTIONS via obParseGLFile - don't overwrite
     logAction('account','Chart of accounts configured (uploaded)',(GL_OPTIONS.length-1)+' accounts');
+    persistChartOfAccounts(GL_OPTIONS.filter(function(o){return o!=='Unclassified'}));
     return;
   }
   var selected=[];
@@ -1887,7 +1923,24 @@ function obSaveGL(){
       else GL_TYPE[prefix]='transfer';
     });
     logAction('account','Chart of accounts configured',selected.length+' accounts');
+    persistChartOfAccounts(selected);
   }
+}
+function persistChartOfAccounts(entries){
+  // Persist every selected/uploaded account to the backend. Without this, only accounts
+  // created LATER via "Create Custom Account" would ever reach the database — and since
+  // hydration replaces GL_OPTIONS wholesale from whatever's in the DB, that would silently
+  // wipe out the defaults the moment a user creates even one custom account after login.
+  if(!currentUser)return;
+  entries.forEach(function(entry){
+    var parts=entry.split(' - ');
+    var code=parts[0].trim();
+    var name=parts.slice(1).join(' - ').trim()||code;
+    var type=GL_TYPE[code]||'expense';
+    fetch('/api/web/chart_of_accounts/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code:code,name:name,account_type:type,description:GL_DESCRIPTIONS[code]||''})
+    }).catch(function(){});
+  });
 }
 function obParseGLFile(input){
   if(!input.files||!input.files[0])return;
@@ -2080,7 +2133,145 @@ const COLORS=["#3b82f6","#8b5cf6","#06b6d4","#f59e0b"];
 const GL_MAP={"6110":"pnl-payroll","6200":"pnl-software","6300":"pnl-cloud","6420":"pnl-marketing","6500":"pnl-profsvc","6600":"pnl-ops","4100":"pnl-revsvc","4200":"pnl-revprod","4300":"pnl-revsvc","7100":"bs-usdc","1200":"bs-usdc"};
 const OPENING={revSvc:1450000,revProd:380000,expPay:620000,expSw:85000,expCloud:142000,expMkt:215000,expProf:67000,expOps:38000,expGas:1.80,cash:2450000,usdc:1800000,eth:12500,bank:0,ar:340000,ap:285000,accrued:125000,equity:3500000,re:692500};
 
+let currentUser=null;
 let wallets=[],activeWalletAddr=null,scanData=null,txs=[],idx=0,mappings={};
+
+// ============ AUTH (web app login, separate from the API-key auth used by platform integrations) ============
+function switchAuthTab(tab){
+  var loginBtn=document.getElementById('authTabLogin'),signupBtn=document.getElementById('authTabSignup');
+  var loginForm=document.getElementById('authFormLogin'),signupForm=document.getElementById('authFormSignup');
+  if(tab==='login'){
+    loginBtn.style.background='#fff';loginBtn.style.color='#0f172a';loginBtn.style.boxShadow='0 1px 2px rgba(0,0,0,.08)';
+    signupBtn.style.background='transparent';signupBtn.style.color='#64748b';signupBtn.style.boxShadow='none';
+    loginForm.style.display='block';signupForm.style.display='none';
+  } else {
+    signupBtn.style.background='#fff';signupBtn.style.color='#0f172a';signupBtn.style.boxShadow='0 1px 2px rgba(0,0,0,.08)';
+    loginBtn.style.background='transparent';loginBtn.style.color='#64748b';loginBtn.style.boxShadow='none';
+    signupForm.style.display='block';loginForm.style.display='none';
+  }
+  document.getElementById('authError').style.display='none';
+}
+function showAuthError(msg){
+  var el=document.getElementById('authError');
+  el.textContent=msg;el.style.display='block';
+}
+async function doLogin(){
+  var email=document.getElementById('loginEmail').value.trim();
+  var password=document.getElementById('loginPassword').value;
+  if(!email||!password){showAuthError('Enter your email and password.');return;}
+  try{
+    var res=await fetch('/api/web/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:password})});
+    var data=await res.json();
+    if(!res.ok){showAuthError(data.error||'Login failed.');return;}
+    currentUser=data.user;
+    await hydrateFromServer();
+  }catch(e){showAuthError('Login error: '+e.message);}
+}
+async function doSignup(){
+  var orgName=document.getElementById('signupOrgName').value.trim();
+  var name=document.getElementById('signupName').value.trim();
+  var email=document.getElementById('signupEmail').value.trim();
+  var password=document.getElementById('signupPassword').value;
+  if(!orgName||!email||!password){showAuthError('Fill in your firm name, email, and password.');return;}
+  if(password.length<8){showAuthError('Password must be at least 8 characters.');return;}
+  try{
+    var res=await fetch('/api/web/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({org_name:orgName,email:email,password:password,name:name})});
+    var data=await res.json();
+    if(!res.ok){showAuthError(data.error||'Sign up failed.');return;}
+    currentUser=data.user;
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('authScreen').classList.remove('active');
+    document.getElementById('onboardScreen').classList.add('active');
+    document.getElementById('onboardScreen').style.display='flex';
+  }catch(e){showAuthError('Sign up error: '+e.message);}
+}
+async function checkAuthOnLoad(){
+  try{
+    var res=await fetch('/api/web/me');
+    var data=await res.json();
+    if(data.logged_in){
+      currentUser=data.user;
+      await hydrateFromServer();
+    }
+  }catch(e){console.log('Auth check failed:',e);}
+}
+async function hydrateFromServer(){
+  try{
+    var res=await fetch('/api/web/data');
+    var payload=await res.json();
+    if(!payload.success){
+      document.getElementById('authScreen').style.display='none';
+      document.getElementById('authScreen').classList.remove('active');
+      document.getElementById('onboardScreen').classList.add('active');
+      document.getElementById('onboardScreen').style.display='flex';
+      return;
+    }
+    wallets=[];
+    (payload.wallets||[]).forEach(function(w){
+      wallets.push({addr:w.address,name:w.name,chain:w.chain?(w.chain.charAt(0).toUpperCase()+w.chain.slice(1)):'',chainKey:w.chain,_dbId:w.id});
+      var s=getStore(w.address);
+      s.lastBlock=w.last_block;
+      s.scanTime=w.last_scan_time;
+      if(w.reconcile_baseline_balance!==null&&w.reconcile_baseline_balance!==undefined){
+        s.reconcileBaseline={balance:parseFloat(w.reconcile_baseline_balance),setAt:w.reconcile_baseline_set_at,txCountAtBaseline:w.reconcile_baseline_tx_count||0};
+      }
+    });
+    var walletById={};
+    (payload.wallets||[]).forEach(function(w){walletById[w.id]=w.address;});
+    (payload.transactions||[]).forEach(function(t){
+      var walletAddr=t.wallet_address||walletById[t.wallet_id];
+      if(!walletAddr)return;
+      var s=getStore(walletAddr);
+      s.txs.push({hash:t.tx_hash,block:t.block_number,date:t.tx_date,dir:t.direction,amount:parseFloat(t.amount),cp:t.counterparty,gas:parseFloat(t.gas||0),asset:t.asset||'USDC',source:t.source||'blockchain'});
+      if(t.gl_code)s.mappings[t.tx_hash]=t.gl_code;
+    });
+    if(payload.cp_mappings){
+      wallets.forEach(function(w){Object.assign(getStore(w.addr).cpMappings,payload.cp_mappings);});
+    }
+    if(payload.chart_of_accounts&&payload.chart_of_accounts.length){
+      var dbCodes=payload.chart_of_accounts.map(function(a){return a.code});
+      var merged=GL_OPTIONS.slice(); // keep existing defaults, only add ones not already present
+      dbCodes.forEach(function(c){if(!merged.includes(c))merged.push(c);});
+      GL_OPTIONS=merged;
+      payload.chart_of_accounts.forEach(function(a){
+        var code=a.code.split(' ')[0];
+        if(a.description)GL_DESCRIPTIONS[code]=a.description;
+      });
+    }
+    if(payload.audit_log&&payload.audit_log.length){
+      auditLog=payload.audit_log.map(function(a){
+        return{timestamp:new Date(a.created_at).toLocaleString(),type:a.log_type,action:a.action,detail:a.detail,user:'admin'};
+      });
+    }
+
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('authScreen').classList.remove('active');
+
+    if(wallets.length>0){
+      document.getElementById('appShell').style.display='flex';
+      var allWithData=wallets.filter(function(w){return getStore(w.addr).txs.length>0});
+      if(allWithData.length){
+        selectedWallets.clear();
+        allWithData.forEach(function(w){selectedWallets.add(w.addr.toLowerCase());});
+        loadSelected();
+      }
+      navTo('ledger');
+      showToast('Welcome back'+(currentUser.name?', '+currentUser.name:''));
+    } else {
+      document.getElementById('onboardScreen').classList.add('active');
+      document.getElementById('onboardScreen').style.display='flex';
+    }
+  }catch(e){
+    console.log('Hydration error:',e);
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('authScreen').classList.remove('active');
+    document.getElementById('onboardScreen').classList.add('active');
+    document.getElementById('onboardScreen').style.display='flex';
+  }
+}
+function logout(){
+  fetch('/api/web/logout',{method:'POST'}).finally(function(){location.reload();});
+}
 
 let ledgerView='single'; // 'single' or 'all'
 let selectedWallets=new Set();
@@ -2088,6 +2279,10 @@ let auditLog=[]; // {timestamp, type, action, detail, user}
 let auditFilter='all';
 function logAction(type,action,detail){
   auditLog.unshift({timestamp:new Date().toLocaleString(),type,action,detail,user:'admin'});
+  if(currentUser){
+    fetch('/api/web/audit_log',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:type,action:action,detail:detail})}).catch(function(){});
+  }
 }
 function renderAuditLog(){
   const el=document.getElementById('auditLogTable');if(!el)return;
@@ -2247,7 +2442,11 @@ function navTo(id){
   if(id==='reports')renderReports();
   if(id==='automations')renderAutomations();
   if(id==='auditlog')renderAuditLog();
-  if(id==='settings')updateDailyPreview();
+  if(id==='settings'){
+    updateDailyPreview();
+    var acctEl=document.getElementById('settingsAccountInfo');
+    if(acctEl&&currentUser)acctEl.textContent=currentUser.email+(currentUser.org_name?' · '+currentUser.org_name:'');
+  }
 }
 function showConfig(){navTo('config');}
 function openLedger(){if(!txs.length)return;idx=0;ledgerView='single';if(activeWalletAddr)selectedWallets.add(activeWalletAddr.toLowerCase());navTo('ledger');}
@@ -2526,6 +2725,23 @@ function onScanComplete(report){
   store.lastBlock=report.scan_range?report.scan_range.to_block:null;
   store.scanTime=new Date().toLocaleString();
 
+  if(currentUser){
+    var wMeta=wallets.find(function(w){return w.addr.toLowerCase()===report.wallet.toLowerCase()});
+    if(wMeta&&!wMeta._dbId){
+      // First time this wallet is being saved - persist it plus every transaction we have so far
+      fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({address:report.wallet,name:wMeta.name,chain:wMeta.chainKey,lookback:wMeta.lookback||1000,transactions:store.txs})
+      }).then(function(res){return res.json()}).then(function(data){
+        if(data.success)wMeta._dbId=data.wallet_id;
+      }).catch(function(){});
+    } else if(wMeta&&wMeta._dbId&&addedCount>0){
+      var newlyAdded=newTxs.filter(function(t){return !existingHashes.has(t.hash)});
+      fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wallet_id:wMeta._dbId,transactions:newlyAdded,last_block:store.lastBlock})
+      }).catch(function(){});
+    }
+  }
+
   // Recompute scanData summary from the FULL merged history, not just this scan
   const allTx=store.txs;
   const inTx=allTx.filter(t=>t.dir==='inflow');
@@ -2653,6 +2869,7 @@ function classify(v){
   if(v==="__custom__"){openCustom();return;}
   const tx=txs[idx];
   mappings[tx.hash]=v;
+  const walletAddrForSave=(tx.walletAddr||activeWalletAddr||'');
   if(v!=="Unclassified"){
     logAction('classification','Classified transaction',`${addr(tx.hash)} as ${v} ($${fmt(tx.amount)} ${tx.dir})`);
     cpMappings[tx.cp]=v;
@@ -2663,6 +2880,20 @@ function classify(v){
       const note=document.getElementById("classifyNotice");
       if(note){note.textContent="Auto-classified "+autoCount+" more transaction"+(autoCount>1?"s":"")+" from this counterparty";note.style.display="block";
         setTimeout(()=>{note.style.display="none";},4000);}
+    }
+    if(currentUser&&walletAddrForSave){
+      const wMeta=wallets.find(w=>w.addr.toLowerCase()===walletAddrForSave.toLowerCase());
+      if(wMeta&&wMeta._dbId){
+        txs.forEach(t=>{
+          if(mappings[t.hash]===v&&(t.cp===tx.cp||t.hash===tx.hash)){
+            const tWalletMeta=wallets.find(w=>w.addr.toLowerCase()===(t.walletAddr||walletAddrForSave).toLowerCase());
+            if(tWalletMeta&&tWalletMeta._dbId){
+              fetch('/api/web/transactions/classify',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({wallet_id:tWalletMeta._dbId,tx_hash:t.origHash||t.hash,gl_code:v,counterparty:t.cp})}).catch(function(){});
+            }
+          }
+        });
+      }
     }
     // Stay on current transaction so arrows are visible
   } else {
@@ -4851,6 +5082,10 @@ function saveCustomAccount(){
   GL_OPTIONS.push(glEntry);
   GL_TYPE[code]=type;
   if(description)GL_DESCRIPTIONS[code]=description;
+  if(currentUser){
+    fetch('/api/web/chart_of_accounts/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code:code,name:name,account_type:type,description:description})}).catch(function(){});
+  }
   logAction('account','Account created',`${glEntry} (${type})`);
   closeCustom();
   // If on COA page, re-render. If on ledger, classify current tx.
@@ -4937,6 +5172,8 @@ function drawArrows(){
   });
 }
 window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
+
+checkAuthOnLoad();
 </script>
 <!-- CUSTOM ACCOUNT MODAL -->
 <div class="custom-overlay" id="markVendorOverlay" onclick="if(event.target===this)closeMarkVendorModal()">

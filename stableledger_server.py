@@ -10,6 +10,7 @@ Then open http://localhost:8090 in your browser.
 
 import base64
 import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -35,6 +36,7 @@ from pathlib import Path
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 DB_AVAILABLE = False
+DB_UNAVAILABLE_REASON = "DATABASE_URL is not set on this service"
 db_pool = None
 
 if DATABASE_URL:
@@ -45,8 +47,13 @@ if DATABASE_URL:
         _db_url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
         db_pool = pg_pool.SimpleConnectionPool(1, 10, _db_url)
         DB_AVAILABLE = True
+    except ImportError as e:
+        DB_UNAVAILABLE_REASON = f"psycopg2 is not installed ({e}) — check that requirements.txt is present and was picked up by the build"
+        print(f"  [DB] {DB_UNAVAILABLE_REASON}")
+        DB_AVAILABLE = False
     except Exception as e:
-        print(f"  [DB] Could not connect to database: {e}")
+        DB_UNAVAILABLE_REASON = f"could not connect: {e}"
+        print(f"  [DB] {DB_UNAVAILABLE_REASON}")
         DB_AVAILABLE = False
 
 
@@ -63,7 +70,7 @@ def db_release(conn):
 
 def db_init_schema():
     if not DB_AVAILABLE:
-        print("  [DB] No DATABASE_URL configured — running in memory-only mode (no persistence, no API).")
+        print(f"  [DB] Running in memory-only mode (no persistence, no API) — reason: {DB_UNAVAILABLE_REASON}")
         return
     conn = db_conn()
     try:
@@ -86,6 +93,26 @@ def db_init_schema():
                 created_at TIMESTAMPTZ DEFAULT now(),
                 last_used_at TIMESTAMPTZ,
                 revoked BOOLEAN DEFAULT false
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                name TEXT,
+                role TEXT DEFAULT 'member',
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                expires_at TIMESTAMPTZ NOT NULL
             );
         """)
         cur.execute("""
@@ -145,7 +172,7 @@ def db_init_schema():
                 counterparty TEXT NOT NULL,
                 gl_code TEXT NOT NULL,
                 updated_at TIMESTAMPTZ DEFAULT now(),
-                UNIQUE(org_id, end_user_id, counterparty)
+                UNIQUE(org_id, counterparty)
             );
         """)
         cur.execute("""
@@ -229,6 +256,105 @@ def get_org_from_api_key(api_key):
             conn.commit()
         cur.close()
         return dict(row) if row else None
+    finally:
+        db_release(conn)
+
+
+# ---------- Web app session auth (separate from API key auth above, same org model) ----------
+def hash_password(password, salt=None):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    pw_hash = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000).hex()
+    return pw_hash, salt
+
+
+def verify_password(password, salt, stored_hash):
+    computed, _ = hash_password(password, salt)
+    return hmac.compare_digest(computed, stored_hash)
+
+
+def create_web_session(user_id):
+    token = secrets.token_urlsafe(32)
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO sessions (token, user_id, expires_at) VALUES (%s, %s, now() + interval '30 days')",
+            (token, user_id)
+        )
+        conn.commit()
+        cur.close()
+        return token
+    finally:
+        db_release(conn)
+
+
+def get_user_from_session(token):
+    if not token or not DB_AVAILABLE:
+        return None
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT u.id, u.org_id, u.email, u.name, u.role, o.name as org_name
+            FROM sessions s JOIN users u ON u.id = s.user_id JOIN organizations o ON o.id = u.org_id
+            WHERE s.token = %s AND s.expires_at > now()
+        """, (token,))
+        row = cur.fetchone()
+        cur.close()
+        return dict(row) if row else None
+    finally:
+        db_release(conn)
+
+
+def signup_new_org(org_name, email, password, name):
+    """Signup creates a brand new organization with this user as its first member.
+    Adding teammates to an existing org is a separate, later flow (invite links)."""
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        if cur.fetchone():
+            cur.close()
+            return {"success": False, "message": "An account with this email already exists."}
+
+        cur.execute("INSERT INTO organizations (name, contact_email) VALUES (%s, %s) RETURNING id",
+                     (org_name, email))
+        org_id = cur.fetchone()[0]
+
+        pw_hash, salt = hash_password(password)
+        cur.execute(
+            "INSERT INTO users (org_id, email, password_hash, salt, name, role) VALUES (%s, %s, %s, %s, %s, 'owner') RETURNING id",
+            (org_id, email, pw_hash, salt, name)
+        )
+        user_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        token = create_web_session(user_id)
+        return {"success": True, "token": token, "user": {"id": user_id, "org_id": org_id, "email": email, "name": name, "org_name": org_name}}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "message": str(e)[:200]}
+    finally:
+        db_release(conn)
+
+
+def login_user(email, password):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT u.id, u.org_id, u.email, u.name, u.password_hash, u.salt, o.name as org_name
+            FROM users u JOIN organizations o ON o.id = u.org_id WHERE u.email = %s
+        """, (email,))
+        row = cur.fetchone()
+        cur.close()
+        if not row or not verify_password(password, row["salt"], row["password_hash"]):
+            return {"success": False, "message": "Invalid email or password."}
+        token = create_web_session(row["id"])
+        return {"success": True, "token": token, "user": {"id": row["id"], "org_id": row["org_id"], "email": row["email"], "name": row["name"], "org_name": row["org_name"]}}
+    except Exception as e:
+        return {"success": False, "message": str(e)[:200]}
     finally:
         db_release(conn)
 
@@ -411,6 +537,70 @@ def db_get_chart_of_accounts(org_id):
         if not rows:
             return DEFAULT_CHART_OF_ACCOUNTS
         return [{"code": f"{r['code']} - {r['name']}", "description": r.get("description", "")} for r in rows]
+    finally:
+        db_release(conn)
+
+
+def db_save_chart_of_accounts_entry(org_id, code, name, account_type, description=""):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO chart_of_accounts (org_id, code, name, account_type, description)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (org_id, code) DO UPDATE SET name = EXCLUDED.name, account_type = EXCLUDED.account_type, description = EXCLUDED.description
+        """, (org_id, code, name, account_type, description))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] save_coa_entry error: {e}")
+        return False
+    finally:
+        db_release(conn)
+
+
+def db_list_audit_log(org_id, limit=300):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM audit_log WHERE org_id = %s ORDER BY created_at DESC LIMIT %s", (org_id, limit))
+        rows = [dict(r) for r in cur.fetchall()]
+        cur.close()
+        return rows
+    finally:
+        db_release(conn)
+
+
+def db_get_counterparty_mappings(org_id):
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT counterparty, gl_code FROM counterparty_mappings WHERE org_id = %s", (org_id,))
+        rows = cur.fetchall()
+        cur.close()
+        return {r["counterparty"]: r["gl_code"] for r in rows}
+    finally:
+        db_release(conn)
+
+
+def db_save_counterparty_mapping(org_id, end_user_id, counterparty, gl_code):
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO counterparty_mappings (org_id, end_user_id, counterparty, gl_code)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (org_id, counterparty) DO UPDATE SET gl_code = EXCLUDED.gl_code, end_user_id = EXCLUDED.end_user_id, updated_at = now()
+        """, (org_id, end_user_id, counterparty, gl_code))
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] save_counterparty_mapping error: {e}")
+        return False
     finally:
         db_release(conn)
 
@@ -847,7 +1037,7 @@ class SolanaStablecoinLedger:
     SOL_USD_PRICE = 70
 
     def __init__(self, watched_wallet, tx_limit=50):
-        self.watched_wallet = watched_wallet
+        self.watched_wallet = str(watched_wallet).strip()
         self.tx_limit = tx_limit
         self.tokens = SOLANA_TOKENS
         self.progress = {"phase": "", "pct": 0, "found": 0}
@@ -863,10 +1053,16 @@ class SolanaStablecoinLedger:
                 with urllib.request.urlopen(req, timeout=20) as resp:
                     result = json.loads(resp.read().decode())
                 if "error" in result:
+                    print(f"  [Solana RPC ERROR] method={method}")
+                    print(f"  [Solana RPC ERROR] params sent: {json.dumps(params)[:500]}")
+                    print(f"  [Solana RPC ERROR] response: {result['error']}")
                     raise RuntimeError(f"RPC error: {result['error']}")
                 return result.get("result")
             except urllib.error.HTTPError as e:
                 err_body = e.read().decode() if hasattr(e, 'read') else ""
+                print(f"  [Solana RPC HTTP ERROR] method={method} status={e.code}")
+                print(f"  [Solana RPC HTTP ERROR] params sent: {json.dumps(params)[:500]}")
+                print(f"  [Solana RPC HTTP ERROR] body: {err_body[:500]}")
                 last_err = f"HTTP {e.code}: {err_body[:200]}"
                 time.sleep(1.0 * (2 ** attempt))
             except (urllib.error.URLError, TimeoutError) as e:
@@ -1771,8 +1967,37 @@ def run_scan(wallet, lookback, from_block=None, requested_chain=None):
 
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/api/web/me":
+            user = self._authed_web_user()
+            self._send_json(200, {"logged_in": bool(user), "user": user})
+            return
+
+        if self.path == "/api/web/data":
+            user = self._authed_web_user()
+            if not user:
+                self._send_json(401, {"error": "Not logged in"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            org_id = user["org_id"]
+            wallets = db_list_wallets(org_id)
+            transactions = db_list_transactions(org_id, limit=10000)
+            cp_mappings = db_get_counterparty_mappings(org_id)
+            coa = db_get_chart_of_accounts(org_id)
+            audit_log = db_list_audit_log(org_id)
+            self._send_json(200, {
+                "success": True,
+                "wallets": wallets,
+                "transactions": transactions,
+                "cp_mappings": cp_mappings,
+                "chart_of_accounts": coa,
+                "audit_log": audit_log,
+            })
+            return
+
         if self.path.startswith("/api/v1/wallets"):
-            org = self._authed_org()
+            org = self._authed_org_any()
             if not org:
                 self._send_json(401, {"error": "Invalid or missing API key"})
                 return
@@ -1787,7 +2012,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/v1/transactions"):
-            org = self._authed_org()
+            org = self._authed_org_any()
             if not org:
                 self._send_json(401, {"error": "Invalid or missing API key"})
                 return
@@ -1804,7 +2029,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/v1/financial-statements"):
-            org = self._authed_org()
+            org = self._authed_org_any()
             if not org:
                 self._send_json(401, {"error": "Invalid or missing API key"})
                 return
@@ -2026,8 +2251,185 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/web/signup":
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            org_name = (body.get("org_name") or "").strip()
+            email = (body.get("email") or "").strip().lower()
+            password = body.get("password") or ""
+            name = (body.get("name") or "").strip()
+            if not org_name or not email or not password:
+                self._send_json(400, {"error": "org_name, email, and password are required"})
+                return
+            if len(password) < 8:
+                self._send_json(400, {"error": "Password must be at least 8 characters"})
+                return
+            result = signup_new_org(org_name, email, password, name)
+            if not result["success"]:
+                self._send_json(400, {"error": result["message"]})
+                return
+            self.send_response(201)
+            self._cors()
+            self.send_header("Set-Cookie", f"shepherd_session={result['token']}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax")
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "user": result["user"]}, default=str).encode())
+            return
+
+        if self.path == "/api/web/login":
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            email = (body.get("email") or "").strip().lower()
+            password = body.get("password") or ""
+            result = login_user(email, password)
+            if not result["success"]:
+                self._send_json(401, {"error": result["message"]})
+                return
+            self.send_response(200)
+            self._cors()
+            self.send_header("Set-Cookie", f"shepherd_session={result['token']}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax")
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "user": result["user"]}, default=str).encode())
+            return
+
+        if self.path == "/api/web/logout":
+            self.send_response(200)
+            self._cors()
+            self.send_header("Set-Cookie", "shepherd_session=; Path=/; Max-Age=0")
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True}).encode())
+            return
+
+        if self.path == "/api/web/wallets/save":
+            user = self._authed_web_user()
+            if not user:
+                self._send_json(401, {"error": "Not logged in"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            address = (body.get("address") or "").strip()
+            chain = (body.get("chain") or "").strip().lower()
+            name = body.get("name") or address
+            lookback = int(body.get("lookback") or 1000)
+            txs = body.get("transactions") or []
+            if not address or not chain:
+                self._send_json(400, {"error": "address and chain are required"})
+                return
+            wallet_id = db_save_wallet_v1(user["org_id"], None, address, name, chain, lookback)
+            if not wallet_id:
+                self._send_json(500, {"error": "Could not save wallet"})
+                return
+            saved_count = db_save_transactions_v1(user["org_id"], wallet_id, txs)
+            db_save_audit_entry_v1(user["org_id"], None, "account", "Wallet connected",
+                                    f"{name} ({chain}) — {saved_count} transactions")
+            self._send_json(201, {"success": True, "wallet_id": wallet_id, "transactions_saved": saved_count})
+            return
+
+        if self.path == "/api/web/transactions/sync":
+            # Persist new transactions found on a rescan of an already-saved wallet.
+            user = self._authed_web_user()
+            if not user:
+                self._send_json(401, {"error": "Not logged in"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            wallet_id = body.get("wallet_id")
+            txs = body.get("transactions") or []
+            last_block = body.get("last_block")
+            if not wallet_id:
+                self._send_json(400, {"error": "wallet_id is required"})
+                return
+            saved_count = db_save_transactions_v1(user["org_id"], wallet_id, txs)
+            if last_block is not None:
+                conn = db_conn()
+                try:
+                    cur = conn.cursor()
+                    cur.execute("UPDATE wallets SET last_block = %s, last_scan_time = %s WHERE id = %s AND org_id = %s",
+                                (last_block, datetime.now(timezone.utc).isoformat(), wallet_id, user["org_id"]))
+                    conn.commit()
+                    cur.close()
+                except Exception as e:
+                    conn.rollback()
+                    print(f"  [DB] update wallet last_block error: {e}")
+                finally:
+                    db_release(conn)
+            self._send_json(200, {"success": True, "transactions_saved": saved_count})
+            return
+
+        if self.path == "/api/web/transactions/classify":
+            user = self._authed_web_user()
+            if not user:
+                self._send_json(401, {"error": "Not logged in"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            wallet_id = body.get("wallet_id")
+            tx_hash = body.get("tx_hash")
+            gl_code = body.get("gl_code")
+            counterparty = body.get("counterparty")
+            if not wallet_id or not tx_hash or not gl_code:
+                self._send_json(400, {"error": "wallet_id, tx_hash, and gl_code are required"})
+                return
+            conn = db_conn()
+            try:
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute("SELECT id FROM transactions WHERE org_id = %s AND wallet_id = %s AND tx_hash = %s",
+                            (user["org_id"], wallet_id, tx_hash))
+                row = cur.fetchone()
+                cur.close()
+            finally:
+                db_release(conn)
+            if not row:
+                self._send_json(404, {"error": "Transaction not found"})
+                return
+            ok = db_classify_transaction_v1(user["org_id"], row["id"], gl_code)
+            if counterparty and gl_code != "Unclassified":
+                db_save_counterparty_mapping(user["org_id"], None, counterparty, gl_code)
+            self._send_json(200, {"success": ok})
+            return
+
+        if self.path == "/api/web/chart_of_accounts/save":
+            user = self._authed_web_user()
+            if not user:
+                self._send_json(401, {"error": "Not logged in"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            code = body.get("code")
+            name = body.get("name")
+            account_type = body.get("account_type", "expense")
+            description = body.get("description", "")
+            if not code or not name:
+                self._send_json(400, {"error": "code and name are required"})
+                return
+            ok = db_save_chart_of_accounts_entry(user["org_id"], code, name, account_type, description)
+            self._send_json(200 if ok else 500, {"success": ok})
+            return
+
+        if self.path == "/api/web/audit_log":
+            user = self._authed_web_user()
+            if user and DB_AVAILABLE:
+                body = self._read_json_body()
+                db_save_audit_entry_v1(user["org_id"], None, body.get("type", ""), body.get("action", ""), body.get("detail", ""))
+            self._send_json(200, {"success": bool(user)})
+            return
+
         if self.path == "/api/v1/wallets":
-            org = self._authed_org()
+            org = self._authed_org_any()
             if not org:
                 self._send_json(401, {"error": "Invalid or missing API key"})
                 return
@@ -2099,7 +2501,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/v1/wallets/") and self.path.endswith("/scan"):
-            org = self._authed_org()
+            org = self._authed_org_any()
             if not org:
                 self._send_json(401, {"error": "Invalid or missing API key"})
                 return
@@ -2155,7 +2557,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/v1/transactions/") and self.path.endswith("/classify"):
-            org = self._authed_org()
+            org = self._authed_org_any()
             if not org:
                 self._send_json(401, {"error": "Invalid or missing API key"})
                 return
@@ -2442,6 +2844,31 @@ class Handler(SimpleHTTPRequestHandler):
             return None
         api_key = auth[7:].strip()
         return get_org_from_api_key(api_key)
+
+    def _get_session_token(self):
+        cookie_header = self.headers.get("Cookie", "")
+        for part in cookie_header.split(";"):
+            part = part.strip()
+            if part.startswith("shepherd_session="):
+                return part.split("=", 1)[1]
+        return None
+
+    def _authed_web_user(self):
+        """Web app auth via session cookie, separate from the API-key auth above,
+        but resolving to the same underlying organization/wallet/transaction data."""
+        return get_user_from_session(self._get_session_token())
+
+    def _authed_org_any(self):
+        """Accept EITHER an API key (Bearer token, for programmatic access) OR a
+        session cookie (for the web app). Both resolve to the same org-scoped data,
+        so every /api/v1/* endpoint can serve both the web UI and API customers."""
+        org = self._authed_org()
+        if org:
+            return org
+        user = self._authed_web_user()
+        if user:
+            return {"id": user["org_id"], "name": user["org_name"]}
+        return None
 
     def _send_json(self, code, payload):
         body = json.dumps(payload, default=str).encode()
