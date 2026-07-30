@@ -352,8 +352,10 @@ def login_user(email, password):
         row = cur.fetchone()
         cur.close()
         if not row or not verify_password(password, row["salt"], row["password_hash"]):
+            print(f"  [Login] FAILED for {email} — {'no such user' if not row else 'wrong password'}")
             return {"success": False, "message": "Invalid email or password."}
         token = create_web_session(row["id"])
+        print(f"  [Login] Success: user id={row['id']} org_id={row['org_id']} ({email})")
         return {"success": True, "token": token, "user": {"id": row["id"], "org_id": row["org_id"], "email": row["email"], "name": row["name"], "org_name": row["org_name"]}}
     except Exception as e:
         return {"success": False, "message": str(e)[:200]}
@@ -2006,6 +2008,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == "/api/web/data":
             user = self._authed_web_user()
             if not user:
+                print(f"  [Hydrate] 401 - no valid session cookie recognized (cookie header: {self.headers.get('Cookie', '<none>')[:80]})")
                 self._send_json(401, {"error": "Not logged in"})
                 return
             if not DB_AVAILABLE:
@@ -2017,6 +2020,7 @@ class Handler(SimpleHTTPRequestHandler):
             cp_mappings = db_get_counterparty_mappings(org_id)
             coa = db_get_chart_of_accounts(org_id)
             audit_log = db_list_audit_log(org_id)
+            print(f"  [Hydrate] org_id={org_id}: {len(wallets)} wallets, {len(transactions)} transactions")
             self._send_json(200, {
                 "success": True,
                 "wallets": wallets,
