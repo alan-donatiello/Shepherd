@@ -1781,6 +1781,24 @@ async function obScanAll(){
         if(result.scan_range)store.lastBlock=result.scan_range.to_block;
         totalTxFound+=store.txs.length;
         if(statusEl)statusEl.textContent=w.name+': '+store.txs.length+' transactions found';
+
+        // Persist this wallet + everything found, same as the Connections-page scan flow.
+        // Onboarding's scan never had this wired in, which is why nothing from onboarding
+        // was ever reaching the database even though the scan itself worked fine.
+        if(currentUser){
+          fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({address:w.addr,name:w.name,chain:w.chainKey||(w.chain==='Solana'?'solana':(w.chain||'base').toLowerCase()),lookback:w.lookback||100,transactions:store.txs})
+          }).then(function(res){return res.json()}).then(function(data){
+            if(data.success){
+              w._dbId=data.wallet_id;
+              var wMain=wallets.find(function(x){return x.addr.toLowerCase()===w.addr.toLowerCase()});
+              if(wMain)wMain._dbId=data.wallet_id;
+            } else {
+              console.error('[Persistence] Onboarding wallet save rejected:',data.error||data);
+              showPersistenceWarning();
+            }
+          }).catch(function(e){console.error('[Persistence] Onboarding wallet save failed:',e);showPersistenceWarning();});
+        }
       }
     }catch(e){console.log('Scan error for',w.name,e);}
   }
@@ -2607,7 +2625,28 @@ function onRefreshComplete(report){
   }
 
   saveToStore();
-  
+
+  // Persist any newly found transactions - this was missing here, same gap as onboarding's scan.
+  if(currentUser&&addedCount>0){
+    var wMeta=wallets.find(function(w){return w.addr.toLowerCase()===activeWalletAddr.toLowerCase()});
+    if(wMeta&&wMeta._dbId){
+      var justAdded=newTxs.filter(function(t){return !existingHashes.has(t.hash)});
+      fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wallet_id:wMeta._dbId,transactions:justAdded,last_block:store.lastBlock})
+      }).then(function(res){return res.json()}).then(function(data){
+        if(!data.success){console.error('[Persistence] Refresh sync rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Refresh sync failed:',e);showPersistenceWarning();});
+    } else if(wMeta&&!wMeta._dbId){
+      // This wallet was never saved in the first place (e.g. added before persistence existed) - save it now
+      fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({address:wMeta.addr,name:wMeta.name,chain:wMeta.chainKey||(wMeta.chain||'base').toLowerCase(),lookback:1000,transactions:txs})
+      }).then(function(res){return res.json()}).then(function(data){
+        if(data.success)wMeta._dbId=data.wallet_id;
+        else{console.error('[Persistence] Refresh wallet save rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Refresh wallet save failed:',e);showPersistenceWarning();});
+    }
+  }
+
   // Show notification
   const notice=document.getElementById("classifyNotice");
   if(addedCount>0){
@@ -4686,14 +4725,25 @@ async function rescanWalletForReconciliation(w){
     cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'
   }));
   const existingHashes=new Set(store.txs.map(t=>t.hash));
+  const newlyAdded=[];
   newTxs.forEach(t=>{
     if(!existingHashes.has(t.hash)){
       store.txs.push(t);
+      newlyAdded.push(t);
       if(store.cpMappings[t.cp])store.mappings[t.hash]=store.cpMappings[t.cp];
     }
   });
   if(result.scan_range)store.lastBlock=result.scan_range.to_block;
   store.scanTime=new Date().toLocaleString();
+
+  if(currentUser&&newlyAdded.length>0){
+    var wMain=wallets.find(function(x){return x.addr.toLowerCase()===w.addr.toLowerCase()});
+    if(wMain&&wMain._dbId){
+      fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wallet_id:wMain._dbId,transactions:newlyAdded,last_block:store.lastBlock})
+      }).catch(function(e){console.error('[Persistence] Reconciliation sync failed:',e);showPersistenceWarning();});
+    }
+  }
 }
 
 async function runChainReconciliation(){
