@@ -371,33 +371,80 @@
 
 <!-- ONBOARDING -->
 <!-- SCREEN: AUTH (login/signup gate) -->
-<div class="onboard-screen active" id="authScreen" style="align-items:center;justify-content:center">
-  <div style="max-width:380px;width:100%;background:#fff;border-radius:16px;padding:36px 40px;box-shadow:0 24px 48px rgba(0,0,0,.2)">
-    <div style="text-align:center;margin-bottom:28px">
-      <div style="font-size:22px;font-weight:700;color:#0f172a">Shepherd</div>
-      <div style="font-size:13px;color:#64748b;margin-top:2px">Continuous Close Accounting</div>
+<div class="onboard-screen active" id="authScreen" style="align-items:stretch;justify-content:stretch;padding:0">
+  <div style="display:flex;width:100%;min-height:100vh">
+
+    <!-- Brand panel -->
+    <div style="flex:1;background:linear-gradient(160deg,#0F1B2D 0%,#14243B 55%,#0B1420 100%);display:flex;flex-direction:column;justify-content:space-between;padding:48px;color:#fff;min-width:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:30px;height:30px;border-radius:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center">
+          <svg width="16" height="16" fill="none" stroke="#fff" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.04A8.97 8.97 0 0 0 6 3.75c-1.05 0-2.06.18-3 .51v14.25A8.99 8.99 0 0 1 6 18c2.3 0 4.4.87 6 2.29m0-14.25a8.97 8.97 0 0 1 6-2.29c1.05 0 2.06.18 3 .51v14.25A8.99 8.99 0 0 0 18 18a8.97 8.97 0 0 0-6 2.29m0-14.25v14.25"/></svg>
+        </div>
+        <span style="font-size:15px;font-weight:600;letter-spacing:.02em">Shepherd</span>
+      </div>
+
+      <div style="max-width:420px">
+        <div style="font-family:Georgia,serif;font-size:32px;line-height:1.25;font-weight:500;margin-bottom:20px">Your clients' books, reconciled to the chain.</div>
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:32px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:18px;height:18px;border-radius:50%;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="10" height="10" fill="none" stroke="#4ADE80" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></div>
+            <span style="font-size:13.5px;color:#B9C2CC;line-height:1.5">Base, Ethereum, Polygon, and Solana — every major stablecoin, automatically</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:18px;height:18px;border-radius:50%;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="10" height="10" fill="none" stroke="#4ADE80" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></div>
+            <span style="font-size:13.5px;color:#B9C2CC;line-height:1.5">AI classification that gets sharper with every approval</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:18px;height:18px;border-radius:50%;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="10" height="10" fill="none" stroke="#4ADE80" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></div>
+            <span style="font-size:13.5px;color:#B9C2CC;line-height:1.5">Reconciled against the chain itself and against QuickBooks — not just internal math</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:#5C6B7A;font-family:ui-monospace,monospace">CONTINUOUS CLOSE ACCOUNTING</div>
     </div>
 
-    <div style="display:flex;gap:4px;background:#f1f5f9;border-radius:8px;padding:3px;margin-bottom:20px">
-      <button id="authTabLogin" onclick="switchAuthTab('login')" style="flex:1;padding:8px;border:none;border-radius:6px;background:#fff;font-size:13px;font-weight:600;color:#0f172a;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.08)">Log In</button>
-      <button id="authTabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:8px;border:none;border-radius:6px;background:transparent;font-size:13px;font-weight:600;color:#64748b;cursor:pointer">Sign Up</button>
-    </div>
+    <!-- Auth form panel -->
+    <div style="width:440px;flex-shrink:0;background:#fff;display:flex;align-items:center;justify-content:center;padding:40px">
+      <div style="width:100%;max-width:320px">
+        <div style="margin-bottom:28px">
+          <div id="authHeading" style="font-size:20px;font-weight:700;color:#0f172a">Welcome back</div>
+          <div id="authSubheading" style="font-size:13px;color:#64748b;margin-top:4px">Log in to your Shepherd account</div>
+        </div>
 
-    <div id="authFormLogin">
-      <div class="cm-field"><label>Email</label><input type="email" id="loginEmail" placeholder="you@yourfirm.com"></div>
-      <div class="cm-field"><label>Password</label><input type="password" id="loginPassword" placeholder="Password"></div>
-      <button style="width:100%;margin-top:8px;font-size:13px;font-weight:600;padding:11px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="doLogin()">Log In</button>
-    </div>
+        <button onclick="startGoogleSSO()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;font-size:13px;font-weight:500;color:#334155;cursor:pointer;margin-bottom:18px;transition:background .15s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'">
+          <svg width="17" height="17" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
+        </button>
 
-    <div id="authFormSignup" style="display:none">
-      <div class="cm-field"><label>Firm / Company Name</label><input type="text" id="signupOrgName" placeholder="e.g. Eisner Amper"></div>
-      <div class="cm-field"><label>Your Name</label><input type="text" id="signupName" placeholder="Your name"></div>
-      <div class="cm-field"><label>Email</label><input type="email" id="signupEmail" placeholder="you@yourfirm.com"></div>
-      <div class="cm-field"><label>Password</label><input type="password" id="signupPassword" placeholder="At least 8 characters"></div>
-      <button style="width:100%;margin-top:8px;font-size:13px;font-weight:600;padding:11px;border-radius:8px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="doSignup()">Create Account</button>
-    </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+          <div style="flex:1;height:1px;background:#e2e8f0"></div>
+          <span style="font-size:11px;color:#94a3b8">or</span>
+          <div style="flex:1;height:1px;background:#e2e8f0"></div>
+        </div>
 
-    <div id="authError" style="display:none;margin-top:14px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b"></div>
+        <div id="authFormLogin">
+          <div class="cm-field"><label>Email</label><input type="email" id="loginEmail" placeholder="you@yourfirm.com"></div>
+          <div class="cm-field"><label>Password</label><input type="password" id="loginPassword" placeholder="Password"></div>
+          <button style="width:100%;margin-top:8px;font-size:13px;font-weight:600;padding:11px;border-radius:8px;border:none;background:#0f172a;color:#fff;cursor:pointer" onclick="doLogin()">Log In</button>
+        </div>
+
+        <div id="authFormSignup" style="display:none">
+          <div class="cm-field"><label>Firm / Company Name</label><input type="text" id="signupOrgName" placeholder="e.g. Eisner Amper"></div>
+          <div class="cm-field"><label>Your Name</label><input type="text" id="signupName" placeholder="Your name"></div>
+          <div class="cm-field"><label>Email</label><input type="email" id="signupEmail" placeholder="you@yourfirm.com"></div>
+          <div class="cm-field"><label>Password</label><input type="password" id="signupPassword" placeholder="At least 8 characters"></div>
+          <button style="width:100%;margin-top:8px;font-size:13px;font-weight:600;padding:11px;border-radius:8px;border:none;background:#0f172a;color:#fff;cursor:pointer" onclick="doSignup()">Create Account</button>
+        </div>
+
+        <div id="authError" style="display:none;margin-top:14px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:12px;color:#991b1b"></div>
+
+        <div style="margin-top:22px;text-align:center;font-size:12.5px;color:#64748b">
+          <span id="authSwitchPrompt">Don't have an account?</span>
+          <a href="#" id="authSwitchLink" onclick="switchAuthTab('signup');return false" style="color:#3b82f6;font-weight:500;text-decoration:none;margin-left:4px">Sign up</a>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -827,6 +874,30 @@
 
 <!-- MAIN CONTENT -->
 <div class="main-content">
+
+<!-- ACCOUNT MENU (top right, persistent across all screens) -->
+<div id="accountMenuWrap" style="position:fixed;top:16px;right:24px;z-index:400;display:none">
+  <div id="accountMenuTrigger" onclick="toggleAccountMenu()" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+    <div id="accountAvatar" style="width:26px;height:26px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">?</div>
+    <span id="accountMenuName" style="font-size:12px;font-weight:500;color:#334155;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Account</span>
+    <svg width="12" height="12" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+  </div>
+  <div id="accountMenuDropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;width:240px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid #f1f5f9">
+      <div id="accountMenuFullName" style="font-size:13px;font-weight:600;color:#0f172a">—</div>
+      <div id="accountMenuEmail" style="font-size:11px;color:#94a3b8;margin-top:2px">—</div>
+      <div id="accountMenuOrg" style="font-size:11px;color:#3b82f6;margin-top:4px;font-weight:500">—</div>
+    </div>
+    <div onclick="navTo('settings');toggleAccountMenu(false)" style="padding:11px 16px;font-size:13px;color:#334155;cursor:pointer;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 0 1 0 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+      Settings
+    </div>
+    <div onclick="logout()" style="padding:11px 16px;font-size:13px;color:#dc2626;cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid #f1f5f9" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75"/></svg>
+      Log Out
+    </div>
+  </div>
+</div>
 
 <!-- AUDIT TRAIL MODAL -->
 <div class="audit-overlay" id="auditOverlay" onclick="if(event.target===this)closeAudit()">
@@ -1419,10 +1490,6 @@
       <h2 style="font-size:26px;font-weight:700;margin-bottom:14px">Settings</h2><div style="height:4px;width:100%;margin-bottom:20px;background:linear-gradient(90deg, transparent 0%, #0f172a 8%, #0f172a 92%, transparent 100%);border-radius:50%"></div>
       
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:20px">
-        <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:13px;font-weight:500">Account</div><div style="font-size:11px;color:#94a3b8" id="settingsAccountInfo">—</div></div>
-          <button style="font-size:11px;padding:6px 14px;border-radius:4px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer" onclick="logout()">Log Out</button>
-        </div>
         <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:13px;font-weight:500">Team Access</div><div style="font-size:11px;color:#94a3b8">Invite team members and manage permissions</div></div>
           <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
@@ -1652,7 +1719,7 @@ function obComplete(){
 
   if(!obWallets.length){
     document.getElementById('onboardScreen').style.display='none';
-    document.getElementById('appShell').style.display='flex';
+    document.getElementById('appShell').style.display='flex';populateAccountMenu();
     var allWithData=wallets.filter(function(w){return getStore(w.addr).txs.length>0});
     if(allWithData.length){
       selectedWallets.clear();
@@ -1728,7 +1795,7 @@ async function obScanAll(){
 
   setTimeout(function(){
     document.getElementById('onboardScreen').style.display='none';
-    document.getElementById('appShell').style.display='flex';
+    document.getElementById('appShell').style.display='flex';populateAccountMenu();
     navTo('ledger');
     var allWithData=wallets.filter(function(w){return getStore(w.addr).txs.length>0});
     if(allWithData.length){
@@ -1743,7 +1810,7 @@ async function obScanAll(){
 }
 function skipOnboarding(){
   document.getElementById('onboardScreen').style.display='none';
-  document.getElementById('appShell').style.display='flex';
+  document.getElementById('appShell').style.display='flex';populateAccountMenu();
 }
 
 function obSetConf(val,el){
@@ -1858,7 +1925,7 @@ function obSaveBillMatching(){
         var statusEl=document.getElementById('billcomStatus');if(statusEl)statusEl.innerHTML='<span style="color:#16a34a">Connected</span>';
         fetchBillComBills();
       }
-    }).catch(function(){});
+    }).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
   }
 
   var useSame=document.getElementById('obBillUseSameEmail').checked;
@@ -1939,7 +2006,7 @@ function persistChartOfAccounts(entries){
     var type=GL_TYPE[code]||'expense';
     fetch('/api/web/chart_of_accounts/save',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({code:code,name:name,account_type:type,description:GL_DESCRIPTIONS[code]||''})
-    }).catch(function(){});
+    }).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
   });
 }
 function obParseGLFile(input){
@@ -2137,17 +2204,27 @@ let currentUser=null;
 let wallets=[],activeWalletAddr=null,scanData=null,txs=[],idx=0,mappings={};
 
 // ============ AUTH (web app login, separate from the API-key auth used by platform integrations) ============
+function startGoogleSSO(){
+  window.location.href='/auth/google';
+}
 function switchAuthTab(tab){
-  var loginBtn=document.getElementById('authTabLogin'),signupBtn=document.getElementById('authTabSignup');
   var loginForm=document.getElementById('authFormLogin'),signupForm=document.getElementById('authFormSignup');
+  var heading=document.getElementById('authHeading'),sub=document.getElementById('authSubheading');
+  var prompt=document.getElementById('authSwitchPrompt'),link=document.getElementById('authSwitchLink');
   if(tab==='login'){
-    loginBtn.style.background='#fff';loginBtn.style.color='#0f172a';loginBtn.style.boxShadow='0 1px 2px rgba(0,0,0,.08)';
-    signupBtn.style.background='transparent';signupBtn.style.color='#64748b';signupBtn.style.boxShadow='none';
     loginForm.style.display='block';signupForm.style.display='none';
+    heading.textContent='Welcome back';
+    sub.textContent='Log in to your Shepherd account';
+    prompt.textContent="Don't have an account?";
+    link.textContent='Sign up';
+    link.setAttribute('onclick',"switchAuthTab('signup');return false");
   } else {
-    signupBtn.style.background='#fff';signupBtn.style.color='#0f172a';signupBtn.style.boxShadow='0 1px 2px rgba(0,0,0,.08)';
-    loginBtn.style.background='transparent';loginBtn.style.color='#64748b';loginBtn.style.boxShadow='none';
     signupForm.style.display='block';loginForm.style.display='none';
+    heading.textContent='Create your account';
+    sub.textContent='Set up Shepherd for your firm';
+    prompt.textContent='Already have an account?';
+    link.textContent='Log in';
+    link.setAttribute('onclick',"switchAuthTab('login');return false");
   }
   document.getElementById('authError').style.display='none';
 }
@@ -2248,7 +2325,7 @@ async function hydrateFromServer(){
     document.getElementById('authScreen').classList.remove('active');
 
     if(wallets.length>0){
-      document.getElementById('appShell').style.display='flex';
+      document.getElementById('appShell').style.display='flex';populateAccountMenu();
       var allWithData=wallets.filter(function(w){return getStore(w.addr).txs.length>0});
       if(allWithData.length){
         selectedWallets.clear();
@@ -2281,7 +2358,7 @@ function logAction(type,action,detail){
   auditLog.unshift({timestamp:new Date().toLocaleString(),type,action,detail,user:'admin'});
   if(currentUser){
     fetch('/api/web/audit_log',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type:type,action:action,detail:detail})}).catch(function(){});
+      body:JSON.stringify({type:type,action:action,detail:detail})}).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
   }
 }
 function renderAuditLog(){
@@ -2444,8 +2521,6 @@ function navTo(id){
   if(id==='auditlog')renderAuditLog();
   if(id==='settings'){
     updateDailyPreview();
-    var acctEl=document.getElementById('settingsAccountInfo');
-    if(acctEl&&currentUser)acctEl.textContent=currentUser.email+(currentUser.org_name?' · '+currentUser.org_name:'');
   }
 }
 function showConfig(){navTo('config');}
@@ -2733,12 +2808,13 @@ function onScanComplete(report){
         body:JSON.stringify({address:report.wallet,name:wMeta.name,chain:wMeta.chainKey,lookback:wMeta.lookback||1000,transactions:store.txs})
       }).then(function(res){return res.json()}).then(function(data){
         if(data.success)wMeta._dbId=data.wallet_id;
-      }).catch(function(){});
+        else{console.error('[Persistence] Wallet save rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
     } else if(wMeta&&wMeta._dbId&&addedCount>0){
       var newlyAdded=newTxs.filter(function(t){return !existingHashes.has(t.hash)});
       fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({wallet_id:wMeta._dbId,transactions:newlyAdded,last_block:store.lastBlock})
-      }).catch(function(){});
+      }).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
     }
   }
 
@@ -2889,7 +2965,7 @@ function classify(v){
             const tWalletMeta=wallets.find(w=>w.addr.toLowerCase()===(t.walletAddr||walletAddrForSave).toLowerCase());
             if(tWalletMeta&&tWalletMeta._dbId){
               fetch('/api/web/transactions/classify',{method:'POST',headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({wallet_id:tWalletMeta._dbId,tx_hash:t.origHash||t.hash,gl_code:v,counterparty:t.cp})}).catch(function(){});
+                body:JSON.stringify({wallet_id:tWalletMeta._dbId,tx_hash:t.origHash||t.hash,gl_code:v,counterparty:t.cp})}).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
             }
           }
         });
@@ -3820,6 +3896,43 @@ function closeHelpPopup(id){
   closeHelpBackdrop();
 }
 
+var lastPersistenceWarning=0;
+function showPersistenceWarning(){
+  // Throttle - if several saves fail around the same time, don't stack a dozen warnings
+  var now=Date.now();
+  if(now-lastPersistenceWarning<5000)return;
+  lastPersistenceWarning=now;
+  var existing=document.getElementById('shepherdPersistWarn');
+  if(existing)existing.remove();
+  var el=document.createElement('div');
+  el.id='shepherdPersistWarn';
+  el.style.cssText='position:fixed;bottom:24px;right:24px;background:#7c2d12;color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9999;display:flex;align-items:center;gap:8px;max-width:320px';
+  el.innerHTML='<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>'
+    +'<span>Changes aren\'t saving. Try logging out and back in.</span>';
+  document.body.appendChild(el);
+  setTimeout(function(){el.remove();},8000);
+}
+function toggleAccountMenu(force){
+  var dd=document.getElementById('accountMenuDropdown');
+  if(!dd)return;
+  var open=typeof force==='boolean'?force:dd.style.display==='none';
+  dd.style.display=open?'block':'none';
+}
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('accountMenuWrap');
+  if(wrap&&!wrap.contains(e.target))toggleAccountMenu(false);
+});
+function populateAccountMenu(){
+  if(!currentUser)return;
+  var displayName=currentUser.name||currentUser.email||'Account';
+  var initial=(currentUser.name||currentUser.email||'?').trim().charAt(0).toUpperCase();
+  document.getElementById('accountAvatar').textContent=initial;
+  document.getElementById('accountMenuName').textContent=displayName;
+  document.getElementById('accountMenuFullName').textContent=currentUser.name||currentUser.email;
+  document.getElementById('accountMenuEmail').textContent=currentUser.email||'';
+  document.getElementById('accountMenuOrg').textContent=currentUser.org_name||'';
+  document.getElementById('accountMenuWrap').style.display='block';
+}
 function showToast(msg){
   var existing=document.getElementById('shepherdToast');
   if(existing)existing.remove();
@@ -5084,7 +5197,7 @@ function saveCustomAccount(){
   if(description)GL_DESCRIPTIONS[code]=description;
   if(currentUser){
     fetch('/api/web/chart_of_accounts/save',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code:code,name:name,account_type:type,description:description})}).catch(function(){});
+      body:JSON.stringify({code:code,name:name,account_type:type,description:description})}).catch(function(e){console.error('[Persistence] Save failed:',e);showPersistenceWarning();});
   }
   logAction('account','Account created',`${glEntry} (${type})`);
   closeCustom();

@@ -330,10 +330,12 @@ def signup_new_org(org_name, email, password, name):
         user_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
+        print(f"  [Signup] Created organization id={org_id} ({org_name}), user id={user_id} ({email})")
         token = create_web_session(user_id)
         return {"success": True, "token": token, "user": {"id": user_id, "org_id": org_id, "email": email, "name": name, "org_name": org_name}}
     except Exception as e:
         conn.rollback()
+        print(f"  [Signup] FAILED: {e}")
         return {"success": False, "message": str(e)[:200]}
     finally:
         db_release(conn)
@@ -357,6 +359,30 @@ def login_user(email, password):
         return {"success": False, "message": str(e)[:200]}
     finally:
         db_release(conn)
+
+def find_or_create_user_by_google(email, name):
+    """Log in an existing user by email, or create a brand-new org for them if this
+    is their first time — same auto-provisioning behavior as email/password signup,
+    just skipping the password step since Google already verified their identity."""
+    conn = db_conn()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute("""
+            SELECT u.id, u.org_id, u.email, u.name, o.name as org_name
+            FROM users u JOIN organizations o ON o.id = u.org_id WHERE u.email = %s
+        """, (email,))
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            token = create_web_session(row["id"])
+            return {"success": True, "token": token, "user": dict(row)}
+    finally:
+        db_release(conn)
+
+    # No existing account for this email - provision a new org, same as signup.
+    org_name_guess = (email.split("@")[1].split(".")[0].capitalize() if "@" in email else "New Organization")
+    random_password = secrets.token_urlsafe(24)  # Google-only accounts never use this, but the column is NOT NULL
+    return signup_new_org(org_name_guess, email, random_password, name)
 
 
 # ---------- Core data operations (all org-scoped) ----------
@@ -396,6 +422,7 @@ def db_save_wallet_v1(org_id, end_user_id, address, name, chain, lookback):
         wallet_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
+        print(f"  [DB] Saved wallet id={wallet_id} org_id={org_id} address={address} chain={chain}")
         return wallet_id
     except Exception as e:
         conn.rollback()
@@ -1571,6 +1598,10 @@ QBO_CLIENT_SECRET = os.environ.get("QBO_CLIENT_SECRET", "").strip()
 QBO_REDIRECT_URI = os.environ.get("QBO_REDIRECT_URI", "http://localhost:8090/qbo/callback").strip()
 QBO_ENVIRONMENT = os.environ.get("QBO_ENVIRONMENT", "sandbox").strip()
 
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8090/auth/google/callback").strip()
+
 qbo_tokens = {"access_token": None, "refresh_token": None, "realm_id": None, "expires_at": 0}
 
 def qbo_base_url():
@@ -2153,6 +2184,73 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(debug_info, indent=2).encode())
+            return
+
+        if self.path.startswith("/auth/google") and not self.path.startswith("/auth/google/callback"):
+            if not GOOGLE_CLIENT_ID:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<h3>Google sign-in isn't configured on this server yet.</h3><p>Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI.</p>")
+                return
+            params = urllib.parse.urlencode({
+                "client_id": GOOGLE_CLIENT_ID, "response_type": "code",
+                "scope": "openid email profile",
+                "redirect_uri": GOOGLE_REDIRECT_URI, "access_type": "online", "prompt": "select_account"
+            })
+            self.send_response(302)
+            self.send_header("Location", f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
+            self.end_headers()
+            return
+
+        if self.path.startswith("/auth/google/callback"):
+            query = urllib.parse.urlparse(self.path).query
+            p = urllib.parse.parse_qs(query)
+            code = p.get("code", [""])[0]
+            if not code:
+                self.send_response(400)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<h3>Google sign-in was cancelled or failed.</h3><p><a href='/'>Return to Shepherd</a></p>")
+                return
+            try:
+                token_body = urllib.parse.urlencode({
+                    "code": code, "client_id": GOOGLE_CLIENT_ID, "client_secret": GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": GOOGLE_REDIRECT_URI, "grant_type": "authorization_code"
+                }).encode()
+                token_req = urllib.request.Request("https://oauth2.googleapis.com/token", data=token_body,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"})
+                with urllib.request.urlopen(token_req, timeout=15) as resp:
+                    tokens = json.loads(resp.read().decode())
+
+                profile_req = urllib.request.Request("https://www.googleapis.com/oauth2/v2/userinfo",
+                    headers={"Authorization": f"Bearer {tokens['access_token']}"})
+                with urllib.request.urlopen(profile_req, timeout=15) as resp:
+                    profile = json.loads(resp.read().decode())
+
+                email = (profile.get("email") or "").strip().lower()
+                name = profile.get("name") or email.split("@")[0]
+                if not email:
+                    raise ValueError("Google did not return an email address")
+                if not DB_AVAILABLE:
+                    raise RuntimeError("Persistence not configured on this server")
+
+                result = find_or_create_user_by_google(email, name)
+                if not result["success"]:
+                    raise RuntimeError(result.get("message", "Could not create account"))
+
+                self.send_response(302)
+                self._cors()
+                self.send_header("Set-Cookie", f"shepherd_session={result['token']}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax")
+                self.send_header("Location", "/")
+                self.end_headers()
+                print(f"  [Google SSO] Signed in: {email}")
+            except Exception as e:
+                print(f"  [Google SSO] Error: {e}")
+                self.send_response(500)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(f"<h3>Google sign-in failed</h3><pre>{str(e)[:300]}</pre><p><a href='/'>Return to Shepherd</a></p>".encode())
             return
 
         if self.path.startswith("/qbo/auth"):
