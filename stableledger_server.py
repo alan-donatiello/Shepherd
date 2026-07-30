@@ -2183,6 +2183,11 @@ class Handler(SimpleHTTPRequestHandler):
                 "QBO_CLIENT_SECRET_preview": (QBO_CLIENT_SECRET[:4] + "..." + QBO_CLIENT_SECRET[-4:]) if len(QBO_CLIENT_SECRET) > 8 else QBO_CLIENT_SECRET,
                 "QBO_REDIRECT_URI": QBO_REDIRECT_URI,
                 "ANTHROPIC_KEY_set": bool(ANTHROPIC_API_KEY),
+                "GOOGLE_CLIENT_ID_set": bool(GOOGLE_CLIENT_ID),
+                "GOOGLE_CLIENT_ID_preview": (GOOGLE_CLIENT_ID[:8] + "..." + GOOGLE_CLIENT_ID[-12:]) if len(GOOGLE_CLIENT_ID) > 20 else GOOGLE_CLIENT_ID,
+                "GOOGLE_CLIENT_SECRET_set": bool(GOOGLE_CLIENT_SECRET),
+                "GOOGLE_REDIRECT_URI": GOOGLE_REDIRECT_URI,
+                "GOOGLE_REDIRECT_URI_note": "This EXACT string must appear character-for-character in Google Console under Authorized redirect URIs, including https:// and no trailing slash.",
             }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
