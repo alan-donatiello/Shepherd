@@ -198,6 +198,16 @@ def db_init_schema():
                 created_at TIMESTAMPTZ DEFAULT now()
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS beta_signups (
+                id SERIAL PRIMARY KEY,
+                name TEXT,
+                email TEXT NOT NULL,
+                firm_name TEXT,
+                message TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+        """)
         conn.commit()
         cur.close()
         print("  [DB] Multi-tenant schema ready.")
@@ -2358,6 +2368,37 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/api/beta/signup":
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Signups aren't available right now — please try again shortly."})
+                return
+            body = self._read_json_body()
+            name = (body.get("name") or "").strip()[:200]
+            email = (body.get("email") or "").strip().lower()[:200]
+            firm_name = (body.get("firm_name") or "").strip()[:200]
+            message = (body.get("message") or "").strip()[:2000]
+            if not email or "@" not in email:
+                self._send_json(400, {"error": "A valid email is required."})
+                return
+            conn = db_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "INSERT INTO beta_signups (name, email, firm_name, message) VALUES (%s, %s, %s, %s)",
+                    (name, email, firm_name, message)
+                )
+                conn.commit()
+                cur.close()
+                print(f"  [Beta Signup] {email} ({firm_name or 'no firm given'})")
+                self._send_json(200, {"success": True})
+            except Exception as e:
+                conn.rollback()
+                print(f"  [Beta Signup] FAILED: {e}")
+                self._send_json(500, {"error": "Something went wrong — please try again."})
+            finally:
+                db_release(conn)
+            return
+
         if self.path == "/api/web/signup":
             if not DB_AVAILABLE:
                 self._send_json(503, {"error": "Persistence not configured on this server"})
