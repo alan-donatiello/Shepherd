@@ -318,6 +318,19 @@
     /* Give room at the top so page titles don't sit under the toggle button */
     .screen .container>div:first-child{padding-top:44px}
 
+    /* Account menu (top-right) needs the same clearance as the hamburger toggle gets */
+    #accountMenuWrap{top:10px!important;right:14px!important}
+    #accountMenuName{max-width:70px!important}
+    #accountMenuDropdown{width:210px!important}
+
+    /* Auth screen: the two-column split with a marketing panel doesn't work below
+       tablet width - the panel alone was wider than most phones. Drop the marketing
+       side entirely on mobile and let the actual login form take full focus, which
+       is the standard pattern (Stripe, Linear, etc. all do this on mobile). */
+    #authScreen>div{flex-direction:column!important;min-height:auto!important}
+    #authScreen>div>div:first-child{display:none!important}
+    #authScreen>div>div:last-child{width:100%!important;padding:32px 20px!important;min-height:100vh}
+
     /* 4-up stat cards become 2x2 instead of a tight single row */
     .summary-cards{grid-template-columns:1fr 1fr!important;gap:8px!important}
     .sc{padding:12px!important}
