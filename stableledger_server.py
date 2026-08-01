@@ -116,6 +116,15 @@ def db_init_schema():
             );
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                expires_at TIMESTAMPTZ NOT NULL,
+                used BOOLEAN DEFAULT false
+            );
+        """)
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS end_users (
                 id SERIAL PRIMARY KEY,
                 org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
@@ -394,7 +403,10 @@ def find_or_create_user_by_google(email, name):
     # No existing account for this email - provision a new org, same as signup.
     org_name_guess = (email.split("@")[1].split(".")[0].capitalize() if "@" in email else "New Organization")
     random_password = secrets.token_urlsafe(24)  # Google-only accounts never use this, but the column is NOT NULL
-    return signup_new_org(org_name_guess, email, random_password, name)
+    result = signup_new_org(org_name_guess, email, random_password, name)
+    if result["success"]:
+        send_welcome_email(email, name, org_name_guess)
+    return result
 
 
 # ---------- Core data operations (all org-scoped) ----------
@@ -1614,6 +1626,71 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8090/auth/google/callback").strip()
 
+# System-level email (welcome emails, password resets) - separate from the per-user
+# SMTP credentials configured in Settings for daily digest notifications. This needs
+# its own dedicated sending account, since brand-new users haven't configured anything yet.
+SYSTEM_SMTP_HOST = os.environ.get("SYSTEM_SMTP_HOST", "smtp.gmail.com").strip()
+SYSTEM_SMTP_PORT = int(os.environ.get("SYSTEM_SMTP_PORT", "587"))
+SYSTEM_SMTP_USER = os.environ.get("SYSTEM_SMTP_USER", "").strip()
+SYSTEM_SMTP_PASS = os.environ.get("SYSTEM_SMTP_PASS", "").strip()
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8090").strip()
+
+
+def send_system_email(to_email, subject, html_body):
+    """Sends a transactional email (welcome, password reset) from Shepherd's own
+    account, not the recipient's. Silently no-ops with a log line if not configured,
+    rather than raising - a missing welcome email shouldn't ever break signup."""
+    if not SYSTEM_SMTP_USER or not SYSTEM_SMTP_PASS:
+        print(f"  [Email] Skipped '{subject}' to {to_email} - SYSTEM_SMTP_USER/PASS not configured")
+        return False
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"Shepherd <{SYSTEM_SMTP_USER}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html_body, "html"))
+
+        server = smtplib.SMTP(SYSTEM_SMTP_HOST, SYSTEM_SMTP_PORT)
+        server.starttls()
+        server.login(SYSTEM_SMTP_USER, SYSTEM_SMTP_PASS)
+        server.sendmail(SYSTEM_SMTP_USER, to_email, msg.as_string())
+        server.quit()
+        print(f"  [Email] Sent '{subject}' to {to_email}")
+        return True
+    except Exception as e:
+        print(f"  [Email] FAILED to send '{subject}' to {to_email}: {e}")
+        return False
+
+
+def send_welcome_email(to_email, name, org_name):
+    first_name = (name or "").split(" ")[0] or "there"
+    html = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
+      <h2 style="margin-bottom:4px">Welcome to Shepherd, {first_name}</h2>
+      <p style="color:#475569;line-height:1.6">Your account for <strong>{org_name}</strong> is set up. Connect a wallet or bank account to get your first transactions classified.</p>
+      <p style="color:#475569;line-height:1.6">This product is early, and your feedback genuinely shapes what gets built next. If anything is confusing, broken, or missing - just reply to this email and tell me directly.</p>
+      <p style="color:#475569;line-height:1.6">Thanks for trying it out.</p>
+    </div>
+    """
+    send_system_email(to_email, "Welcome to Shepherd", html)
+
+
+def send_password_reset_email(to_email, reset_token):
+    reset_link = f"{APP_BASE_URL}/?reset_token={reset_token}"
+    html = f"""
+    <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
+      <h2 style="margin-bottom:4px">Reset your Shepherd password</h2>
+      <p style="color:#475569;line-height:1.6">Click the link below to set a new password. This link expires in 1 hour.</p>
+      <p style="margin:24px 0"><a href="{reset_link}" style="background:#0f172a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Reset Password</a></p>
+      <p style="color:#94a3b8;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
+    </div>
+    """
+    send_system_email(to_email, "Reset your Shepherd password", html)
+
 qbo_tokens = {"access_token": None, "refresh_token": None, "realm_id": None, "expires_at": 0}
 
 def qbo_base_url():
@@ -2418,6 +2495,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not result["success"]:
                 self._send_json(400, {"error": result["message"]})
                 return
+            send_welcome_email(email, name, org_name)
             self.send_response(201)
             self._cors()
             self.send_header("Set-Cookie", f"shepherd_session={result['token']}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax")
@@ -2443,6 +2521,85 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"success": True, "user": result["user"]}, default=str).encode())
+            return
+
+        if self.path == "/api/web/password-reset/request":
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            email = (body.get("email") or "").strip().lower()
+            if not email:
+                self._send_json(400, {"error": "Email is required"})
+                return
+
+            conn = db_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+                row = cur.fetchone()
+                if row:
+                    user_id = row[0]
+                    token = secrets.token_urlsafe(32)
+                    cur.execute(
+                        "INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (%s, %s, now() + interval '1 hour')",
+                        (token, user_id)
+                    )
+                    conn.commit()
+                    send_password_reset_email(email, token)
+                    print(f"  [Password Reset] Requested for {email}")
+                cur.close()
+            except Exception as e:
+                conn.rollback()
+                print(f"  [Password Reset] Error: {e}")
+            finally:
+                db_release(conn)
+
+            # Always return success regardless of whether the email exists - this avoids
+            # leaking which emails are registered to anyone probing the endpoint.
+            self._send_json(200, {"success": True, "message": "If an account exists for that email, a reset link has been sent."})
+            return
+
+        if self.path == "/api/web/password-reset/confirm":
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured on this server"})
+                return
+            body = self._read_json_body()
+            token = (body.get("token") or "").strip()
+            new_password = body.get("password") or ""
+            if not token or not new_password:
+                self._send_json(400, {"error": "token and password are required"})
+                return
+            if len(new_password) < 8:
+                self._send_json(400, {"error": "Password must be at least 8 characters"})
+                return
+
+            conn = db_conn()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT user_id FROM password_reset_tokens WHERE token = %s AND used = false AND expires_at > now()",
+                    (token,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    cur.close()
+                    self._send_json(400, {"error": "This reset link is invalid or has expired. Please request a new one."})
+                    return
+                user_id = row[0]
+                pw_hash, salt = hash_password(new_password)
+                cur.execute("UPDATE users SET password_hash = %s, salt = %s WHERE id = %s", (pw_hash, salt, user_id))
+                cur.execute("UPDATE password_reset_tokens SET used = true WHERE token = %s", (token,))
+                conn.commit()
+                cur.close()
+                print(f"  [Password Reset] Completed for user_id={user_id}")
+                self._send_json(200, {"success": True})
+            except Exception as e:
+                conn.rollback()
+                print(f"  [Password Reset] Confirm error: {e}")
+                self._send_json(500, {"error": "Something went wrong. Please try again."})
+            finally:
+                db_release(conn)
             return
 
         if self.path == "/api/web/logout":

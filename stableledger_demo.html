@@ -480,6 +480,9 @@
         <div id="authFormLogin">
           <div class="auth-field"><label>Email</label><input type="email" id="loginEmail"></div>
           <div class="auth-field"><label>Password</label><input type="password" id="loginPassword" placeholder="Password"></div>
+          <div style="text-align:right;margin-top:-10px;margin-bottom:16px">
+            <a href="#" onclick="openForgotPasswordModal();return false" style="font-size:12px;color:#64748b;text-decoration:none">Forgot password?</a>
+          </div>
           <button style="width:100%;margin-top:6px;font-size:14px;font-weight:600;padding:12px;border-radius:9px;border:none;background:#0f172a;color:#fff;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#1e293b'" onmouseout="this.style.background='#0f172a'" onclick="doLogin()">Log In</button>
         </div>
 
@@ -553,6 +556,9 @@
         <div class="ob-nav">
           <div></div>
           <button style="background:#3b82f6;color:#fff" onclick="obNext(4)">Continue &rarr;</button>
+        </div>
+        <div style="text-align:right;margin-top:8px">
+          <a href="#" onclick="obNext(4);return false" style="font-size:12px;color:#94a3b8;text-decoration:none">Skip for now</a>
         </div>
         <div class="ob-progress"><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
@@ -640,6 +646,9 @@
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(1)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveAutomation();obNext(8);obToggleBillEmail()">Continue &rarr;</button>
         </div>
+        <div style="text-align:right;margin-top:8px">
+          <a href="#" onclick="obNext(8);obToggleBillEmail();return false" style="font-size:12px;color:#94a3b8;text-decoration:none">Skip for now</a>
+        </div>
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
 
@@ -705,6 +714,9 @@
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(4)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveBillMatching();obNext(7)">Continue &rarr;</button>
+        </div>
+        <div style="text-align:right;margin-top:8px">
+          <a href="#" onclick="obNext(7);return false" style="font-size:12px;color:#94a3b8;text-decoration:none">Skip for now</a>
         </div>
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div><div class="ob-progress-bar"></div></div>
       </div>
@@ -829,6 +841,9 @@
         <div class="ob-nav">
           <button style="background:#f1f5f9;color:#475569" onclick="obNext(8)">&larr; Back</button>
           <button style="background:#3b82f6;color:#fff" onclick="obSaveGL();obNext(5)">Continue &rarr;</button>
+        </div>
+        <div style="text-align:right;margin-top:8px">
+          <a href="#" onclick="obNext(5);return false" style="font-size:12px;color:#94a3b8;text-decoration:none">Skip for now</a>
         </div>
         <div class="ob-progress"><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar done"></div><div class="ob-progress-bar active"></div><div class="ob-progress-bar"></div></div>
       </div>
@@ -2337,6 +2352,17 @@ async function doSignup(){
   }catch(e){showAuthError('Sign up error: '+e.message);}
 }
 async function checkAuthOnLoad(){
+  // If this page load includes a password reset token in the URL, show that flow
+  // immediately regardless of current login state - the token identifies which
+  // account to reset, independent of whatever session (if any) is active right now.
+  var urlParams=new URLSearchParams(window.location.search);
+  var resetToken=urlParams.get('reset_token');
+  if(resetToken){
+    window.pendingResetToken=resetToken;
+    document.getElementById('resetPasswordOverlay').classList.add('open');
+    return;
+  }
+
   try{
     var res=await fetch('/api/web/me');
     var data=await res.json();
@@ -2353,6 +2379,57 @@ async function checkAuthOnLoad(){
   // for someone who has genuinely never used Shepherd on this device before.
   if(!localStorage.getItem('shepherd_has_visited')){
     switchAuthTab('signup');
+  }
+}
+function openForgotPasswordModal(){
+  document.getElementById('forgotPasswordForm').style.display='block';
+  document.getElementById('forgotPasswordSuccess').style.display='none';
+  document.getElementById('forgotPasswordEmail').value=document.getElementById('loginEmail').value||'';
+  document.getElementById('forgotPasswordOverlay').classList.add('open');
+}
+function closeForgotPasswordModal(){
+  document.getElementById('forgotPasswordOverlay').classList.remove('open');
+}
+async function submitForgotPassword(){
+  var email=document.getElementById('forgotPasswordEmail').value.trim();
+  if(!email||email.indexOf('@')===-1)return;
+  var btn=document.getElementById('forgotPasswordBtn');
+  btn.disabled=true;btn.textContent='Sending...';
+  try{
+    await fetch('/api/web/password-reset/request',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:email})});
+  }catch(e){console.log('Password reset request failed:',e);}
+  btn.disabled=false;btn.textContent='Send Reset Link';
+  document.getElementById('forgotPasswordForm').style.display='none';
+  document.getElementById('forgotPasswordSuccess').style.display='block';
+}
+async function submitPasswordReset(){
+  var newPassword=document.getElementById('resetPasswordNew').value;
+  var errEl=document.getElementById('resetPasswordError');
+  var btn=document.getElementById('resetPasswordBtn');
+  if(!newPassword||newPassword.length<8){
+    errEl.textContent='Password must be at least 8 characters.';
+    errEl.style.display='block';
+    return;
+  }
+  errEl.style.display='none';
+  btn.disabled=true;btn.textContent='Setting password...';
+  try{
+    var res=await fetch('/api/web/password-reset/confirm',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:window.pendingResetToken,password:newPassword})});
+    var data=await res.json();
+    if(!data.success){
+      errEl.textContent=data.error||'Something went wrong. Please try again.';
+      errEl.style.display='block';
+      btn.disabled=false;btn.textContent='Set New Password';
+      return;
+    }
+    document.getElementById('resetPasswordForm').style.display='none';
+    document.getElementById('resetPasswordSuccess').style.display='block';
+  }catch(e){
+    errEl.textContent='Could not reach the server. Please try again.';
+    errEl.style.display='block';
+    btn.disabled=false;btn.textContent='Set New Password';
   }
 }
 async function hydrateFromServer(){
@@ -5404,6 +5481,41 @@ window.addEventListener("resize",()=>requestAnimationFrame(drawArrows));
 checkAuthOnLoad();
 </script>
 <!-- CUSTOM ACCOUNT MODAL -->
+<div class="custom-overlay" id="forgotPasswordOverlay" onclick="if(event.target===this)closeForgotPasswordModal()">
+  <div class="custom-modal" style="max-width:380px">
+    <h3>Reset your password</h3>
+    <div id="forgotPasswordForm">
+      <div class="cm-sub">Enter your account email and we'll send you a link to set a new password.</div>
+      <div class="cm-field"><label>Email</label><input type="email" id="forgotPasswordEmail"></div>
+      <div class="cm-actions">
+        <button style="background:#f1f5f9;color:#475569" onclick="closeForgotPasswordModal()">Cancel</button>
+        <button style="background:#0f172a;color:#fff" onclick="submitForgotPassword()" id="forgotPasswordBtn">Send Reset Link</button>
+      </div>
+    </div>
+    <div id="forgotPasswordSuccess" style="display:none;text-align:center;padding:8px 0">
+      <p style="font-size:13px;color:#475569;line-height:1.6">If an account exists for that email, a reset link is on its way. Check your inbox.</p>
+      <button style="background:#0f172a;color:#fff;margin-top:12px;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-size:13px" onclick="closeForgotPasswordModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="custom-overlay" id="resetPasswordOverlay" onclick="if(event.target===this)return">
+  <div class="custom-modal" style="max-width:380px">
+    <h3>Set a new password</h3>
+    <div id="resetPasswordForm">
+      <div class="cm-field"><label>New Password</label><input type="password" id="resetPasswordNew" placeholder="At least 8 characters"></div>
+      <div class="cm-actions">
+        <button style="background:#0f172a;color:#fff;width:100%" onclick="submitPasswordReset()" id="resetPasswordBtn">Set New Password</button>
+      </div>
+      <div class="beta-error" id="resetPasswordError" style="display:none;margin-top:12px;font-size:12.5px;color:#991b1b;background:#fef2f2;padding:9px 12px;border-radius:6px"></div>
+    </div>
+    <div id="resetPasswordSuccess" style="display:none;text-align:center;padding:8px 0">
+      <p style="font-size:13px;color:#475569;line-height:1.6">Your password has been updated.</p>
+      <button style="background:#0f172a;color:#fff;margin-top:12px;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-size:13px" onclick="location.href='/'">Continue to Login</button>
+    </div>
+  </div>
+</div>
+
 <div class="custom-overlay" id="markVendorOverlay" onclick="if(event.target===this)closeMarkVendorModal()">
   <div class="custom-modal" style="max-width:420px">
     <h3>Mark as Known Vendor</h3>
