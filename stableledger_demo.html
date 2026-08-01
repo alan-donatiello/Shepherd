@@ -6,7 +6,8 @@
 <title>Shepherd</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#fff;color:#1e293b}
+  html{scroll-behavior:smooth;overflow-x:hidden}
+  body{font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:#fff;color:#1e293b;overflow-x:hidden;max-width:100vw}
   .mono{font-family:'Cascadia Code','Fira Code',Consolas,monospace}
   .header{border-bottom:1px solid #e2e8f0;padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
   .logo{display:flex;align-items:center;gap:10px}
@@ -3286,7 +3287,7 @@ function renderTx(){
   const tDr=journal.reduce((s,l)=>s+l.dr,0),tCr=journal.reduce((s,l)=>s+l.cr,0);
   document.getElementById("journalCard").innerHTML=`
     <div class="j-hdr"><div>#</div><div>Account</div><div>Debit</div><div>Credit</div></div>
-    ${journal.map((l,i)=>`<div class="j-line" id="jl-${i}"><div>${l.n}</div><div>${l.acct}</div>
+    ${journal.map((l,i)=>`<div class="j-line" id="jl-${i}" onclick="highlightFinancialLine('${l.t}',${i})" style="cursor:pointer"><div>${l.n}</div><div>${l.acct}</div>
       <div class="${l.dr>0?'dr':'zero'} mono">${l.dr>0?'$'+fmt(l.dr):'-'}</div>
       <div class="${l.cr>0?'cr':'zero'} mono">${l.cr>0?'$'+fmt(l.cr):'-'}</div>
       <div class="dot" style="border-color:${COLORS[i%4]};background:${COLORS[i%4]}20"></div></div>`).join("")}
@@ -5466,9 +5467,28 @@ function openAudit(glCode,label){
 }
 function closeAudit(){document.getElementById("auditOverlay").classList.remove("open");}
 
+function highlightFinancialLine(target,index){
+  const tgt=document.getElementById("fs-"+target);
+  if(!tgt)return;
+  const color=COLORS[index%4];
+  tgt.scrollIntoView({behavior:"smooth",block:"center"});
+  const prevBg=tgt.style.background,prevTransition=tgt.style.transition;
+  tgt.style.transition="background-color .3s ease";
+  tgt.style.background=color+"25";
+  setTimeout(()=>{
+    tgt.style.background=prevBg;
+    setTimeout(()=>{tgt.style.transition=prevTransition;},300);
+  },1600);
+}
 function drawArrows(){
   const svg=document.getElementById("arrowSvg"),grid=document.getElementById("mainGrid");
   if(!svg||!grid||!txs.length)return;
+  // On mobile the journal panel and financial statements stack vertically instead of
+  // sitting side by side, so a drawn connecting line has no stable spatial meaning -
+  // it would just be a long line running down the page. Skip drawing entirely below
+  // the mobile breakpoint; tapping a journal line (see highlightFinancialLine) is the
+  // mobile equivalent instead.
+  if(window.innerWidth<=768){svg.innerHTML="";return;}
   const gr=grid.getBoundingClientRect();
   svg.setAttribute("width",gr.width);svg.setAttribute("height",gr.height);svg.innerHTML="";
   // Only draw arrows when current transaction is classified
