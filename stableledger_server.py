@@ -1659,6 +1659,10 @@ def send_system_email(to_email, subject, html_body):
             headers={
                 "Authorization": f"Bearer {RESEND_API_KEY}",
                 "Content-Type": "application/json",
+                # Resend's API sits behind Cloudflare, which commonly blocks requests
+                # carrying Python's default urllib User-Agent as a bot signature
+                # (Cloudflare error 1010). A normal-looking User-Agent avoids that.
+                "User-Agent": "Mozilla/5.0 (compatible; Shepherd/1.0; +https://getshepherd.co)",
             },
             method="POST",
         )
