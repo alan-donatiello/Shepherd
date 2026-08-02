@@ -1626,55 +1626,63 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
 GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8090/auth/google/callback").strip()
 
-# System-level email (welcome emails, password resets) - separate from the per-user
-# SMTP credentials configured in Settings for daily digest notifications. This needs
-# its own dedicated sending account, since brand-new users haven't configured anything yet.
-SYSTEM_SMTP_HOST = os.environ.get("SYSTEM_SMTP_HOST", "smtp.gmail.com").strip()
-SYSTEM_SMTP_PORT = int(os.environ.get("SYSTEM_SMTP_PORT", "587"))
-SYSTEM_SMTP_USER = os.environ.get("SYSTEM_SMTP_USER", "").strip()
-SYSTEM_SMTP_PASS = os.environ.get("SYSTEM_SMTP_PASS", "").strip()
+# System-level email (welcome emails, password resets), sent via Resend's HTTPS API.
+# Deliberately not SMTP - Railway blocks outbound SMTP ports on Free/Trial/Hobby plans,
+# confirmed directly in their own docs, and recommends exactly this kind of HTTPS-based
+# email API as the standard workaround.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Shepherd <onboarding@getshepherd.co>").strip()
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8090").strip()
 
 
 def send_system_email(to_email, subject, html_body):
-    """Sends a transactional email (welcome, password reset) from Shepherd's own
-    account, not the recipient's. Silently no-ops with a log line if not configured,
-    rather than raising - a missing welcome email shouldn't ever break signup."""
-    if not SYSTEM_SMTP_USER or not SYSTEM_SMTP_PASS:
-        print(f"  [Email] Skipped '{subject}' to {to_email} - SYSTEM_SMTP_USER/PASS not configured")
+    """Sends a transactional email (welcome, password reset) via Resend's HTTPS API.
+    Railway blocks outbound SMTP entirely on Free/Trial/Hobby plans (confirmed directly
+    in their own docs), so this deliberately does NOT use SMTP at all - HTTPS is never
+    blocked, which is exactly why Resend and similar services exist for this situation.
+    Silently no-ops with a log line if not configured, rather than raising - a missing
+    welcome email shouldn't ever break signup."""
+    if not RESEND_API_KEY:
+        print(f"  [Email] Skipped '{subject}' to {to_email} - RESEND_API_KEY not configured")
         return False
     try:
-        import smtplib
         import socket
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"Shepherd <{SYSTEM_SMTP_USER}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html_body, "html"))
-
-        # "Network is unreachable" from smtplib in a container almost always means it
-        # resolved an IPv6 address for the SMTP host and there's no IPv6 route out -
-        # extremely common on platforms like Railway. Force IPv4-only DNS resolution
-        # for the duration of this connection (rather than connecting via a raw IP
-        # directly, which would break TLS certificate validation against the hostname).
+        payload = json.dumps({
+            "from": RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        # Same root cause as the earlier SMTP "Network is unreachable" issue: this
+        # container has no IPv6 route out, and that fix never got carried over to this
+        # HTTPS call when it replaced the SMTP code. Force IPv4-only DNS resolution for
+        # the duration of this request rather than letting urllib pick whatever address
+        # family it resolves first.
         _orig_getaddrinfo = socket.getaddrinfo
         def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
             return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
         socket.getaddrinfo = _ipv4_only_getaddrinfo
         try:
-            server = smtplib.SMTP(SYSTEM_SMTP_HOST, SYSTEM_SMTP_PORT, timeout=15)
-            server.starttls()
-            server.login(SYSTEM_SMTP_USER, SYSTEM_SMTP_PASS)
-            server.sendmail(SYSTEM_SMTP_USER, to_email, msg.as_string())
-            server.quit()
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read().decode())
         finally:
             socket.getaddrinfo = _orig_getaddrinfo
 
-        print(f"  [Email] Sent '{subject}' to {to_email}")
+        print(f"  [Email] Sent '{subject}' to {to_email} (id={result.get('id', '?')})")
         return True
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode() if hasattr(e, 'read') else ""
+        print(f"  [Email] FAILED to send '{subject}' to {to_email}: HTTP {e.code}: {err_body[:300]}")
+        return False
     except Exception as e:
         print(f"  [Email] FAILED to send '{subject}' to {to_email}: {e}")
         return False
