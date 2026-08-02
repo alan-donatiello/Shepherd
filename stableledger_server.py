@@ -405,7 +405,7 @@ def find_or_create_user_by_google(email, name):
     random_password = secrets.token_urlsafe(24)  # Google-only accounts never use this, but the column is NOT NULL
     result = signup_new_org(org_name_guess, email, random_password, name)
     if result["success"]:
-        send_welcome_email(email, name, org_name_guess)
+        threading.Thread(target=send_welcome_email, args=(email, name, org_name_guess), daemon=True).start()
     return result
 
 
@@ -1645,6 +1645,7 @@ def send_system_email(to_email, subject, html_body):
         return False
     try:
         import smtplib
+        import socket
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
 
@@ -1654,11 +1655,24 @@ def send_system_email(to_email, subject, html_body):
         msg["To"] = to_email
         msg.attach(MIMEText(html_body, "html"))
 
-        server = smtplib.SMTP(SYSTEM_SMTP_HOST, SYSTEM_SMTP_PORT)
-        server.starttls()
-        server.login(SYSTEM_SMTP_USER, SYSTEM_SMTP_PASS)
-        server.sendmail(SYSTEM_SMTP_USER, to_email, msg.as_string())
-        server.quit()
+        # "Network is unreachable" from smtplib in a container almost always means it
+        # resolved an IPv6 address for the SMTP host and there's no IPv6 route out -
+        # extremely common on platforms like Railway. Force IPv4-only DNS resolution
+        # for the duration of this connection (rather than connecting via a raw IP
+        # directly, which would break TLS certificate validation against the hostname).
+        _orig_getaddrinfo = socket.getaddrinfo
+        def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+            return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+        socket.getaddrinfo = _ipv4_only_getaddrinfo
+        try:
+            server = smtplib.SMTP(SYSTEM_SMTP_HOST, SYSTEM_SMTP_PORT, timeout=15)
+            server.starttls()
+            server.login(SYSTEM_SMTP_USER, SYSTEM_SMTP_PASS)
+            server.sendmail(SYSTEM_SMTP_USER, to_email, msg.as_string())
+            server.quit()
+        finally:
+            socket.getaddrinfo = _orig_getaddrinfo
+
         print(f"  [Email] Sent '{subject}' to {to_email}")
         return True
     except Exception as e:
@@ -2495,7 +2509,11 @@ class Handler(SimpleHTTPRequestHandler):
             if not result["success"]:
                 self._send_json(400, {"error": result["message"]})
                 return
-            send_welcome_email(email, name, org_name)
+            # Send the welcome email in the background - an SMTP round trip can take
+            # several seconds, and there's no reason to make someone wait through that
+            # just to finish signing up. The account itself is already fully created
+            # by this point; the email is a nice-to-have, not something to block on.
+            threading.Thread(target=send_welcome_email, args=(email, name, org_name), daemon=True).start()
             self.send_response(201)
             self._cors()
             self.send_header("Set-Cookie", f"shepherd_session={result['token']}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax")
@@ -2546,7 +2564,7 @@ class Handler(SimpleHTTPRequestHandler):
                         (token, user_id)
                     )
                     conn.commit()
-                    send_password_reset_email(email, token)
+                    threading.Thread(target=send_password_reset_email, args=(email, token), daemon=True).start()
                     print(f"  [Password Reset] Requested for {email}")
                 cur.close()
             except Exception as e:
