@@ -1641,6 +1641,11 @@ RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "Shepherd <onboarding@ge
 # automated "onboarding@" address, not something anyone is actually reading. Route
 # replies to a real monitored inbox instead.
 REPLY_TO_EMAIL = os.environ.get("REPLY_TO_EMAIL", "alan@getshepherd.co").strip()
+
+# Protects the /admin dashboard. Not a real auth system - just enough to keep this
+# off the public internet while there's a single operator (you) and no real admin
+# role concept yet. Set this on Railway before relying on it.
+ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "").strip()
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8090").strip()
 
 
@@ -2448,6 +2453,108 @@ class Handler(SimpleHTTPRequestHandler):
                     self.send_header("Content-Type", "text/html")
                     self.end_headers()
                     self.wfile.write(f"<h3>OAuth Error: {e}</h3>".encode())
+            return
+
+        if self.path.startswith("/admin"):
+            query = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(query)
+            key = params.get("key", [""])[0]
+            if not ADMIN_SECRET or key != ADMIN_SECRET:
+                self.send_response(403)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<h3>Not authorized.</h3><p>Add ?key=YOUR_ADMIN_SECRET to the URL. Set ADMIN_SECRET on Railway if you haven't yet.</p>")
+                return
+            if not DB_AVAILABLE:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<h3>Persistence not configured on this server.</h3>")
+                return
+
+            conn = db_conn()
+            try:
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+                cur.execute("SELECT count(*) as c FROM organizations")
+                total_orgs = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM users")
+                total_users = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM wallets")
+                total_wallets = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM transactions")
+                total_txs = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM transactions WHERE gl_code IS NOT NULL")
+                total_classified = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM beta_signups")
+                total_beta = cur.fetchone()["c"]
+
+                cur.execute("""
+                    SELECT o.id, o.name as org_name, o.created_at, u.email, u.name as user_name,
+                        (SELECT count(*) FROM wallets w WHERE w.org_id = o.id) as wallet_count,
+                        (SELECT count(*) FROM transactions t WHERE t.org_id = o.id) as tx_count
+                    FROM organizations o
+                    LEFT JOIN users u ON u.org_id = o.id
+                    ORDER BY o.created_at DESC LIMIT 100
+                """)
+                orgs = cur.fetchall()
+
+                cur.execute("SELECT name, email, firm_name, message, created_at FROM beta_signups ORDER BY created_at DESC LIMIT 100")
+                beta_signups = cur.fetchall()
+                cur.close()
+            finally:
+                db_release(conn)
+
+            def esc(s):
+                return (str(s) if s is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+            orgs_rows = "".join(f"""
+                <tr>
+                    <td>{esc(o['org_name'])}</td>
+                    <td>{esc(o['user_name'])} &lt;{esc(o['email'])}&gt;</td>
+                    <td>{o['wallet_count']}</td>
+                    <td>{o['tx_count']}</td>
+                    <td>{esc(o['created_at'])[:16]}</td>
+                </tr>""" for o in orgs)
+
+            beta_rows = "".join(f"""
+                <tr>
+                    <td>{esc(b['name'])}</td>
+                    <td>{esc(b['email'])}</td>
+                    <td>{esc(b['firm_name'])}</td>
+                    <td>{esc(b['message'])[:80]}</td>
+                    <td>{esc(b['created_at'])[:16]}</td>
+                </tr>""" for b in beta_signups)
+
+            html = f"""<!DOCTYPE html><html><head><title>Shepherd Admin</title>
+            <style>
+                body{{font-family:-apple-system,sans-serif;background:#f8fafc;color:#0f172a;padding:32px;max-width:1100px;margin:0 auto}}
+                h1{{font-size:22px}} h2{{font-size:16px;margin:32px 0 12px;color:#334155}}
+                .stats{{display:flex;gap:16px;margin:20px 0}}
+                .stat{{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;flex:1}}
+                .stat .num{{font-size:24px;font-weight:700}} .stat .label{{font-size:12px;color:#64748b;text-transform:uppercase}}
+                table{{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-size:13px}}
+                th{{text-align:left;padding:10px 12px;background:#f1f5f9;font-size:11px;text-transform:uppercase;color:#64748b}}
+                td{{padding:10px 12px;border-top:1px solid #f1f5f9}}
+            </style></head><body>
+                <h1>Shepherd Admin</h1>
+                <div class="stats">
+                    <div class="stat"><div class="num">{total_orgs}</div><div class="label">Organizations</div></div>
+                    <div class="stat"><div class="num">{total_users}</div><div class="label">Users</div></div>
+                    <div class="stat"><div class="num">{total_wallets}</div><div class="label">Wallets Connected</div></div>
+                    <div class="stat"><div class="num">{total_txs}</div><div class="label">Transactions ({total_classified} classified)</div></div>
+                    <div class="stat"><div class="num">{total_beta}</div><div class="label">Beta Signups</div></div>
+                </div>
+                <h2>Organizations ({len(orgs)})</h2>
+                <table><tr><th>Org</th><th>Owner</th><th>Wallets</th><th>Transactions</th><th>Signed Up</th></tr>{orgs_rows}</table>
+                <h2>Beta Signups ({len(beta_signups)})</h2>
+                <table><tr><th>Name</th><th>Email</th><th>Firm</th><th>Message</th><th>Requested</th></tr>{beta_rows}</table>
+            </body></html>"""
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(html.encode())
             return
 
         if self.path == "/logo.png":

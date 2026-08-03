@@ -1577,6 +1577,10 @@
           <div><div style="font-size:13px;font-weight:500">Team Access</div><div style="font-size:11px;color:#94a3b8">Invite team members and manage permissions</div></div>
           <span style="font-size:11px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:4px">Coming soon</span>
         </div>
+        <div style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f1f5f9">
+          <div><div style="font-size:13px;font-weight:500">Replay Onboarding</div><div style="font-size:11px;color:#94a3b8">Show the onboarding flow again - useful for demos. Doesn't affect your existing data.</div></div>
+          <button style="font-size:11px;padding:6px 14px;border-radius:4px;border:1px solid #e2e8f0;background:#fff;color:#475569;cursor:pointer" onclick="replayOnboarding()">Replay</button>
+        </div>
       </div>
 
       <!-- Notifications -->
@@ -1778,6 +1782,15 @@ function obSelect(el,field){
   clientProfile[field]=el.textContent;
 }
 
+function replayOnboarding(){
+  // Purely visual - doesn't touch wallets, transactions, or any persisted data.
+  // Just shows the onboarding screens again so you can demo the flow without
+  // needing a throwaway account every time.
+  document.getElementById('appShell').style.display='none';
+  document.getElementById('onboardScreen').classList.add('active');
+  document.getElementById('onboardScreen').style.display='flex';
+  obNext(1);
+}
 function obNext(step){
   document.querySelectorAll('.ob-step').forEach(s=>s.style.display='none');
   document.getElementById('obStep'+step).style.display='block';
