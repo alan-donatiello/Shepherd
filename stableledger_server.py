@@ -2480,8 +2480,12 @@ class Handler(SimpleHTTPRequestHandler):
                 total_orgs = cur.fetchone()["c"]
                 cur.execute("SELECT count(*) as c FROM users")
                 total_users = cur.fetchone()["c"]
-                cur.execute("SELECT count(*) as c FROM wallets")
-                total_wallets = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM wallets WHERE chain != 'bank'")
+                total_crypto_wallets = cur.fetchone()["c"]
+                cur.execute("SELECT count(DISTINCT address) as c FROM wallets WHERE chain != 'bank'")
+                unique_crypto_wallets = cur.fetchone()["c"]
+                cur.execute("SELECT count(*) as c FROM wallets WHERE chain = 'bank'")
+                total_bank_accounts = cur.fetchone()["c"]
                 cur.execute("SELECT count(*) as c FROM transactions")
                 total_txs = cur.fetchone()["c"]
                 cur.execute("SELECT count(*) as c FROM transactions WHERE gl_code IS NOT NULL")
@@ -2491,7 +2495,8 @@ class Handler(SimpleHTTPRequestHandler):
 
                 cur.execute("""
                     SELECT o.id, o.name as org_name, o.created_at, u.email, u.name as user_name,
-                        (SELECT count(*) FROM wallets w WHERE w.org_id = o.id) as wallet_count,
+                        (SELECT count(*) FROM wallets w WHERE w.org_id = o.id AND w.chain != 'bank') as wallet_count,
+                        (SELECT count(*) FROM wallets w WHERE w.org_id = o.id AND w.chain = 'bank') as bank_count,
                         (SELECT count(*) FROM transactions t WHERE t.org_id = o.id) as tx_count
                     FROM organizations o
                     LEFT JOIN users u ON u.org_id = o.id
@@ -2513,8 +2518,10 @@ class Handler(SimpleHTTPRequestHandler):
                     <td>{esc(o['org_name'])}</td>
                     <td>{esc(o['user_name'])} &lt;{esc(o['email'])}&gt;</td>
                     <td>{o['wallet_count']}</td>
+                    <td>{o['bank_count']}</td>
                     <td>{o['tx_count']}</td>
                     <td>{esc(o['created_at'])[:16]}</td>
+                    <td><button class="del-btn" onclick="deleteOrg({o['id']},'{esc(o['org_name'])}')">Delete</button></td>
                 </tr>""" for o in orgs)
 
             beta_rows = "".join(f"""
@@ -2529,26 +2536,49 @@ class Handler(SimpleHTTPRequestHandler):
             html = f"""<!DOCTYPE html><html><head><title>Shepherd Admin</title>
             <style>
                 body{{font-family:-apple-system,sans-serif;background:#f8fafc;color:#0f172a;padding:32px;max-width:1100px;margin:0 auto}}
-                h1{{font-size:22px}} h2{{font-size:16px;margin:32px 0 12px;color:#334155}}
-                .stats{{display:flex;gap:16px;margin:20px 0}}
-                .stat{{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;flex:1}}
+                h1{{font-size:22px}} h2{{font-size:16px;margin:32px 0 4px;color:#334155}}
+                .sub{{font-size:12px;color:#94a3b8;margin-bottom:12px}}
+                .stats{{display:flex;gap:16px;margin:20px 0;flex-wrap:wrap}}
+                .stat{{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;flex:1;min-width:140px}}
                 .stat .num{{font-size:24px;font-weight:700}} .stat .label{{font-size:12px;color:#64748b;text-transform:uppercase}}
+                .stat .sublabel{{font-size:11px;color:#94a3b8;margin-top:2px}}
                 table{{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-size:13px}}
                 th{{text-align:left;padding:10px 12px;background:#f1f5f9;font-size:11px;text-transform:uppercase;color:#64748b}}
                 td{{padding:10px 12px;border-top:1px solid #f1f5f9}}
+                .del-btn{{font-size:11px;padding:5px 10px;border-radius:4px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;cursor:pointer}}
+                .del-btn:hover{{background:#fee2e2}}
+                .del-btn:disabled{{opacity:.5;cursor:default}}
             </style></head><body>
                 <h1>Shepherd Admin</h1>
                 <div class="stats">
                     <div class="stat"><div class="num">{total_orgs}</div><div class="label">Organizations</div></div>
                     <div class="stat"><div class="num">{total_users}</div><div class="label">Users</div></div>
-                    <div class="stat"><div class="num">{total_wallets}</div><div class="label">Wallets Connected</div></div>
+                    <div class="stat"><div class="num">{total_crypto_wallets}</div><div class="label">Wallet Connections</div><div class="sublabel">{unique_crypto_wallets} unique address{'es' if unique_crypto_wallets != 1 else ''} - repeats usually mean the same demo wallet reused across test signups</div></div>
+                    <div class="stat"><div class="num">{total_bank_accounts}</div><div class="label">Bank Accounts (Plaid)</div></div>
                     <div class="stat"><div class="num">{total_txs}</div><div class="label">Transactions ({total_classified} classified)</div></div>
-                    <div class="stat"><div class="num">{total_beta}</div><div class="label">Beta Signups</div></div>
+                    <div class="stat"><div class="num">{total_beta}</div><div class="label">Beta Signups</div><div class="sublabel">People who filled out "Request Access" on the getshepherd.co landing page - not app accounts</div></div>
                 </div>
                 <h2>Organizations ({len(orgs)})</h2>
-                <table><tr><th>Org</th><th>Owner</th><th>Wallets</th><th>Transactions</th><th>Signed Up</th></tr>{orgs_rows}</table>
+                <div class="sub">Every signed-up account and what they've connected so far. Deleting an org removes its user, wallets, transactions, and everything else tied to it - permanently, no undo.</div>
+                <table><tr><th>Org</th><th>Owner</th><th>Wallets</th><th>Bank Accounts</th><th>Transactions</th><th>Signed Up</th><th></th></tr>{orgs_rows}</table>
                 <h2>Beta Signups ({len(beta_signups)})</h2>
+                <div class="sub">Requests submitted through the landing page's gate, before anyone has an actual account - this is your outreach queue, not existing users</div>
                 <table><tr><th>Name</th><th>Email</th><th>Firm</th><th>Message</th><th>Requested</th></tr>{beta_rows}</table>
+                <script>
+                const ADMIN_KEY={json.dumps(key)};
+                async function deleteOrg(orgId,orgName){{
+                  if(!confirm('Permanently delete "'+orgName+'"? This removes their user, wallets, transactions, and everything else tied to this account. This cannot be undone.'))return;
+                  const btn=event.target;
+                  btn.disabled=true;btn.textContent='Deleting...';
+                  try{{
+                    const res=await fetch('/admin/delete-org',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+                      body:JSON.stringify({{key:ADMIN_KEY,org_id:orgId}})}});
+                    const data=await res.json();
+                    if(data.success){{location.reload();}}
+                    else{{alert('Delete failed: '+(data.error||'unknown error'));btn.disabled=false;btn.textContent='Delete';}}
+                  }}catch(e){{alert('Delete failed: '+e.message);btn.disabled=false;btn.textContent='Delete';}}
+                }}
+                </script>
             </body></html>"""
 
             self.send_response(200)
@@ -2609,6 +2639,42 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/admin/delete-org":
+            body = self._read_json_body()
+            key = body.get("key", "")
+            if not ADMIN_SECRET or key != ADMIN_SECRET:
+                self._send_json(403, {"error": "Not authorized"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured"})
+                return
+            org_id = body.get("org_id")
+            if not org_id:
+                self._send_json(400, {"error": "org_id is required"})
+                return
+            conn = db_conn()
+            try:
+                cur = conn.cursor()
+                # ON DELETE CASCADE on every child table (users, wallets, transactions,
+                # sessions, etc.) means this one delete removes everything belonging
+                # to the org in a single, atomic step - no orphaned rows left behind.
+                cur.execute("SELECT name FROM organizations WHERE id = %s", (org_id,))
+                row = cur.fetchone()
+                org_name = row[0] if row else f"id={org_id}"
+                cur.execute("DELETE FROM organizations WHERE id = %s", (org_id,))
+                deleted = cur.rowcount
+                conn.commit()
+                cur.close()
+                print(f"  [Admin] Deleted organization: {org_name} (id={org_id})")
+                self._send_json(200, {"success": True, "deleted": deleted > 0})
+            except Exception as e:
+                conn.rollback()
+                print(f"  [Admin] Delete org FAILED: {e}")
+                self._send_json(500, {"error": str(e)[:200]})
+            finally:
+                db_release(conn)
+            return
+
         if self.path == "/api/beta/signup":
             if not DB_AVAILABLE:
                 self._send_json(503, {"error": "Signups aren't available right now — please try again shortly."})
