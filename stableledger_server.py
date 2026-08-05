@@ -2312,7 +2312,16 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"connected": connected, "realm_id": qbo_tokens.get("realm_id")}).encode())
             return
 
-        if self.path == "/debug/env":
+        if self.path.startswith("/debug/env"):
+            query = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(query)
+            key = params.get("key", [""])[0]
+            if not ADMIN_SECRET or key != ADMIN_SECRET:
+                self.send_response(403)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<h3>Not authorized.</h3>")
+                return
             debug_info = {
                 "QBO_CLIENT_ID_set": bool(QBO_CLIENT_ID),
                 "QBO_CLIENT_ID_len": len(QBO_CLIENT_ID) if QBO_CLIENT_ID else 0,
@@ -2511,7 +2520,7 @@ class Handler(SimpleHTTPRequestHandler):
                 db_release(conn)
 
             def esc(s):
-                return (str(s) if s is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                return (str(s) if s is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
 
             orgs_rows = "".join(f"""
                 <tr>
@@ -2521,7 +2530,7 @@ class Handler(SimpleHTTPRequestHandler):
                     <td>{o['bank_count']}</td>
                     <td>{o['tx_count']}</td>
                     <td>{esc(o['created_at'])[:16]}</td>
-                    <td><button class="del-btn" onclick="deleteOrg({o['id']},'{esc(o['org_name'])}')">Delete</button></td>
+                    <td><button class="del-btn" data-org-id="{o['id']}" data-org-name="{esc(o['org_name'])}" onclick="deleteOrg(this)">Delete</button></td>
                 </tr>""" for o in orgs)
 
             beta_rows = "".join(f"""
@@ -2566,9 +2575,10 @@ class Handler(SimpleHTTPRequestHandler):
                 <table><tr><th>Name</th><th>Email</th><th>Firm</th><th>Message</th><th>Requested</th></tr>{beta_rows}</table>
                 <script>
                 const ADMIN_KEY={json.dumps(key)};
-                async function deleteOrg(orgId,orgName){{
+                async function deleteOrg(btn){{
+                  const orgId=btn.dataset.orgId;
+                  const orgName=btn.dataset.orgName;
                   if(!confirm('Permanently delete "'+orgName+'"? This removes their user, wallets, transactions, and everything else tied to this account. This cannot be undone.'))return;
-                  const btn=event.target;
                   btn.disabled=true;btn.textContent='Deleting...';
                   try{{
                     const res=await fetch('/admin/delete-org',{{method:'POST',headers:{{'Content-Type':'application/json'}},
