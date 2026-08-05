@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shepherd | Automated Stablecoin Accounting</title>
+<meta name="description" content="Shepherd connects to your bank accounts and wallets, classifies every transaction with AI, and closes your books automatically. For any business running stablecoins.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0F1B2D;
+    --ink-soft:#4A5568;
+    --paper:#F6F7F5;
+    --paper-2:#ECEEEA;
+    --paper-3:#FFFFFF;
+    --green:#14532D;
+    --green-bright:#1F8A4C;
+    --green-pale:#E8F3EC;
+    --amber:#B45309;
+    --amber-pale:#FBEEDE;
+    --rule:#DBDED7;
+    --rule-soft:#E8EAE5;
+    --serif:'Fraunces',Georgia,serif;
+    --sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--sans);color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased;font-size:16px}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--green-pale);color:var(--green)}
+  :focus-visible{outline:2px solid var(--green-bright);outline-offset:3px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 32px}
+
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:26px 32px;max-width:1080px;margin:0 auto}
+  .nav-mark{display:flex;align-items:center;gap:10px}
+  .nav-mark img{width:49px;height:34px;border-radius:7px;display:block}
+  .nav-word{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:.02em}
+  .nav-cta{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.03em;padding:9px 16px;border:1px solid var(--ink);border-radius:100px;transition:background .15s,color .15s}
+  .nav-cta:hover{background:var(--ink);color:var(--paper)}
+
+  .hero{padding:24px 0 64px;max-width:820px;margin:0 auto}
+  h1{font-family:var(--serif);font-weight:500;letter-spacing:-.01em;font-size:clamp(34px,5vw,54px);line-height:1.1;color:var(--ink);margin-bottom:20px}
+  .hero-sub{font-size:18px;line-height:1.6;color:var(--ink-soft);max-width:100%;margin-bottom:32px}
+  .hero-actions{display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:56px}
+  .btn-primary{font-family:var(--sans);font-size:14px;font-weight:600;padding:14px 26px;background:var(--green);color:#fff;border-radius:8px;transition:background .15s,transform .15s;display:inline-block}
+  .btn-primary:hover{background:var(--green-bright);transform:translateY(-1px)}
+  .hero-note{font-family:var(--sans);font-size:13.5px;color:var(--ink-soft);max-width:520px;line-height:1.5}
+
+  .badges-label{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:14px}
+  .badges-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:36px}
+  .badge{display:flex;align-items:center;gap:6px;font-size:12px;padding:5px 12px 5px 7px;border-radius:20px;background:var(--paper-3);border:1px solid var(--rule);color:var(--ink-soft)}
+  .badge svg,.badge img{display:block}
+
+  .transform{margin-top:8px;position:relative;display:grid;grid-template-columns:1fr 44px 1fr 44px 1fr;align-items:center;gap:0;width:100%}
+  .tcard{background:var(--paper-3);border:1px solid var(--rule);border-radius:12px;padding:20px 22px;opacity:0;transform:translateY(8px);animation:cardIn .6s ease forwards}
+  .tcard.raw{animation-delay:.15s}
+  .tcard.journal{animation-delay:1.05s}
+  .tcard.gl{animation-delay:1.95s}
+  @keyframes cardIn{to{opacity:1;transform:translateY(0)}}
+  .tcard-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dot{width:6px;height:6px;border-radius:50%}
+  .dot.amber{background:var(--amber)}
+  .dot.green{background:var(--green-bright)}
+  .traw-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;font-family:var(--mono);font-size:13px}
+  .traw-row:last-child{margin-bottom:0}
+  .traw-k{color:var(--ink-soft);font-size:11px}
+  .traw-v{color:var(--ink);font-weight:500}
+  .traw-v.dim{color:var(--ink-soft);font-weight:400}
+  .traw-pending{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);background:var(--amber-pale);padding:3px 8px;border-radius:4px}
+  .jrow{display:grid;grid-template-columns:1fr auto auto;gap:10px;font-family:var(--mono);font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--rule-soft)}
+  .jrow:last-of-type{border-bottom:none}
+  .jrow .acct{color:var(--ink)}
+  .jrow .amt{text-align:right;min-width:64px;color:var(--ink-soft)}
+  .jrow .amt.on{color:var(--green);font-weight:600}
+  .treconciled{display:inline-block;margin-top:12px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--green);background:var(--green-pale);padding:3px 8px;border-radius:4px}
+  .tarrow{display:flex;align-items:center;justify-content:center;opacity:0;animation:arrowIn .4s ease forwards;animation-delay:.75s}
+  .tarrow.second{animation-delay:1.65s}
+  .tarrow-circle{width:40px;height:40px;border-radius:50%;background:var(--green-pale);display:flex;align-items:center;justify-content:center}
+  .tarrow svg{width:20px;height:20px;color:var(--green-bright)}
+  @keyframes arrowIn{to{opacity:1}}
+  @media(prefers-reduced-motion:reduce){.tcard,.tarrow{animation:none;opacity:1;transform:none}}
+
+  section{padding:56px 0}
+  .rule-top{border-top:1px solid var(--rule)}
+  .section-head{max-width:640px;margin-bottom:36px}
+  h2{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.2;color:var(--ink);margin-bottom:14px}
+  .eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .eyebrow::before{content:'';width:16px;height:1px;background:var(--green)}
+
+  .bullets{display:flex;flex-direction:column;gap:18px;max-width:520px}
+  .bullet{display:flex;align-items:center;gap:14px}
+  .bullet-icon{width:22px;height:22px;border-radius:50%;background:var(--green-pale);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .bullet-icon svg{width:12px;height:12px;color:var(--green-bright)}
+  .bullet h4{font-family:var(--sans);font-size:15.5px;font-weight:600;color:var(--ink);line-height:1.4}
+
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin-top:8px}
+  @media(max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+  .step-num{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);margin-bottom:14px}
+  .step h3{font-family:var(--sans);font-size:17px;font-weight:600;color:var(--ink);margin-bottom:10px}
+  .step p{font-size:14.5px;color:var(--ink-soft);line-height:1.6}
+
+  .cap-row{display:grid;grid-template-columns:200px 1fr;gap:32px;padding:24px 0;border-top:1px solid var(--rule-soft)}
+  .cap-row:last-child{border-bottom:1px solid var(--rule-soft)}
+  .cap-label{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--green);text-transform:uppercase;padding-top:2px}
+  .cap-text h4{font-family:var(--sans);font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px}
+  .cap-text p{font-size:14.5px;color:var(--ink-soft);line-height:1.6;max-width:520px}
+
+  .video-shell{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--rule);background:var(--ink);box-shadow:0 24px 60px -20px rgba(15,27,45,.35);aspect-ratio:16/10;margin-top:8px}
+  .video-shell video{width:100%;height:100%;display:block;object-fit:cover}
+  .video-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#8A96A3;background:linear-gradient(160deg,#111D2E 0%,#0B1420 100%)}
+  .video-placeholder .vp-icon{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1)}
+  .video-placeholder .vp-icon svg{width:20px;height:20px}
+  .video-placeholder .vp-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A96A3}
+  .video-caption{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+
+  .closing{background:var(--ink);color:var(--paper);border-radius:16px;padding:56px 48px;margin:0 0 96px}
+  .closing h2{color:#fff;max-width:520px}
+  .closing p{color:#B9C2CC;font-size:16px;line-height:1.65;max-width:480px;margin-bottom:32px}
+  .closing .btn-primary{background:var(--green-bright)}
+  .closing .btn-primary:hover{background:#26A35A}
+  .closing-meta{font-family:var(--mono);font-size:12px;color:#7C8A99;margin-top:20px}
+
+  footer{padding:32px 0 56px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+  .footer-mono{font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:.02em}
+
+  .beta-overlay{display:none;position:fixed;inset:0;background:rgba(15,27,45,.55);z-index:1000;align-items:center;justify-content:center;padding:20px}
+  .beta-overlay.open{display:flex}
+  .beta-modal{background:var(--paper-3);border-radius:14px;max-width:440px;width:100%;padding:36px;position:relative;box-shadow:0 30px 70px -20px rgba(15,27,45,.4)}
+  .beta-close{position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);transition:background .15s}
+  .beta-close:hover{background:var(--paper-2)}
+  .beta-modal h3{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--ink);margin-bottom:8px}
+  .beta-modal p{font-size:13.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:22px}
+  .beta-field{margin-bottom:14px}
+  .beta-field label{display:block;font-size:11px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+  .beta-field input,.beta-field textarea{width:100%;font-size:14px;padding:10px 12px;border:1.5px solid var(--rule);border-radius:8px;outline:none;color:var(--ink);font-family:var(--sans);background:#fff;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+  .beta-field textarea{resize:vertical;min-height:64px}
+  .beta-field input:focus,.beta-field textarea:focus{border-color:var(--green-bright);box-shadow:0 0 0 3px var(--green-pale)}
+  .beta-submit{width:100%;margin-top:6px;font-family:var(--sans);font-size:14px;font-weight:600;padding:12px;border-radius:8px;border:none;background:var(--green);color:#fff;cursor:pointer;transition:background .15s}
+  .beta-submit:hover{background:var(--green-bright)}
+  .beta-submit:disabled{opacity:.6;cursor:default}
+  .beta-error{display:none;margin-top:12px;font-size:12.5px;color:#B45309;background:var(--amber-pale);padding:9px 12px;border-radius:6px}
+  .beta-success{display:none;text-align:center;padding:12px 0}
+  .beta-success svg{width:40px;height:40px;color:var(--green-bright);margin-bottom:14px}
+  .beta-success h3{margin-bottom:6px}
+
+  @media(max-width:760px){
+    .wrap,.nav{padding-left:20px;padding-right:20px}
+    .transform{grid-template-columns:1fr;gap:16px}
+    .tarrow{transform:rotate(90deg);animation-delay:.75s}
+    .bullets{gap:16px}
+    .steps{grid-template-columns:1fr;gap:32px}
+    .cap-row{grid-template-columns:1fr;gap:8px}
+    .video-shell{aspect-ratio:4/3;border-radius:10px}
+    .video-caption{flex-direction:column;align-items:flex-start;gap:4px}
+    .closing{padding:40px 26px;border-radius:12px}
+    h1{font-size:28px;white-space:normal}
+    h2{font-size:24px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-mark">
+    <img src="data:image/png;base64,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" alt="Shepherd">
+    <span class="nav-word">SHEPHERD</span>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <section class="hero">
+    <h1>Simple, Automated, Accounting, for all of your assets.</h1>
+    <p class="hero-sub">True daily close has arrived. Connect your bank accounts and wallets. Shepherd classifies every transaction with AI and closes your books daily. Multi-asset, multi-chain, reconciled to the source, fully auditable, synced to your ERP daily.</p>
+    <div class="hero-actions">
+      <a class="btn-primary" href="#" onclick="openBetaModal();return false">Request Access</a>
+      <span class="hero-note">Shepherd is working with a small number of businesses right now to shape the product around real usage.</span>
+    </div>
+
+    <div class="badges-label">Integrations</div>
+    <div class="badges-row">
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Google Workspace</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#2CA01C"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">qb</text></svg>QuickBooks</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#000"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">P</text></svg>Plaid</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#FF6B35"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">B</text></svg>BILL</span>
+    </div>
+    <div class="badges-label">Chains &amp; Tokens</div>
+    <div class="badges-row">
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#0052FF"/></svg>Base</span>
+      <span class="badge"><svg width="10" height="14" viewBox="0 0 32 52"><path fill="#C0CBF6" d="M16 0 0 26.6l16 9.5 16-9.5z"/><path fill="#8A9CE8" d="M16 0v36.1l16-9.5z"/><path fill="#C0CBF6" d="M16 39.5 0 30l16 22 16-22z"/><path fill="#8A9CE8" d="M16 61.5v-22l16-9.5z"/></svg>Ethereum</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#8247E5" d="M16.5 7.3c-.3-.2-.7-.2-1 0l-2.4 1.4-1.6.9-2.4 1.4c-.3.2-.7.2-1 0L6.3 9.4c-.3-.2-.5-.5-.5-.9V6.6c0-.3.2-.6.5-.9l1.8-1c.3-.2.7-.2 1 0l1.8 1c.3.2.5.5.5.9v1.4l1.6-.9V5.7c0-.3-.2-.6-.5-.9L9 2.4c-.3-.2-.7-.2-1 0L4.5 4.8c-.3.2-.5.5-.5.9v4.8c0 .3.2.6.5.9l3.5 2.4c.3.2.7.2 1 0l2.4-1.4 1.6-.9 2.4-1.4c.3-.2.7-.2 1 0l1.8 1c.3.2.5.5.5.9v2.1c0 .3-.2.6-.5.9l-1.8 1c-.3.2-.7.2-1 0l-1.8-1c-.3-.2-.5-.5-.5-.9v-1.3l-1.6.9v1.3c0 .3.2.6.5.9l3.5 2.4c.3.2.7.2 1 0l3.5-2.4c.3-.2.5-.5.5-.9V9.5c0-.3-.2-.6-.5-.9z"/></svg>Polygon</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><defs><linearGradient id="solg" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs><rect y="4" width="24" height="4" rx="2" fill="url(#solg)"/><rect y="10" width="24" height="4" rx="2" fill="url(#solg)"/><rect y="16" width="24" height="4" rx="2" fill="url(#solg)"/></svg>Solana</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#2775CA"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">$</text></svg>USDC</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#26A17B"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">T</text></svg>USDT</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#F5AC37"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">D</text></svg>DAI</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#00A86B"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">P</text></svg>USDP</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#0070BA"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">$</text></svg>PYUSD</span>
+      <span class="badge"><svg width="14" height="14" viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#3C3C9D"/><text x="12" y="16" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">&euro;</text></svg>EURC</span>
+    </div>
+
+    <div class="transform" aria-hidden="true">
+      <div class="tcard raw">
+        <div class="tcard-label"><span class="dot amber"></span>On-chain transaction</div>
+        <div class="traw-row"><span class="traw-k">HASH</span><span class="traw-v dim">0xd4bf...569e</span></div>
+        <div class="traw-row"><span class="traw-k">DIRECTION</span><span class="traw-v">Outflow</span></div>
+        <div class="traw-row"><span class="traw-k">AMOUNT</span><span class="traw-v">$306.00 USDC</span></div>
+        <div class="traw-row"><span class="traw-k">COUNTERPARTY</span><span class="traw-v dim">0xb8c6...fa9a</span></div>
+        <span class="traw-pending">Unclassified</span>
+      </div>
+      <div class="tarrow">
+        <div class="tarrow-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+        </div>
+      </div>
+      <div class="tcard journal">
+        <div class="tcard-label"><span class="dot green"></span>Journal entry</div>
+        <div class="jrow"><span class="acct">6200 Software &amp; SaaS</span><span class="amt on">$306.00</span><span class="amt">&mdash;</span></div>
+        <div class="jrow"><span class="acct">Digital Asset - USDC</span><span class="amt">&mdash;</span><span class="amt on">$306.00</span></div>
+        <div class="jrow"><span class="acct">Network Fees</span><span class="amt on">$0.0004</span><span class="amt">&mdash;</span></div>
+        <span class="treconciled">Debits = Credits</span>
+      </div>
+      <div class="tarrow second">
+        <div class="tarrow-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+        </div>
+      </div>
+      <div class="tcard gl">
+        <div class="tcard-label"><span class="dot green"></span>General ledger</div>
+        <div class="jrow"><span class="acct">6200 Software &amp; SaaS</span><span class="amt">$18,442.10</span><span class="amt"></span></div>
+        <div class="jrow"><span class="acct">Digital Asset - USDC</span><span class="amt">$204,118.76</span><span class="amt"></span></div>
+        <div class="jrow"><span class="acct">Network Fees</span><span class="amt">$92.31</span><span class="amt"></span></div>
+        <span class="treconciled">Balances updated</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="rule-top">
+    <div class="section-head">
+      <div class="eyebrow">See it in action</div>
+      <h2>Connect once, watch your books close automatically every day.</h2>
+    </div>
+    <div class="video-shell">
+      <video id="demoVideo" autoplay muted loop playsinline
+        onerror="this.style.display='none'"
+        onloadeddata="var p=document.getElementById('videoPlaceholder');if(p)p.style.display='none'">
+        <source src="shepherd-demo.mp4" type="video/mp4">
+      </video>
+      <div class="video-placeholder" id="videoPlaceholder">
+        <div class="vp-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 0 1 0 1.971l-11.54 6.347a1.125 1.125 0 0 1-1.667-.985V5.653Z"/></svg>
+        </div>
+        <div class="vp-label">Product walkthrough coming soon</div>
+      </div>
+    </div>
+    <div class="video-caption">
+      <span>Banks, wallets, and stablecoin activity, classified and reconciled live</span>
+      <span>0:00 / 0:24</span>
+    </div>
+  </section>
+
+  <section class="rule-top">
+    <div class="section-head">
+      <div class="eyebrow">How it works</div>
+      <h2>From transaction to close, fully automated.</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>Connect</h3>
+        <p>Add a business bank account, a wallet address, or both. Shepherd reads directly from your bank and from the blockchain, with no manual export required.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>Classify</h3>
+        <p>AI suggests a GL code with a confidence score and its reasoning. Approve once, and every future transaction from that counterparty classifies itself.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>Reconcile</h3>
+        <p>Financial statements build in real time as you classify. Balances are verified independently against the chain itself and against your ERP.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">04</div>
+        <h3>Integrate</h3>
+        <p>Classified transactions push straight into your ERP as journal entries automatically, on your schedule, with no manual export or re-entry required.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rule-top">
+    <div class="section-head">
+      <div class="eyebrow">Built for Scale</div>
+      <h2>The parts that actually matter.</h2>
+    </div>
+
+    <div class="cap-row">
+      <div class="cap-label">Reconciliation</div>
+      <div class="cap-text">
+        <h4>Verified against the source</h4>
+        <p>Shepherd checks its own math against a live balance query to the blockchain, and separately against your ERP's own account balances. That means "reconciled" is independently proven, not self-reported.</p>
+      </div>
+    </div>
+    <div class="cap-row">
+      <div class="cap-label">Fair value</div>
+      <div class="cap-text">
+        <h4>ASC 820 period-end remeasurement</h4>
+        <p>Non-stablecoin holdings get marked to fair value each period with a full disclosure rollforward: opening balance, additions, dispositions, unrealized gain or loss, and closing balance, by asset.</p>
+      </div>
+    </div>
+    <div class="cap-row">
+      <div class="cap-label">One ledger</div>
+      <div class="cap-text">
+        <h4>One ledger for all your assets</h4>
+        <p>Bank account and wallet activity run on a single classification engine and a unified platform. No more disconnected systems that don't talk to each other.</p>
+      </div>
+    </div>
+    <div class="cap-row">
+      <div class="cap-label">Audit trail</div>
+      <div class="cap-text">
+        <h4>Every action, timestamped</h4>
+        <p>Classifications, rescans, rule changes, and exports are logged as they happen and exportable on demand, built to hold up when someone asks how a number was produced.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="footer-mono">SHEPHERD &copy; 2026</span>
+    <span class="footer-mono">SIMPLE, AUTOMATED ACCOUNTING</span>
+  </footer>
+
+</div>
+
+<div class="beta-overlay" id="betaOverlay" onclick="if(event.target===this)closeBetaModal()">
+  <div class="beta-modal">
+    <div class="beta-close" onclick="closeBetaModal()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </div>
+
+    <div id="betaFormWrap">
+      <h3>Request access</h3>
+      <p>Shepherd is working with a small number of businesses right now. Tell us a bit about your business and we'll follow up to set up a walkthrough.</p>
+      <div class="beta-field"><label>Name</label><input type="text" id="betaName" placeholder="Your name"></div>
+      <div class="beta-field"><label>Email</label><input type="email" id="betaEmail" placeholder="you@yourbusiness.com"></div>
+      <div class="beta-field"><label>Company</label><input type="text" id="betaFirm" placeholder="e.g. Acme Inc."></div>
+      <div class="beta-field"><label>How are you using stablecoins? <span style="text-transform:none;font-weight:400;color:var(--ink-soft)">(optional)</span></label><textarea id="betaMessage" placeholder="A sentence or two is plenty"></textarea></div>
+      <button class="beta-submit" id="betaSubmitBtn" onclick="submitBetaSignup()">Request Access</button>
+      <div class="beta-error" id="betaError"></div>
+    </div>
+
+    <div class="beta-success" id="betaSuccessWrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+      <h3>Request received</h3>
+      <p>Thanks &mdash; we'll be in touch shortly to set up a walkthrough.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function openBetaModal(){
+  document.getElementById('betaOverlay').classList.add('open');
+  document.getElementById('betaFormWrap').style.display='block';
+  document.getElementById('betaSuccessWrap').style.display='none';
+  document.getElementById('betaError').style.display='none';
+}
+function closeBetaModal(){
+  document.getElementById('betaOverlay').classList.remove('open');
+}
+async function submitBetaSignup(){
+  var name=document.getElementById('betaName').value.trim();
+  var email=document.getElementById('betaEmail').value.trim();
+  var firm=document.getElementById('betaFirm').value.trim();
+  var message=document.getElementById('betaMessage').value.trim();
+  var errEl=document.getElementById('betaError');
+  var btn=document.getElementById('betaSubmitBtn');
+
+  if(!email||email.indexOf('@')===-1){
+    errEl.textContent='Please enter a valid email address.';
+    errEl.style.display='block';
+    return;
+  }
+  errEl.style.display='none';
+  btn.disabled=true;btn.textContent='Sending...';
+
+  try{
+    var res=await fetch('https://app.getshepherd.co/api/beta/signup',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:name,email:email,firm_name:firm,message:message})
+    });
+    var data=await res.json();
+    if(!data.success){
+      errEl.textContent=data.error||'Something went wrong \u2014 please try again.';
+      errEl.style.display='block';
+      btn.disabled=false;btn.textContent='Request Access';
+      return;
+    }
+    document.getElementById('betaFormWrap').style.display='none';
+    document.getElementById('betaSuccessWrap').style.display='block';
+  }catch(e){
+    errEl.textContent='Could not reach the server \u2014 please try again in a moment.';
+    errEl.style.display='block';
+    btn.disabled=false;btn.textContent='Request Access';
+  }
+}
+</script>
+</body>
+</html>
