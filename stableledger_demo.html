@@ -537,14 +537,14 @@
           <span class="ob-label">Business type</span>
           <div class="ob-chips" id="obBizType">
             <div class="ob-chip" onclick="obToggle(this,'bizType')">SaaS / Software</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">DeFi Protocol</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">Payment Processor</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">DAO / Treasury</div>
             <div class="ob-chip" onclick="obToggle(this,'bizType')">E-Commerce</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">Crypto Exchange</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">Services / Agency</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">Payroll / HR</div>
-            <div class="ob-chip" onclick="obToggle(this,'bizType')">Digital Bank</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Financial Services</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Manufacturing</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Healthcare</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Transportation</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Natural Resources</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Industrial</div>
+            <div class="ob-chip" onclick="obToggle(this,'bizType')">Construction</div>
             <div class="ob-chip" onclick="obToggle(this,'bizType')">Other</div>
           </div>
         </div>
@@ -554,13 +554,13 @@
           <div class="ob-chips" id="obTxTypes">
             <div class="ob-chip" onclick="obToggle(this,'txTypes')">Payroll</div>
             <div class="ob-chip" onclick="obToggle(this,'txTypes')">Vendor payments</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Client revenue</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Treasury mgmt</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">DeFi activity</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Intercompany transfers</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Product Revenue</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Treasury</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Inventory</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Rent</div>
             <div class="ob-chip" onclick="obToggle(this,'txTypes')">SaaS subscriptions</div>
             <div class="ob-chip" onclick="obToggle(this,'txTypes')">Contractor payments</div>
-            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Grants / distributions</div>
+            <div class="ob-chip" onclick="obToggle(this,'txTypes')">Other</div>
           </div>
         </div>
         <div class="ob-section">
@@ -617,7 +617,7 @@
             <span style="font-size:13px;font-weight:600;color:#0f172a">Email &amp; Notifications</span>
           </div>
           <div style="padding:12px 14px">
-            <div style="font-size:11px;color:#64748b;line-height:1.5;margin-bottom:10px">Your email powers three things: daily activity updates, scanning your inbox for invoices, and giving the AI more context to classify transactions automatically.</div>
+            <div style="font-size:11px;color:#64748b;line-height:1.5;margin-bottom:10px">Connect your email and slack to enable notifications from Shepherd and inbox scanning for invoices, giving the AI more context to classify transactions automatically.</div>
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
               <div style="display:flex;gap:8px;align-items:center">
                 <span style="font-size:11px;color:#64748b;width:70px;display:flex;align-items:center;gap:4px">Email
@@ -706,7 +706,7 @@
               <span style="font-size:13px;font-weight:600;color:#0f172a">Email invoice scanning</span>
             </div>
             <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#64748b;cursor:pointer">
-              <input type="checkbox" id="obBillUseSameEmail" onchange="obToggleBillEmail()" checked>
+              <input type="checkbox" id="obBillUseSameEmail" onchange="obToggleBillEmail()">
               Use same email as notifications
             </label>
           </div>
@@ -722,7 +722,7 @@
               </div>
             </div>
           </div>
-          <div id="obBillEmailSameNote" style="font-size:11px;color:#92400e">Will scan the inbox for <span id="obBillEmailSameAddr" style="font-weight:600">the email connected in Automations</span> for invoice PDFs.</div>
+          <div id="obBillEmailSameNote" style="font-size:11px;color:#92400e">Scans your connected inbox for invoice PDFs.</div>
         </div>
 
         <div class="ob-nav">
@@ -808,9 +808,8 @@
             <div class="ob-chips" id="obGLRevChips">
               <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">4100 - Revenue - Services</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
               <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">4200 - Revenue - Product</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
-              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4300 - Customer Refund</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
-              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4400 - Interest Income</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
-              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4500 - Staking Revenue</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+               <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4400 - Interest Income</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+            
             </div>
           </div>
           <div class="ob-section">
@@ -870,7 +869,7 @@
               <circle cx="24" cy="24" r="20" fill="none" stroke="#3b82f6" stroke-width="3" stroke-dasharray="40 86" stroke-linecap="round"/>
             </svg>
           </div>
-          <h2 style="font-size:20px;font-weight:700;margin-bottom:8px;color:#0f172a" id="obScanTitle">Scanning your wallets</h2>
+          <h2 style="font-size:20px;font-weight:700;margin-bottom:8px;color:#0f172a" id="obScanTitle">Scanning your accounts and wallets</h2>
           <div style="font-size:13px;color:#64748b;margin-bottom:16px" id="obScanStatus">Connecting to blockchain...</div>
           <div style="max-width:300px;margin:0 auto 16px">
             <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden">
@@ -1260,7 +1259,7 @@
             </label>
           </div>
           <div style="margin-top:12px;padding:10px 14px;background:#f8fafc;border-radius:6px;font-size:12px;color:#64748b">
-            <strong style="color:#334155">Status:</strong> Scheduled scans require the production environment. <span style="color:#3b82f6">Coming soon.</span>
+           
           </div>
         </div>
       </div>
@@ -1760,7 +1759,7 @@
         </div>
       </div>
 
-      <div style="margin-top:24px;font-size:12px;color:#94a3b8">Questions? Contact <a href="mailto:alan@shepard.finance" style="color:#3b82f6">alan@shepard.finance</a></div>
+      <div style="margin-top:24px;font-size:12px;color:#94a3b8">Questions? Contact <a href="mailto:alan@getshepherd.co" style="color:#3b82f6">alan@shepard.finance</a></div>
     </div>
   </div>
 </div>
