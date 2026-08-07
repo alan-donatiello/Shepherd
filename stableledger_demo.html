@@ -3414,7 +3414,7 @@ function renderTx(){
     </div>
 
     <div class="fs-card">
-      <div class="fs-card-title">Balance Sheet<span class="sub">From classified activity</span></div>
+      <div class="fs-card-title">Balance Sheet<span class="sub"></span></div>
       <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Balance</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
       ${allAssets.map(asset=>{
@@ -3433,7 +3433,7 @@ function renderTx(){
     </div>
 
     <div class="fs-card">
-      <div class="fs-card-title">Cash Flow Statement<span class="sub">Digital assets</span></div>
+      <div class="fs-card-title">Cash Flow Statement<span class="sub"></span></div>
       <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Item</div><div style="text-align:right">Amount</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Operating Activities</div><div></div></div>
       <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div></div>
@@ -3451,7 +3451,7 @@ function renderTx(){
       ${cum.bankInCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Deposits (${cum.bankInCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.bankIn)}${tx.dir==='inflow'&&isMapped&&isTxBank(tx)?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.bankOutCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Withdrawals (${cum.bankOutCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.bankOut)})${tx.dir==='outflow'&&isMapped&&isTxBank(tx)?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${tx.gas>0&&isMapped?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.gas)})</span>`:''}</div></div>`:''}
-      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Digital Asset Change</div><div style="text-align:right;font-weight:700;color:${netAssets>=0?'#16a34a':'#ea580c'}">$${fmt(netAssets)}</div></div>
+      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Asset Change</div><div style="text-align:right;font-weight:700;color:${netAssets>=0?'#16a34a':'#ea580c'}">$${fmt(netAssets)}</div></div>
     </div>
     ${hiddenTargets}`;
 
@@ -3658,7 +3658,7 @@ function renderReconciled(){
         return rows;
       }).join('')}
       ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
-      <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Digital Asset Change</div><div style="text-align:right">$${fmt(netUsdc-cum.gasSpent)}</div></div>
+      <div style="padding:10px 18px;font-size:13px;font-weight:700;display:grid;grid-template-columns:1fr 120px;border-top:2px solid #cbd5e1;background:#f8fafc;color:${netAssets>=0?'#16a34a':'#ea580c'}"><div>Net Asset Change</div><div style="text-align:right">$${fmt(netUsdc-cum.gasSpent)}</div></div>
       ${(cum.bankInCount>0||cum.bankOutCount>0)?`
       <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Bank Cash Flows</div>
       ${cum.bankInCount>0?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 120px"><div>Bank Deposits (${cum.bankInCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.bankIn)}</div></div>`:''}
