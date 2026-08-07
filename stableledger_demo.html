@@ -1429,12 +1429,23 @@
 <!-- ===== SCREEN 2: LEDGER ===== -->
 <div class="screen" id="screen-ledger">
   <div class="container">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;font-weight:500">Period</label>
+        <select id="periodType" onchange="onPeriodTypeChange()" style="font-size:12px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;color:#334155;background:#fff">
+          <option value="all">Since Inception</option>
+          <option value="month">Monthly</option>
+          <option value="quarter">Quarterly</option>
+          <option value="year">Yearly</option>
+        </select>
+        <select id="periodValue" onchange="onPeriodValueChange()" style="font-size:12px;padding:6px 10px;border:1px solid #e2e8f0;border-radius:6px;color:#334155;background:#fff;display:none"></select>
+      </div>
       <button id="refreshBtn" onclick="refreshScan()" style="font-size:12px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;display:flex;align-items:center;gap:6px">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
         Scan for new activity
       </button>
     </div>
+    <div id="periodDataGapNote" style="display:none;font-size:12px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:8px 14px;margin-bottom:12px"></div>
     <div class="summary-cards" id="summaryCards"></div>
     <div id="classifyNotice" style="display:none;font-size:12px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 14px;margin-bottom:16px;font-weight:500"></div>
     <div class="tx-nav">
@@ -1880,7 +1891,7 @@ async function obScanAll(){
       var result=await rRes.json();
       if(result&&!result.error&&result.journals){
         var store=getStore(w.addr);
-        store.txs=result.journals.map(function(j){return{hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}});
+        store.txs=result.journals.map(function(j){return{hash:j.tx_hash,block:j.block_number,date:j.date,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}});
         store.scanData=result;store.mappings={};store.cpMappings={};
         store.scanTime=new Date().toLocaleString();
         if(result.scan_range)store.lastBlock=result.scan_range.to_block;
@@ -2821,7 +2832,7 @@ function onRefreshComplete(walletObj,report){
   const walletAddr=walletObj.addr;
   const store=getStore(walletAddr);
 
-  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}));
+  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,date:j.date,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}));
 
   // Deduplicate against this specific wallet's own existing transactions
   const existingHashes=new Set(store.txs.map(t=>t.hash));
@@ -3253,6 +3264,72 @@ function getFilteredIdxs(){
   return filteredIdxs;
 }
 
+// ============ PERIOD BREAKOUT ============
+// Dates are stored as UTC "YYYY-MM-DD" strings (blockchain dates come from real
+// block timestamps captured server-side; bank dates come from Plaid). Bucketing
+// uses UTC methods throughout to avoid local-timezone off-by-one-day shifts.
+function getPeriodKey(dateStr,type){
+  if(!dateStr)return null;
+  const d=new Date(dateStr+'T00:00:00Z');
+  if(isNaN(d.getTime()))return null;
+  const y=d.getUTCFullYear();
+  if(type==='year')return String(y);
+  if(type==='quarter')return y+'-Q'+(Math.floor(d.getUTCMonth()/3)+1);
+  return y+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); // month
+}
+function getPeriodLabel(key,type){
+  if(type==='year')return key;
+  if(type==='quarter'){const[y,q]=key.split('-Q');return 'Q'+q+' '+y;}
+  const[y,m]=key.split('-');
+  const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return names[parseInt(m,10)-1]+' '+y;
+}
+function onPeriodTypeChange(){
+  const type=document.getElementById('periodType').value;
+  const valSel=document.getElementById('periodValue');
+  if(type==='all'){
+    valSel.style.display='none';
+    filteredIdxs=null;
+    document.getElementById('periodDataGapNote').style.display='none';
+    idx=getFilteredIdxs()[0]||0;
+    renderLedger();
+    return;
+  }
+  const keys=new Set();
+  txs.forEach(function(t){const k=getPeriodKey(t.date,type);if(k)keys.add(k);});
+  const sorted=Array.from(keys).sort().reverse().slice(0,12); // most recent 12
+  if(!sorted.length){
+    alert('None of the loaded transactions have a usable date for '+type+'ly breakout. Older transactions scanned before date-capture was added won\'t have one - try rescanning.');
+    document.getElementById('periodType').value='all';
+    return;
+  }
+  valSel.innerHTML=sorted.map(function(k){return '<option value="'+k+'">'+getPeriodLabel(k,type)+'</option>'}).join('');
+  valSel.style.display='inline-block';
+  onPeriodValueChange();
+}
+function onPeriodValueChange(){
+  const type=document.getElementById('periodType').value;
+  const key=document.getElementById('periodValue').value;
+  const undated=txs.filter(function(t){return !t.date}).length;
+  const gapNote=document.getElementById('periodDataGapNote');
+  if(undated>0){
+    gapNote.textContent=undated+' transaction'+(undated>1?'s':'')+' in this ledger have no captured date (scanned before date tracking was added) and are excluded from every period view below. They still appear in Since Inception.';
+    gapNote.style.display='block';
+  } else {
+    gapNote.style.display='none';
+  }
+  filteredIdxs=txs.map(function(t,i){return i}).filter(function(i){return getPeriodKey(txs[i].date,type)===key;});
+  idx=filteredIdxs.length?filteredIdxs[0]:0;
+  renderLedger();
+}
+function getPeriodFilteredTxs(){
+  // Used specifically for the cumulative financial-statement computation, which
+  // needs actual tx objects, not indices. Falls back to every transaction when
+  // no period is selected (Since Inception), same as getFilteredIdxs.
+  if(filteredIdxs===null)return txs;
+  return filteredIdxs.map(function(i){return txs[i]});
+}
+
 function applyFilters(){
   const dir=document.getElementById('filterDir').value;
   const chain=document.getElementById('filterChain').value;
@@ -3394,7 +3471,7 @@ function getJournal(tx){
 
 function computeTotals(){
   const o=OPENING;let im={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,usdcChg:0,ethChg:0,bankChg:0,uncIn:0,uncOut:0,classified:0};
-  txs.forEach(tx=>{const g=glOf(tx.hash),p=pfx(g);im.expGas+=tx.gas;
+  getPeriodFilteredTxs().forEach(tx=>{const g=glOf(tx.hash),p=pfx(g);im.expGas+=tx.gas;
     if(g==="Unclassified"){if(tx.dir==="inflow")im.uncIn+=tx.amount;else im.uncOut+=tx.amount;}
     else{im.classified++;if(p==="4100")im.revSvc+=tx.amount;else if(p==="4200")im.revProd+=tx.amount;
       else if(p==="6110")im.expPay+=tx.amount;else if(p==="6200")im.expSw+=tx.amount;else if(p==="6300")im.expCloud+=tx.amount;
@@ -3411,13 +3488,18 @@ function computeTotals(){
 function renderLedger(){
   // Wallet chips
   renderWalletChips();
-  // Summary cards
-  const s=scanData.summary,t=computeTotals();
+  // Summary cards - computed from whatever period is currently selected, not
+  // the static scanData.summary (which is always since-inception and never
+  // respected any filter, period-based or otherwise)
+  const periodTxs=getPeriodFilteredTxs();
+  const inTxs=periodTxs.filter(t=>t.dir==='inflow'),outTxs=periodTxs.filter(t=>t.dir==='outflow');
+  const totalIn=inTxs.reduce((s,t)=>s+t.amount,0),totalOut=outTxs.reduce((s,t)=>s+t.amount,0);
+  const t=computeTotals();
   document.getElementById("summaryCards").innerHTML=[
-    {l:"Total In",v:fmtShort(s.total_usdc_in),s:s.inflow_count+" transfers",c:"#16a34a"},
-    {l:"Total Out",v:fmtShort(s.total_usdc_out),s:s.outflow_count+" transfers",c:"#ea580c"},
-    {l:"Net",v:fmtShort(s.net_usdc),s:s.transfer_count+" total",c:s.net_usdc>=0?"#16a34a":"#ea580c"},
-    {l:"Classified",v:t.im.classified+"/"+txs.length,s:(txs.length-t.im.classified)+" remaining",c:t.im.classified===txs.length?"#16a34a":"#d97706"},
+    {l:"Total In",v:fmtShort(totalIn),s:inTxs.length+" transfers",c:"#16a34a"},
+    {l:"Total Out",v:fmtShort(totalOut),s:outTxs.length+" transfers",c:"#ea580c"},
+    {l:"Net",v:fmtShort(totalIn-totalOut),s:periodTxs.length+" total",c:(totalIn-totalOut)>=0?"#16a34a":"#ea580c"},
+    {l:"Classified",v:t.im.classified+"/"+periodTxs.length,s:(periodTxs.length-t.im.classified)+" remaining",c:t.im.classified===periodTxs.length?"#16a34a":"#d97706"},
   ].map(c=>`<div class="sc"><div class="sc-label">${c.l}</div><div class="sc-value" style="color:${c.c}">${c.v}</div><div class="sc-sub">${c.s}</div></div>`).join("");
   renderTx();
 }
@@ -3482,7 +3564,7 @@ function renderTx(){
   // Compute cumulative totals across ALL classified transactions
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
     assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{},byAccount:{}};
-  txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
+  getPeriodFilteredTxs().forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
     else if(tp==="6110")cum.expPay+=t.amount;else if(tp==="6200")cum.expSw+=t.amount;else if(tp==="6300")cum.expCloud+=t.amount;
@@ -3734,7 +3816,7 @@ function renderReconciled(){
   // Compute cumulative from zero
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
     assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{},byAccount:{}};
-  txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
+  getPeriodFilteredTxs().forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
     else if(tp==="6110")cum.expPay+=t.amount;else if(tp==="6200")cum.expSw+=t.amount;else if(tp==="6300")cum.expCloud+=t.amount;
@@ -5139,7 +5221,7 @@ async function rescanWalletForReconciliation(w){
   if(result.error)throw new Error(result.error);
 
   const newTxs=(result.journals||[]).map(j=>({
-    hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,
+    hash:j.tx_hash,block:j.block_number,date:j.date,dir:j.direction,amount:j.amount,
     cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'
   }));
   const existingHashes=new Set(store.txs.map(t=>t.hash));

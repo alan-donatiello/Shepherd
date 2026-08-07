@@ -222,6 +222,16 @@ def db_init_schema():
                 created_at TIMESTAMPTZ DEFAULT now()
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS plaid_access_tokens (
+                id SERIAL PRIMARY KEY,
+                org_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+                item_id TEXT UNIQUE NOT NULL,
+                access_token TEXT NOT NULL,
+                institution_name TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            );
+        """)
         conn.commit()
         cur.close()
         print("  [DB] Multi-tenant schema ready.")
@@ -981,6 +991,24 @@ class EVMStablecoinLedger:
         self._receipt_cache[tx_hash] = r
         return r
 
+    def _block_timestamp(self, block_number):
+        """Real calendar date for a block - eth_getLogs never returns one, only
+        eth_getBlockByNumber does, so this is a genuinely separate call. Cached
+        per unique block since many transfers usually share the same block,
+        so this doesn't multiply the RPC cost by transfer count."""
+        if not hasattr(self, "_block_ts_cache"):
+            self._block_ts_cache = {}
+        if block_number in self._block_ts_cache:
+            return self._block_ts_cache[block_number]
+        try:
+            block = self._rpc("eth_getBlockByNumber", [hex(block_number), False])
+            ts = int(block["timestamp"], 16) if block and block.get("timestamp") else None
+            date_str = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d") if ts else None
+        except Exception:
+            date_str = None
+        self._block_ts_cache[block_number] = date_str
+        return date_str
+
     def _gas_usd_for_outflow(self, tx_hash):
         r = self._receipt(tx_hash)
         if not r or r.get("status") != "0x1":
@@ -1025,6 +1053,7 @@ class EVMStablecoinLedger:
         return {
             "tx_hash": transfer["tx_hash"],
             "block_number": transfer["block_number"],
+            "date": self._block_timestamp(transfer["block_number"]),
             "direction": transfer["direction"],
             "asset": asset,
             "chain": self.chain_key,
@@ -1215,6 +1244,8 @@ class SolanaStablecoinLedger:
         fee_lamports = meta.get("fee", 0)
         fee_sol = fee_lamports / 1e9
         fee_usd = round(fee_sol * self.SOL_USD_PRICE, 6)
+        block_time = tx.get("blockTime")
+        date_str = datetime.utcfromtimestamp(block_time).strftime("%Y-%m-%d") if block_time else None
         account_keys = []
         msg = tx.get("transaction", {}).get("message", {})
         for ak in msg.get("accountKeys", []):
@@ -1265,6 +1296,7 @@ class SolanaStablecoinLedger:
                 "tx_hash": signature,
                 "block_number": slot,
                 "slot": slot,
+                "date": date_str,
                 "log_index": 0,
                 "fee_sol": fee_sol if is_signer else 0,
                 "fee_usd": fee_usd if is_signer else 0,
@@ -1306,6 +1338,7 @@ class SolanaStablecoinLedger:
         return {
             "tx_hash": transfer["tx_hash"],
             "block_number": transfer.get("slot", 0),
+            "date": transfer.get("date"),
             "direction": transfer["direction"],
             "asset": asset,
             "amount": amt,
@@ -1348,7 +1381,57 @@ PLAID_CLIENT_ID = os.environ.get("PLAID_CLIENT_ID", "").strip()
 PLAID_SECRET = os.environ.get("PLAID_SECRET", "").strip()
 PLAID_ENV = os.environ.get("PLAID_ENV", "sandbox").strip()  # sandbox, development, or production
 
-plaid_items = {}  # access_token keyed by item_id, plus metadata
+plaid_items = {}  # in-memory cache only - access_token keyed by item_id, plus metadata.
+# This dict alone is NOT durable: it lives in server process memory and is wiped on
+# every restart/redeploy, which is exactly why bank connections kept silently breaking
+# after any deploy. db_save_plaid_item/db_get_plaid_access_token below are the actual
+# source of truth; this dict just avoids a DB round-trip on every single lookup.
+
+def db_save_plaid_item(org_id, item_id, access_token, institution_name=""):
+    if not DB_AVAILABLE:
+        return
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO plaid_access_tokens (org_id, item_id, access_token, institution_name)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (item_id) DO UPDATE SET access_token = EXCLUDED.access_token
+        """, (org_id, item_id, access_token, institution_name))
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        conn.rollback()
+        print(f"  [DB] save_plaid_item error: {e}")
+    finally:
+        db_release(conn)
+
+def db_get_plaid_access_token(item_id):
+    if not DB_AVAILABLE:
+        return None
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT access_token FROM plaid_access_tokens WHERE item_id = %s", (item_id,))
+        row = cur.fetchone()
+        cur.close()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"  [DB] get_plaid_access_token error: {e}")
+        return None
+    finally:
+        db_release(conn)
+
+def get_plaid_item(item_id):
+    """Looks up a Plaid item's access token, checking the in-memory cache first
+    and falling back to the database - which is what actually survives a restart."""
+    if item_id in plaid_items:
+        return plaid_items[item_id]
+    token = db_get_plaid_access_token(item_id)
+    if token:
+        plaid_items[item_id] = {"access_token": token}
+        return plaid_items[item_id]
+    return None
 
 def plaid_base_url():
     return f"https://{PLAID_ENV}.plaid.com"
@@ -1385,12 +1468,14 @@ def plaid_create_link_token():
     })
     return result
 
-def plaid_exchange_public_token(public_token):
+def plaid_exchange_public_token(public_token, org_id=None):
     result = plaid_request("/item/public_token/exchange", {"public_token": public_token})
     if result["success"]:
         access_token = result["data"]["access_token"]
         item_id = result["data"]["item_id"]
         plaid_items[item_id] = {"access_token": access_token}
+        if org_id:
+            db_save_plaid_item(org_id, item_id, access_token)
         return {"success": True, "item_id": item_id}
     return result
 
@@ -3133,7 +3218,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
 
             txs_to_save = [{
-                "hash": j["tx_hash"], "block": j.get("block_number"), "dir": j["direction"],
+                "hash": j["tx_hash"], "block": j.get("block_number"), "date": j.get("date"), "dir": j["direction"],
                 "amount": j["amount"], "cp": j["counterparty"], "gas": j.get("gas_usd", 0),
                 "asset": j.get("asset", "USDC"), "source": "blockchain"
             } for j in report.get("journals", [])]
@@ -3193,7 +3278,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return
 
             txs_to_save = [{
-                "hash": j["tx_hash"], "block": j.get("block_number"), "dir": j["direction"],
+                "hash": j["tx_hash"], "block": j.get("block_number"), "date": j.get("date"), "dir": j["direction"],
                 "amount": j["amount"], "cp": j["counterparty"], "gas": j.get("gas_usd", 0),
                 "asset": j.get("asset", "USDC"), "source": "blockchain"
             } for j in report.get("journals", [])]
@@ -3344,10 +3429,14 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if self.path == "/api/plaid/exchange_token":
+            user = self._authed_web_user()
+            if not user:
+                self._send_json(401, {"error": "Not logged in"})
+                return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode()) if length else {}
             public_token = body.get("public_token", "")
-            result = plaid_exchange_public_token(public_token)
+            result = plaid_exchange_public_token(public_token, org_id=user["org_id"])
             self.send_response(200)
             self._cors()
             self.send_header("Content-Type", "application/json")
@@ -3359,7 +3448,7 @@ class Handler(SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length).decode()) if length else {}
             item_id = body.get("item_id", "")
-            item = plaid_items.get(item_id)
+            item = get_plaid_item(item_id)
             if not item:
                 result = {"success": False, "message": "Unknown item_id"}
             else:
@@ -3376,7 +3465,7 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.loads(self.rfile.read(length).decode()) if length else {}
             item_id = body.get("item_id", "")
             cursor = body.get("cursor")
-            item = plaid_items.get(item_id)
+            item = get_plaid_item(item_id)
             if not item:
                 result = {"success": False, "message": "Unknown item_id"}
             else:
