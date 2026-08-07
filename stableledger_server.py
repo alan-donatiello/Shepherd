@@ -1726,6 +1726,21 @@ def send_welcome_email(to_email, name, org_name):
     send_system_email(to_email, "Welcome to Shepherd", html)
 
 
+def send_beta_signup_confirmation(to_email, name):
+    first_name = (name or "").split(" ")[0] or "there"
+    html = f"""
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;color:#0f172a;padding:8px">
+      <h2 style="margin:0 0 12px;font-size:20px">Thanks, {first_name}</h2>
+      <p style="color:#475569;line-height:1.6;margin:0 0 16px;font-size:15px">Your request for Shepherd access came through. We're working with a small number of businesses right now to shape the product around real usage, and we'll follow up personally within a day or two to set up a walkthrough.</p>
+      <p style="color:#475569;line-height:1.6;margin:0;font-size:15px">Talk soon.</p>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;border-top:1px solid #e2e8f0;width:100%"><tr><td style="padding-top:20px">
+        <img src="{APP_BASE_URL}/logo.png" width="28" height="19" alt="Shepherd" style="display:block;border-radius:4px">
+      </td></tr></table>
+    </div>
+    """
+    send_system_email(to_email, "We got your request for Shepherd access", html)
+
+
 def send_password_reset_email(to_email, reset_token):
     reset_link = f"{APP_BASE_URL}/?reset_token={reset_token}"
     html = f"""
@@ -2794,6 +2809,7 @@ class Handler(SimpleHTTPRequestHandler):
                 conn.commit()
                 cur.close()
                 print(f"  [Beta Signup] {email} ({firm_name or 'no firm given'})")
+                threading.Thread(target=send_beta_signup_confirmation, args=(email, name), daemon=True).start()
                 self._send_json(200, {"success": True})
             except Exception as e:
                 conn.rollback()
