@@ -808,8 +808,9 @@
             <div class="ob-chips" id="obGLRevChips">
               <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">4100 - Revenue - Services</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
               <div class="gl-chip ob-chip selected" onclick="obToggleGL(this)"><span class="gl-text">4200 - Revenue - Product</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
-               <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4400 - Interest Income</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
-            
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4300 - Customer Refund</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4400 - Interest Income</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
+              <div class="gl-chip ob-chip" onclick="obToggleGL(this)"><span class="gl-text">4500 - Staking Revenue</span><span class="gl-edit" onclick="event.stopPropagation();obEditGL(this.parentElement)" title="Edit">&#9998;</span></div>
             </div>
           </div>
           <div class="ob-section">
@@ -2657,6 +2658,7 @@ function renderWalletChips(){
   el.innerHTML=chips;
 }
 const fmt=n=>Math.abs(n)<.01&&n!==0?n.toFixed(4):n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const escHtml=s=>(s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const fmtShort=n=>{if(Math.abs(n)>=1e6)return"$"+(n/1e6).toFixed(1)+"M";if(Math.abs(n)>=1e3)return"$"+(n/1e3).toFixed(1)+"K";return"$"+fmt(n)};
 const addr=a=>{
   if(!a)return a;
@@ -3206,12 +3208,29 @@ function isTxBank(tx){
   return !!(w&&w.chain==='Bank');
 }
 
+function walletAcctInfo(tx){
+  // Identifies which SPECIFIC connected account (bank or wallet) a transaction
+  // belongs to, so the balance sheet can show real linked accounts by name
+  // instead of one generic "Bank - Checking" bucket or one bucket per token
+  // regardless of which wallet actually holds it.
+  const w=wallets.find(x=>x.addr.toLowerCase()===(tx.walletAddr||activeWalletAddr||'').toLowerCase());
+  const isBank=isTxBank(tx);
+  const assetSymbol=tx.asset||'USDC';
+  if(w){
+    const idx=wallets.indexOf(w);
+    const label=isBank?("Bank - "+w.name):(w.name+" - "+assetSymbol);
+    const target=isBank?("bs-acct-"+idx):("bs-acct-"+idx+"-"+assetSymbol.toLowerCase());
+    return {label,target,isBank,assetSymbol};
+  }
+  // Fallback only if the originating wallet can't be resolved (shouldn't
+  // normally happen, but keeps this from ever throwing)
+  return {label:isBank?"Bank - Checking":("Digital Asset - "+assetSymbol), target:isBank?"bs-bank":("bs-"+assetSymbol.toLowerCase()),isBank,assetSymbol};
+}
 function getJournal(tx){
   const g=glOf(tx.hash),label=g==="Unclassified"?(tx.dir==="outflow"?"AP / Expense (unclassified)":"AR / Revenue (unclassified)"):g;
   const isBank=isTxBank(tx);
   const assetSymbol=tx.asset||'USDC';
-  const assetAcct=isBank?"Bank - Checking":("Digital Asset - "+assetSymbol);
-  const assetTarget=isBank?"bs-bank":("bs-"+assetSymbol.toLowerCase());
+  const {label:assetAcct,target:assetTarget}=walletAcctInfo(tx);
   if(tx.dir==="outflow"){
     const l=[{n:1,acct:label,dr:tx.amount,cr:0,t:getTarget(g,"expense")},{n:2,acct:assetAcct,dr:0,cr:tx.amount,t:assetTarget}];
     if(tx.gas>0){l.push({n:3,acct:"Expense - Network Fees",dr:tx.gas,cr:0,t:"pnl-gas"});l.push({n:4,acct:"Digital Asset - ETH",dr:0,cr:tx.gas,t:"bs-eth"});}
@@ -3309,7 +3328,7 @@ function renderTx(){
   // Financial statements — cumulative from zero, only classified transactions
   // Compute cumulative totals across ALL classified transactions
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
-    assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+    assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{},byAccount:{}};
   txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
@@ -3328,6 +3347,10 @@ function renderTx(){
       else{cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
     }
     cum.expGas+=t.gas;
+    const acctInfo=walletAcctInfo(t);
+    if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,net:0};
+    cum.byAccount[acctInfo.target].net+=(t.dir==="inflow"?1:-1)*t.amount;
+    if(!acctInfo.isBank&&t.dir==="outflow")cum.byAccount[acctInfo.target].net-=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
   const customExpTotal=Object.values(cum.customExp).reduce((s,v)=>s+v,0);
@@ -3417,13 +3440,12 @@ function renderTx(){
       <div class="fs-card-title">Balance Sheet<span class="sub"></span></div>
       <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Balance</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
-      ${allAssets.map(asset=>{
-        const net=netByAsset[asset];
-        if(Math.abs(net)<0.01)return`<div id="fs-bs-${asset.toLowerCase()}"></div>`;
-        return`<div class="fs-line indent clickable ${hc('bs-'+asset.toLowerCase())}" id="fs-bs-${asset.toLowerCase()}" style="grid-template-columns:1fr 100px;${hb('bs-'+asset.toLowerCase())}" onclick="openAudit('${asset.toLowerCase()}','${asset}')"><div>${asset}</div><div style="text-align:right;color:${net>=0?'#16a34a':'#ea580c'}">$${fmt(net)}${incLabel('bs-'+asset.toLowerCase())}</div></div>`;
-      }).join('')}
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent clickable ${hc('bs-eth')}" id="fs-bs-eth" style="grid-template-columns:1fr 100px;${hb('bs-eth')}" onclick="openAudit('gas','Network Fees')"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${incLabel('bs-eth')}</div></div>`:`<div id="fs-bs-eth"></div>`}
-      ${(cum.bankIn>0||cum.bankOut>0)?`<div class="fs-line indent clickable ${hc('bs-bank')}" id="fs-bs-bank" style="grid-template-columns:1fr 100px;${hb('bs-bank')}" onclick="openAudit('bank','Bank Checking')"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}${incLabel('bs-bank')}</div></div>`:`<div id="fs-bs-bank"></div>`}
+      ${Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-acct-')).map(([target,acct])=>{
+        const suffix=target.replace('bs-acct-','');
+        return `<div class="fs-line indent clickable ${hc(target)}" id="fs-${target}" style="grid-template-columns:1fr 100px;${hb(target)}" onclick="openAudit('acct-${suffix}')"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#16a34a':'#ea580c'}">$${fmt(acct.net)}${incLabel(target)}</div></div>`;
+      }).join('')}
+      ${(cum.bankIn>0||cum.bankOut>0)&&!Object.keys(cum.byAccount).some(k=>k.startsWith('bs-acct-')&&cum.byAccount[k].isBank)?`<div class="fs-line indent clickable ${hc('bs-bank')}" id="fs-bs-bank" style="grid-template-columns:1fr 100px;${hb('bs-bank')}" onclick="openAudit('bank','Bank Checking')"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}${incLabel('bs-bank')}</div></div>`:`<div id="fs-bs-bank"></div>`}
       <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Equity</div><div></div></div>
       <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
@@ -3543,7 +3565,7 @@ function renderReconciled(){
 
   // Compute cumulative from zero
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
-    assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{}};
+    assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{},byAccount:{}};
   txs.forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
     const gType=GL_TYPE[tp]||'expense';
     if(tp==="4100")cum.revSvc+=t.amount;else if(tp==="4200")cum.revProd+=t.amount;
@@ -3562,6 +3584,10 @@ function renderReconciled(){
       else{cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
     }
     cum.expGas+=t.gas;
+    const acctInfo=walletAcctInfo(t);
+    if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,net:0};
+    cum.byAccount[acctInfo.target].net+=(t.dir==="inflow"?1:-1)*t.amount;
+    if(!acctInfo.isBank&&t.dir==="outflow")cum.byAccount[acctInfo.target].net-=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
   const customExpTotal=Object.values(cum.customExp).reduce((s,v)=>s+v,0);
@@ -3818,7 +3844,19 @@ async function onPlaidSuccess(public_token,metadata){
     // Register each account as a pseudo-wallet so it flows through the existing pipeline
     accounts.forEach(function(a){
       if(!wallets.find(function(w){return w.addr===a.id})){
-        wallets.push({addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId,mask:a.mask||''});
+        var bankWallet={addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId,mask:a.mask||''};
+        wallets.push(bankWallet);
+        // Persist immediately - this was missing entirely before, meaning connected
+        // bank accounts never survived a refresh or logout, the same class of gap
+        // already found and fixed for crypto wallets earlier.
+        if(currentUser){
+          fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({address:a.id,name:bankWallet.name,chain:'bank',lookback:0,transactions:[]})
+          }).then(function(res){return res.json()}).then(function(saveData){
+            if(saveData.success)bankWallet._dbId=saveData.wallet_id;
+            else{console.error('[Persistence] Bank wallet save rejected:',saveData.error||saveData);showPersistenceWarning();}
+          }).catch(function(e){console.error('[Persistence] Bank wallet save failed:',e);showPersistenceWarning();});
+        }
       }
     });
 
@@ -3844,6 +3882,7 @@ async function syncPlaidTransactions(itemId){
     var item=plaidItems.find(function(p){return p.item_id===itemId});
     if(!item)return;
 
+    var newlyAddedByAccount={};
     data.added.forEach(function(t){
       var acctId=t.account_id;
       var store=getStore(acctId);
@@ -3856,7 +3895,7 @@ async function syncPlaidTransactions(itemId){
       var cp=t.merchant_name||t.name||'Unknown';
       var dateSort=new Date(t.date).getTime();
 
-      store.txs.push({
+      var newTx={
         hash:hash,
         block:dateSort, // used for sorting; displayed as date for bank txs
         date:t.date,
@@ -3865,11 +3904,29 @@ async function syncPlaidTransactions(itemId){
         cp:cp,
         gas:0,
         source:'bank'
-      });
+      };
+      store.txs.push(newTx);
+      if(!newlyAddedByAccount[acctId])newlyAddedByAccount[acctId]=[];
+      newlyAddedByAccount[acctId].push(newTx);
 
       // Auto-classify if counterparty already known
       if(store.cpMappings[cp]){store.mappings[hash]=store.cpMappings[cp];}
     });
+
+    // Persist newly found transactions per account - same gap as the wallet save above,
+    // bank transactions were never reaching the database at all before this.
+    if(currentUser){
+      Object.keys(newlyAddedByAccount).forEach(function(acctId){
+        var wMeta=wallets.find(function(w){return w.addr===acctId});
+        if(wMeta&&wMeta._dbId){
+          fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({wallet_id:wMeta._dbId,transactions:newlyAddedByAccount[acctId],last_block:null})
+          }).then(function(res){return res.json()}).then(function(saveData){
+            if(!saveData.success){console.error('[Persistence] Bank transaction sync rejected:',saveData.error||saveData);showPersistenceWarning();}
+          }).catch(function(e){console.error('[Persistence] Bank transaction sync failed:',e);showPersistenceWarning();});
+        }
+      });
+    }
 
     store_setScanTime(itemId);
   }catch(e){console.log('Sync error:',e);}
@@ -5441,6 +5498,24 @@ function openAudit(glCode,label){
   if(glCode==='gas'){
     // Gas: show all classified outflow transactions with gas > 0
     matching=txs.filter(t=>glOf(t.hash)!=="Unclassified"&&t.dir==="outflow"&&t.gas>.001);
+  } else if(glCode.startsWith('acct-')){
+    // Specific connected account (bank or wallet+token) - the label is derived
+    // here from the wallet's own name rather than passed in as an argument,
+    // since wallet names are user-editable and this keeps them out of any
+    // onclick string entirely (assigned below via textContent, which is safe
+    // regardless of content - unlike interpolating into an HTML/JS string).
+    const parts=glCode.split('-'); // 'acct-3' (bank) or 'acct-3-usdc' (wallet+token)
+    const idx=parseInt(parts[1],10);
+    const assetPart=parts[2]||null;
+    const w=wallets[idx];
+    matching=txs.filter(t=>{
+      if(glOf(t.hash)==="Unclassified")return false;
+      const tw=wallets.find(x=>x.addr.toLowerCase()===(t.walletAddr||activeWalletAddr||'').toLowerCase());
+      if(!tw||wallets.indexOf(tw)!==idx)return false;
+      if(assetPart)return (t.asset||'USDC').toLowerCase()===assetPart;
+      return true;
+    });
+    label=w?(assetPart?(w.name+" - "+assetPart.toUpperCase()):("Bank - "+w.name)):label;
   } else if(glCode==='bank'){
     // Bank: show all classified bank transactions
     matching=txs.filter(t=>glOf(t.hash)!=="Unclassified"&&isTxBank(t));
