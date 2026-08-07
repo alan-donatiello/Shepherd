@@ -142,6 +142,7 @@ def db_init_schema():
                 address TEXT NOT NULL,
                 name TEXT,
                 chain TEXT,
+                plaid_item_id TEXT,
                 lookback INTEGER DEFAULT 1000,
                 last_block BIGINT,
                 last_scan_time TEXT,
@@ -152,6 +153,10 @@ def db_init_schema():
                 UNIQUE(org_id, address, chain)
             );
         """)
+        # Migration - the wallets table already existed on the live database before
+        # this column was added, so CREATE TABLE IF NOT EXISTS above is a no-op for
+        # it. This is safe to run on every startup.
+        cur.execute("ALTER TABLE wallets ADD COLUMN IF NOT EXISTS plaid_item_id TEXT;")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
                 id SERIAL PRIMARY KEY,
@@ -433,16 +438,16 @@ def db_get_or_create_end_user(org_id, external_id, name=None):
         db_release(conn)
 
 
-def db_save_wallet_v1(org_id, end_user_id, address, name, chain, lookback):
+def db_save_wallet_v1(org_id, end_user_id, address, name, chain, lookback, plaid_item_id=None):
     conn = db_conn()
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO wallets (org_id, end_user_id, address, name, chain, lookback)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (org_id, address, chain) DO UPDATE SET name = EXCLUDED.name, end_user_id = EXCLUDED.end_user_id
+            INSERT INTO wallets (org_id, end_user_id, address, name, chain, lookback, plaid_item_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (org_id, address, chain) DO UPDATE SET name = EXCLUDED.name, end_user_id = EXCLUDED.end_user_id, plaid_item_id = EXCLUDED.plaid_item_id
             RETURNING id
-        """, (org_id, end_user_id, address, name, chain, lookback))
+        """, (org_id, end_user_id, address, name, chain, lookback, plaid_item_id))
         wallet_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
@@ -2972,10 +2977,11 @@ class Handler(SimpleHTTPRequestHandler):
             name = body.get("name") or address
             lookback = int(body.get("lookback") or 1000)
             txs = body.get("transactions") or []
+            plaid_item_id = (body.get("plaid_item_id") or "").strip() or None
             if not address or not chain:
                 self._send_json(400, {"error": "address and chain are required"})
                 return
-            wallet_id = db_save_wallet_v1(user["org_id"], None, address, name, chain, lookback)
+            wallet_id = db_save_wallet_v1(user["org_id"], None, address, name, chain, lookback, plaid_item_id)
             if not wallet_id:
                 self._send_json(500, {"error": "Could not save wallet"})
                 return

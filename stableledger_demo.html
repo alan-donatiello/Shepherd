@@ -900,7 +900,7 @@
     <div style="font-size:24px;font-weight:700;color:#0f172a;letter-spacing:-0.02em">Shepherd</div>
   </div>
   <div class="sidebar-nav">
-    <div class="nav-item" onclick="navTo('ledger')" id="nav-ledger">
+    <div class="nav-item" onclick="openLedgerAll()" id="nav-ledger">
       <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
       Ledger
       <span class="nav-badge" id="ledgerBadge" style="display:none">0</span>
@@ -1284,7 +1284,7 @@
     <div class="wc-result" id="scanResult">
       <h4>Scan Complete</h4>
       <div class="wc-result-grid" id="resultGrid"></div>
-      <button class="btn btn-success" onclick="openLedger()">Open Ledger &#8594;</button>
+      <button class="btn btn-success" onclick="openLedgerAll()">Open Ledger &#8594;</button>
     </div>
 
     <div class="wc-saved-section">
@@ -2472,7 +2472,9 @@ async function hydrateFromServer(){
     }
     wallets=[];
     (payload.wallets||[]).forEach(function(w){
-      wallets.push({addr:w.address,name:w.name,chain:w.chain?(w.chain.charAt(0).toUpperCase()+w.chain.slice(1)):'',chainKey:w.chain,_dbId:w.id});
+      var isCreditCard=w.chain==='credit_card';
+      var chainLabel=isCreditCard?'Bank':(w.chain?(w.chain.charAt(0).toUpperCase()+w.chain.slice(1)):'');
+      wallets.push({addr:w.address,name:w.name,chain:chainLabel,chainKey:isCreditCard?'bank':w.chain,_dbId:w.id,isCreditCard:isCreditCard,plaidItemId:w.plaid_item_id||null});
       var s=getStore(w.address);
       s.lastBlock=w.last_block;
       s.scanTime=w.last_scan_time;
@@ -2685,6 +2687,18 @@ function toggleMobileSidebar(force){
   if(backdrop)backdrop.classList.toggle('open',open);
 }
 
+function openLedgerAll(){
+  // The main sidebar Ledger link should always show the full combined view -
+  // bank accounts and wallets together - regardless of whatever narrower
+  // selection might be left over from a previous drill-down (a reconciliation
+  // report, an audit trail click, etc). Those flows intentionally narrow the
+  // selection to one account; this explicitly resets it.
+  selectedWallets.clear();
+  wallets.forEach(function(w){var ws=getStore(w.addr);if(ws.txs.length>0)selectedWallets.add(w.addr.toLowerCase());});
+  ledgerView='all';
+  activeWalletAddr=null;
+  navTo('ledger');
+}
 function navTo(id){
   // Only save ledger state when leaving the ledger page
   var currentScreen=document.querySelector('.screen.active');
@@ -2714,120 +2728,129 @@ function navTo(id){
 function showConfig(){navTo('config');}
 function openLedger(){if(!txs.length)return;idx=0;ledgerView='single';if(activeWalletAddr)selectedWallets.add(activeWalletAddr.toLowerCase());navTo('ledger');}
 
+const REFRESH_BTN_ICON='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> ';
 async function refreshScan(){
-  if(selectedWallets.size!==1){alert('Select a single wallet to scan for new activity.');return;}
-  const lowercasedAddr=[...selectedWallets][0];
-  // selectedWallets stores lowercased addresses for case-insensitive bookkeeping — that's
-  // safe for EVM (case-insensitive) but Solana addresses are case-sensitive base58, so we
-  // must look up the ORIGINAL-CASE address before sending anything to the scan API.
-  const walletObj=wallets.find(w=>w.addr.toLowerCase()===lowercasedAddr);
-  const walletAddr=walletObj?walletObj.addr:lowercasedAddr;
-  activeWalletAddr=walletAddr;
-  const store=getStore(activeWalletAddr);
-  const isBase=activeWalletAddr.startsWith("0x");
-  const CHAIN_KEY_BY_LABEL={Base:'base',Ethereum:'ethereum',Polygon:'polygon',Solana:'solana'};
-  const chainKey=(walletObj&&walletObj.chainKey)||(walletObj&&CHAIN_KEY_BY_LABEL[walletObj.chain])||(isBase?'base':'solana');
+  // Scans every connected account - bank and crypto together - for new activity
+  // since its last scan, rather than requiring the user to pick exactly one.
   const btn=document.getElementById("refreshBtn");
-  btn.disabled=true;btn.innerHTML='Scanning...';
-
-  try{
-    // For EVM: scan from last block. For Solana: scan recent and dedupe
-    const body={wallet:activeWalletAddr,lookback_blocks:isBase?2000:200,chain:chainKey};
-    if(isBase&&store.lastBlock){body.from_block=store.lastBlock+1;}
-
-    const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const data=await res.json();
-    if(data.error)throw new Error(data.error);
-
-    // Poll for completion
-    const poll=setInterval(async()=>{
-      const pr=await fetch("/api/progress");const p=await pr.json();
-      if(!p.running){
-        clearInterval(poll);
-        const rr=await fetch("/api/result");const result=await rr.json();
-        if(result.error){btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';return;}
-        onRefreshComplete(result);
+  if(wallets.length===0)return;
+  btn.disabled=true;
+  const seenPlaidItems=new Set();
+  let failures=[];
+  for(let i=0;i<wallets.length;i++){
+    const w=wallets[i];
+    btn.innerHTML='Scanning '+(i+1)+' of '+wallets.length+'...';
+    try{
+      if(w.chain==='Bank'){
+        // Multiple accounts can share one Plaid item (connection) - only sync
+        // each underlying connection once, not once per account within it.
+        if(w.plaidItemId&&!seenPlaidItems.has(w.plaidItemId)){
+          seenPlaidItems.add(w.plaidItemId);
+          await syncPlaidTransactions(w.plaidItemId);
+        }
+      } else {
+        await scanOneWalletIncremental(w);
       }
-    },500);
-  }catch(e){
-    btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';
-    alert("Scan error: "+e.message);
-  }
-}
-
-function onRefreshComplete(report){
-  const btn=document.getElementById("refreshBtn");
-  btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg> Scan for new activity';
-
-  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}));
-  
-  // Deduplicate: only add txs we don't already have
-  const existingHashes=new Set(txs.map(t=>t.hash));
-  let addedCount=0;
-  newTxs.forEach(t=>{
-    if(!existingHashes.has(t.hash)){
-      txs.push(t);addedCount++;
-      // Auto-classify if counterparty is known
-      if(cpMappings[t.cp]){mappings[t.hash]=cpMappings[t.cp];}
-    }
-  });
-
-  // Update last block
-  const store=getStore(activeWalletAddr);
-  if(report.scan_range)store.lastBlock=report.scan_range.to_block;
-  store.scanTime=new Date().toLocaleString();
-
-  // Update scan data summary
-  if(scanData&&scanData.summary){
-    scanData.summary.transfer_count=txs.length;
-    scanData.summary.inflow_count=txs.filter(t=>t.dir==="inflow").length;
-    scanData.summary.outflow_count=txs.filter(t=>t.dir==="outflow").length;
-    scanData.summary.total_usdc_in=txs.filter(t=>t.dir==="inflow").reduce((s,t)=>s+t.amount,0);
-    scanData.summary.total_usdc_out=txs.filter(t=>t.dir==="outflow").reduce((s,t)=>s+t.amount,0);
-    scanData.summary.net_usdc=scanData.summary.total_usdc_in-scanData.summary.total_usdc_out;
-  }
-
-  saveToStore();
-
-  // Persist any newly found transactions - this was missing here, same gap as onboarding's scan.
-  if(currentUser&&addedCount>0){
-    var wMeta=wallets.find(function(w){return w.addr.toLowerCase()===activeWalletAddr.toLowerCase()});
-    if(wMeta&&wMeta._dbId){
-      var justAdded=newTxs.filter(function(t){return !existingHashes.has(t.hash)});
-      fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({wallet_id:wMeta._dbId,transactions:justAdded,last_block:store.lastBlock})
-      }).then(function(res){return res.json()}).then(function(data){
-        if(!data.success){console.error('[Persistence] Refresh sync rejected:',data.error||data);showPersistenceWarning();}
-      }).catch(function(e){console.error('[Persistence] Refresh sync failed:',e);showPersistenceWarning();});
-    } else if(wMeta&&!wMeta._dbId){
-      // This wallet was never saved in the first place (e.g. added before persistence existed) - save it now
-      fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({address:wMeta.addr,name:wMeta.name,chain:wMeta.chainKey||(wMeta.chain||'base').toLowerCase(),lookback:1000,transactions:txs})
-      }).then(function(res){return res.json()}).then(function(data){
-        if(data.success)wMeta._dbId=data.wallet_id;
-        else{console.error('[Persistence] Refresh wallet save rejected:',data.error||data);showPersistenceWarning();}
-      }).catch(function(e){console.error('[Persistence] Refresh wallet save failed:',e);showPersistenceWarning();});
+    }catch(e){
+      console.error('[Refresh] Failed for '+w.name+':',e);
+      failures.push(w.name);
     }
   }
-
-  // Show notification
-  const notice=document.getElementById("classifyNotice");
-  if(addedCount>0){
-    logAction('scan','Refresh scan',`${addr(activeWalletAddr)} - ${addedCount} new transaction${addedCount>1?'s':''} found`);
-    notice.textContent=`Found ${addedCount} new transaction${addedCount>1?'s':''}. ${Object.keys(cpMappings).length>0?'Known counterparties auto-classified.':''}`;
-    notice.style.display="block";setTimeout(()=>{notice.style.display="none";},5000);
-  } else {
-    notice.textContent="No new transactions found since last scan.";
-    notice.style.display="block";setTimeout(()=>{notice.style.display="none";},3000);
+  btn.disabled=false;btn.innerHTML=REFRESH_BTN_ICON+'Scan for new activity';
+  if(failures.length>0)alert('Scan finished, but these accounts had errors and may not be fully up to date: '+failures.join(', '));
+  // Refresh the ledger to reflect newly synced data across every account,
+  // not just whichever one happened to be selected before the scan.
+  if(selectedWallets.size===0||ledgerView==='all'){
+    wallets.forEach(function(w){var ws=getStore(w.addr);if(ws.txs.length>0)selectedWallets.add(w.addr.toLowerCase());});
   }
-  
+  loadSelected();
+  renderLedger();
   const badge=document.getElementById("ledgerBadge");
   if(badge){
     const unc=txs.filter(t=>!mappings[t.hash]||mappings[t.hash]==='Unclassified').length;
     badge.style.display=unc>0?"inline":"none";
     badge.textContent=unc;
   }
-  renderLedger();
+}
+
+async function scanOneWalletIncremental(walletObj){
+  const walletAddr=walletObj.addr;
+  const store=getStore(walletAddr);
+  const isBase=walletAddr.startsWith("0x");
+  const CHAIN_KEY_BY_LABEL={Base:'base',Ethereum:'ethereum',Polygon:'polygon',Solana:'solana'};
+  const chainKey=walletObj.chainKey||CHAIN_KEY_BY_LABEL[walletObj.chain]||(isBase?'base':'solana');
+  const body={wallet:walletAddr,lookback_blocks:isBase?2000:200,chain:chainKey};
+  if(isBase&&store.lastBlock){body.from_block=store.lastBlock+1;}
+
+  const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await res.json();
+  if(data.error)throw new Error(data.error);
+
+  await new Promise((resolve,reject)=>{
+    const poll=setInterval(async()=>{
+      const pr=await fetch("/api/progress");const p=await pr.json();
+      if(!p.running){
+        clearInterval(poll);
+        const rr=await fetch("/api/result");const result=await rr.json();
+        if(result.error){reject(new Error(result.error));return;}
+        onRefreshComplete(walletObj,result);
+        resolve();
+      }
+    },500);
+  });
+}
+
+function onRefreshComplete(walletObj,report){
+  const walletAddr=walletObj.addr;
+  const store=getStore(walletAddr);
+
+  const newTxs=report.journals.map(j=>({hash:j.tx_hash,block:j.block_number,dir:j.direction,amount:j.amount,cp:j.counterparty,gas:j.gas_usd||0,asset:j.asset||'USDC'}));
+
+  // Deduplicate against this specific wallet's own existing transactions
+  const existingHashes=new Set(store.txs.map(t=>t.hash));
+  let addedCount=0;
+  const justAdded=[];
+  newTxs.forEach(t=>{
+    if(!existingHashes.has(t.hash)){
+      store.txs.push(t);addedCount++;justAdded.push(t);
+      if(store.cpMappings[t.cp]){store.mappings[t.hash]=store.cpMappings[t.cp];}
+    }
+  });
+
+  if(report.scan_range)store.lastBlock=report.scan_range.to_block;
+  store.scanTime=new Date().toLocaleString();
+
+  // Persist any newly found transactions for this specific wallet
+  if(currentUser&&addedCount>0){
+    if(walletObj._dbId){
+      fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wallet_id:walletObj._dbId,transactions:justAdded,last_block:store.lastBlock})
+      }).then(function(res){return res.json()}).then(function(data){
+        if(!data.success){console.error('[Persistence] Refresh sync rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Refresh sync failed:',e);showPersistenceWarning();});
+    } else {
+      // This wallet was never saved in the first place (e.g. added before persistence existed) - save it now
+      fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({address:walletObj.addr,name:walletObj.name,chain:walletObj.chainKey||(walletObj.chain||'base').toLowerCase(),lookback:1000,transactions:store.txs})
+      }).then(function(res){return res.json()}).then(function(data){
+        if(data.success)walletObj._dbId=data.wallet_id;
+        else{console.error('[Persistence] Refresh wallet save rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Refresh wallet save failed:',e);showPersistenceWarning();});
+    }
+  }
+
+  saveToStore();
+
+  // Show notification
+  const notice=document.getElementById("classifyNotice");
+  if(addedCount>0){
+    logAction('scan','Refresh scan',`${addr(walletObj.addr)} - ${addedCount} new transaction${addedCount>1?'s':''} found`);
+    notice.textContent=`${walletObj.name}: found ${addedCount} new transaction${addedCount>1?'s':''}. ${Object.keys(store.cpMappings).length>0?'Known counterparties auto-classified.':''}`;
+    notice.style.display="block";setTimeout(()=>{notice.style.display="none";},5000);
+  }
+  // Badge and full ledger re-render happen once, after every account has been
+  // scanned (back in refreshScan) - not per-wallet here, since mid-loop the
+  // global txs/mappings may not reflect whichever wallet just finished.
 }
 
 // ============ WALLET MANAGEMENT ============
@@ -2841,8 +2864,15 @@ function closeAddWalletModal(){document.getElementById('addWalletOverlay').class
 
 var rescanIndex=null;
 function openRescanModal(i){
-  rescanIndex=i;
   var w=wallets[i];
+  if(w.chain==='Bank'){
+    // Skip the "blocks to scan" modal entirely - that's a crypto-chain concept
+    // and meaningless for a bank account. Just sync directly.
+    if(!w.plaidItemId){alert('This bank account is missing its Plaid connection reference and can\'t be rescanned. Try reconnecting it.');return;}
+    syncPlaidTransactions(w.plaidItemId);
+    return;
+  }
+  rescanIndex=i;
   document.getElementById('rescanWalletLabel').textContent=w.name+' · '+addr(w.addr);
   document.getElementById('rescanBlocksInput').value='10';
   document.getElementById('rescanOverlay').classList.add('open');
@@ -2851,13 +2881,22 @@ function closeRescanModal(){document.getElementById('rescanOverlay').classList.r
 function confirmRescan(){
   if(rescanIndex===null)return;
   var w=wallets[rescanIndex];
+  closeRescanModal();
+  if(w.chain==='Bank'){
+    // Bank accounts don't go through the crypto scan flow at all - that path
+    // validates the address as an 0x/Solana address and silently fails on a
+    // Plaid account id, which is exactly why this button previously did
+    // nothing visible for connected banks.
+    if(!w.plaidItemId){alert('This bank account is missing its Plaid connection reference and can\'t be rescanned. Try reconnecting it.');return;}
+    syncPlaidTransactions(w.plaidItemId);
+    return;
+  }
   var blocks=parseInt(document.getElementById('rescanBlocksInput').value)||10;
   document.getElementById('walletInput').value=w.addr;
   document.getElementById('nameInput').value=w.name;
   document.getElementById('blocksInput').value=blocks;
   var chainSel=document.getElementById('chainSelect');
   if(chainSel&&w.chainKey)chainSel.value=w.chainKey;
-  closeRescanModal();
   startScan();
 }
 
@@ -2927,7 +2966,6 @@ function renderWallets(){
         :`<div style="font-size:11px;color:#94a3b8;margin-top:4px">Not scanned yet</div>`}
       </div>
       <div style="display:flex;gap:6px;align-items:center">
-        ${hasData?`<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger(${i})">Open Ledger</button>`:""}
         <button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="${hasData?`openRescanModal(${i})`:`document.getElementById('walletInput').value='${w.addr}';document.getElementById('nameInput').value='${w.name}';startScan()`}">${hasData?"Rescan":"Scan"}</button>
         <button style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer" onclick="removeWallet(${i},event)">&times;</button>
       </div>
@@ -3207,24 +3245,31 @@ function isTxBank(tx){
   const w=wallets.find(x=>x.addr.toLowerCase()===(tx.walletAddr||activeWalletAddr||'').toLowerCase());
   return !!(w&&w.chain==='Bank');
 }
+function isTxCreditCard(tx){
+  if(!tx)return false;
+  const w=wallets.find(x=>x.addr.toLowerCase()===(tx.walletAddr||activeWalletAddr||'').toLowerCase());
+  return !!(w&&w.isCreditCard);
+}
 
 function walletAcctInfo(tx){
-  // Identifies which SPECIFIC connected account (bank or wallet) a transaction
-  // belongs to, so the balance sheet can show real linked accounts by name
-  // instead of one generic "Bank - Checking" bucket or one bucket per token
-  // regardless of which wallet actually holds it.
+  // Identifies which SPECIFIC connected account (bank, credit card, or wallet)
+  // a transaction belongs to, so the balance sheet can show real linked
+  // accounts by name instead of one generic bucket. Credit cards get a
+  // distinct target prefix (bs-liab- instead of bs-acct-) since they're a
+  // liability, not an asset, and need to be netted and displayed the opposite way.
   const w=wallets.find(x=>x.addr.toLowerCase()===(tx.walletAddr||activeWalletAddr||'').toLowerCase());
   const isBank=isTxBank(tx);
+  const isCC=isTxCreditCard(tx);
   const assetSymbol=tx.asset||'USDC';
   if(w){
     const idx=wallets.indexOf(w);
-    const label=isBank?("Bank - "+w.name):(w.name+" - "+assetSymbol);
-    const target=isBank?("bs-acct-"+idx):("bs-acct-"+idx+"-"+assetSymbol.toLowerCase());
-    return {label,target,isBank,assetSymbol};
+    const label=isCC?("Credit Card - "+w.name):(isBank?("Bank - "+w.name):(w.name+" - "+assetSymbol));
+    const target=isCC?("bs-liab-"+idx):(isBank?("bs-acct-"+idx):("bs-acct-"+idx+"-"+assetSymbol.toLowerCase()));
+    return {label,target,isBank,isCC,assetSymbol};
   }
   // Fallback only if the originating wallet can't be resolved (shouldn't
   // normally happen, but keeps this from ever throwing)
-  return {label:isBank?"Bank - Checking":("Digital Asset - "+assetSymbol), target:isBank?"bs-bank":("bs-"+assetSymbol.toLowerCase()),isBank,assetSymbol};
+  return {label:isBank?"Bank - Checking":("Digital Asset - "+assetSymbol), target:isBank?"bs-bank":("bs-"+assetSymbol.toLowerCase()),isBank,isCC:false,assetSymbol};
 }
 function getJournal(tx){
   const g=glOf(tx.hash),label=g==="Unclassified"?(tx.dir==="outflow"?"AP / Expense (unclassified)":"AR / Revenue (unclassified)"):g;
@@ -3338,18 +3383,25 @@ function renderTx(){
     else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
     else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
     const isBank=isTxBank(t);
+    const isCC=isTxCreditCard(t);
     const asset=t.asset||'USDC';
+    // Credit card transactions are deliberately excluded from bankIn/bankOut here -
+    // that aggregate feeds "Total Assets", and a credit card balance is a liability,
+    // not an asset. Its own balance is tracked separately via cum.byAccount below.
     if(t.dir==="inflow"){
-      if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}
-      else{cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
+      if(isBank&&!isCC){cum.bankIn+=t.amount;cum.bankInCount++;}
+      else if(!isBank){cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
     }else{
-      if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}
-      else{cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
+      if(isBank&&!isCC){cum.bankOut+=t.amount;cum.bankOutCount++;}
+      else if(!isBank){cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
     }
-    cum.expGas+=t.gas;
+    if(!isCC)cum.expGas+=t.gas;
     const acctInfo=walletAcctInfo(t);
-    if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,net:0};
-    cum.byAccount[acctInfo.target].net+=(t.dir==="inflow"?1:-1)*t.amount;
+    if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,isCC:acctInfo.isCC,net:0};
+    // A liability moves opposite an asset: a charge (outflow) INCREASES what's
+    // owed on a credit card, a payment (inflow) DECREASES it - backwards from
+    // how the same directions affect a checking account or wallet balance.
+    cum.byAccount[acctInfo.target].net+=(acctInfo.isCC?(t.dir==="outflow"?1:-1):(t.dir==="inflow"?1:-1))*t.amount;
     if(!acctInfo.isBank&&t.dir==="outflow")cum.byAccount[acctInfo.target].net-=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
@@ -3441,16 +3493,24 @@ function renderTx(){
       <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Balance</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent clickable ${hc('bs-eth')}" id="fs-bs-eth" style="grid-template-columns:1fr 100px;${hb('bs-eth')}" onclick="openAudit('gas','Network Fees')"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${incLabel('bs-eth')}</div></div>`:`<div id="fs-bs-eth"></div>`}
-      ${Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-acct-')).map(([target,acct])=>{
+      ${Object.entries(cum.byAccount).filter(([k,a])=>k.startsWith('bs-acct-')&&!a.isCC).map(([target,acct])=>{
         const suffix=target.replace('bs-acct-','');
         return `<div class="fs-line indent clickable ${hc(target)}" id="fs-${target}" style="grid-template-columns:1fr 100px;${hb(target)}" onclick="openAudit('acct-${suffix}')"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#16a34a':'#ea580c'}">$${fmt(acct.net)}${incLabel(target)}</div></div>`;
       }).join('')}
       ${(cum.bankIn>0||cum.bankOut>0)&&!Object.keys(cum.byAccount).some(k=>k.startsWith('bs-acct-')&&cum.byAccount[k].isBank)?`<div class="fs-line indent clickable ${hc('bs-bank')}" id="fs-bs-bank" style="grid-template-columns:1fr 100px;${hb('bs-bank')}" onclick="openAudit('bank','Bank Checking')"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}${incLabel('bs-bank')}</div></div>`:`<div id="fs-bs-bank"></div>`}
       <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+      ${(()=>{
+        const liabEntries=Object.entries(cum.byAccount).filter(([k,a])=>k.startsWith('bs-liab-'));
+        const totalLiab=liabEntries.reduce((s,[,a])=>s+a.net,0);
+        if(!liabEntries.length)return'';
+        return `<div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Liabilities</div><div></div></div>`
+          +liabEntries.map(([target,acct])=>`<div class="fs-line indent clickable ${hc(target)}" id="fs-${target}" style="grid-template-columns:1fr 100px;${hb(target)}" onclick="openAudit('acct-${target.replace('bs-liab-','')}')"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#ea580c':'#16a34a'}">$${fmt(acct.net)}${incLabel(target)}</div></div>`).join('')
+          +`<div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Liabilities</div><div style="text-align:right;font-weight:700">$${fmt(totalLiab)}</div></div>`;
+      })()}
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Equity</div><div></div></div>
-      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
+      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets-Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-')).reduce((s,[,a])=>s+a.net,0))}</div></div>
       ${Math.abs(cum.xferNet)>.01?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Intercompany / Transfers</div><div style="text-align:right">$${fmt(cum.xferNet)}</div></div>`:''}
-      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets-Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-')).reduce((s,[,a])=>s+a.net,0))}</div></div>
       <div class="fs-check pass">A = L + E: Balanced</div>
     </div>
 
@@ -3575,18 +3635,25 @@ function renderReconciled(){
     else if(gType==="revenue"){cum.customRev[tg]=(cum.customRev[tg]||0)+t.amount;}
     else if(gType==="expense"){cum.customExp[tg]=(cum.customExp[tg]||0)+t.amount;}
     const isBank=isTxBank(t);
+    const isCC=isTxCreditCard(t);
     const asset=t.asset||'USDC';
+    // Credit card transactions are deliberately excluded from bankIn/bankOut here -
+    // that aggregate feeds "Total Assets", and a credit card balance is a liability,
+    // not an asset. Its own balance is tracked separately via cum.byAccount below.
     if(t.dir==="inflow"){
-      if(isBank){cum.bankIn+=t.amount;cum.bankInCount++;}
-      else{cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
+      if(isBank&&!isCC){cum.bankIn+=t.amount;cum.bankInCount++;}
+      else if(!isBank){cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
     }else{
-      if(isBank){cum.bankOut+=t.amount;cum.bankOutCount++;}
-      else{cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
+      if(isBank&&!isCC){cum.bankOut+=t.amount;cum.bankOutCount++;}
+      else if(!isBank){cum.assetOut[asset]=(cum.assetOut[asset]||0)+t.amount;cum.assetOutCount[asset]=(cum.assetOutCount[asset]||0)+1;cum.gasSpent+=t.gas;}
     }
-    cum.expGas+=t.gas;
+    if(!isCC)cum.expGas+=t.gas;
     const acctInfo=walletAcctInfo(t);
-    if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,net:0};
-    cum.byAccount[acctInfo.target].net+=(t.dir==="inflow"?1:-1)*t.amount;
+    if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,isCC:acctInfo.isCC,net:0};
+    // A liability moves opposite an asset: a charge (outflow) INCREASES what's
+    // owed on a credit card, a payment (inflow) DECREASES it - backwards from
+    // how the same directions affect a checking account or wallet balance.
+    cum.byAccount[acctInfo.target].net+=(acctInfo.isCC?(t.dir==="outflow"?1:-1):(t.dir==="inflow"?1:-1))*t.amount;
     if(!acctInfo.isBank&&t.dir==="outflow")cum.byAccount[acctInfo.target].net-=t.gas;
   });
   const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
@@ -3653,17 +3720,21 @@ function renderReconciled(){
       <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
         <div style="font-size:13px;font-weight:600;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0">Balance Sheet</div>
         <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0">Assets</div>
-        ${allAssets.map(asset=>{
-          const net=netByAsset[asset];
-          if(Math.abs(net)<0.01)return'';
-          return`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('${asset.toLowerCase()}','${asset}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${asset}</div><div style="text-align:right;color:${net>=0?'#16a34a':'#ea580c'}">$${fmt(net)}</div></div>`;
-        }).join('')}
         ${cum.gasSpent>0.0000001?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('gas','Network Fees')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})</div></div>`:''}
-        ${(cum.bankIn>0||cum.bankOut>0)?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('bank','Bank Checking')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}</div></div>`:''}
+        ${Object.entries(cum.byAccount).filter(([k,a])=>k.startsWith('bs-acct-')&&!a.isCC).map(([target,acct])=>`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('acct-${target.replace('bs-acct-','')}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#16a34a':'#ea580c'}">$${fmt(acct.net)}</div></div>`).join('')}
+        ${(cum.bankIn>0||cum.bankOut>0)&&!Object.keys(cum.byAccount).some(k=>k.startsWith('bs-acct-')&&cum.byAccount[k].isBank)?`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('bank','Bank Checking')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}</div></div>`:''}
         <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+        ${(()=>{
+          const liabEntries=Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-'));
+          const totalLiab=liabEntries.reduce((s,[,a])=>s+a.net,0);
+          if(!liabEntries.length)return'';
+          return `<div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Liabilities</div>`
+            +liabEntries.map(([target,acct])=>`<div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px;border-bottom:1px solid #f8fafc;cursor:pointer" onclick="openAudit('acct-${target.replace('bs-liab-','')}')" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#ea580c':'#16a34a'}">$${fmt(acct.net)}</div></div>`).join('')
+            +`<div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Liabilities</div><div style="text-align:right;font-weight:700">$${fmt(totalLiab)}</div></div>`;
+        })()}
         <div style="padding:8px 18px;font-size:11px;font-weight:600;color:#334155;text-transform:uppercase;background:#f8fafc;border-bottom:1px solid #e2e8f0;border-top:1px solid #e2e8f0">Equity</div>
-        <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets)}</div></div>
-        <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
+        <div style="padding:7px 18px 7px 28px;font-size:12px;color:#475569;display:grid;grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets-Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-')).reduce((s,[,a])=>s+a.net,0))}</div></div>
+        <div style="padding:8px 18px;font-size:12px;font-weight:600;display:grid;grid-template-columns:1fr 100px;border-top:1px solid #e2e8f0"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets-Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-')).reduce((s,[,a])=>s+a.net,0))}</div></div>
         <div style="padding:10px 18px;font-size:12px;border-top:2px solid #cbd5e1;background:#f0fdf4;color:#166534;font-weight:600">A = L + E: Balanced</div>
       </div>
     </div>
@@ -3841,17 +3912,21 @@ async function onPlaidSuccess(public_token,metadata){
     var accounts=acctData.accounts;
     plaidItems.push({item_id:itemId,institution_name:institutionName,accounts:accounts});
 
-    // Register each account as a pseudo-wallet so it flows through the existing pipeline
+    // Register each account as a pseudo-wallet so it flows through the existing pipeline.
+    // Plaid reports type:'credit' for credit cards vs type:'depository' for checking/savings -
+    // this distinction matters a lot for accounting: a credit card is a liability (money owed),
+    // not an asset (money held), and needs to be journaled the opposite way.
     accounts.forEach(function(a){
       if(!wallets.find(function(w){return w.addr===a.id})){
-        var bankWallet={addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId,mask:a.mask||''};
+        var isCreditCard=a.type==='credit';
+        var bankWallet={addr:a.id,name:institutionName+' '+(a.name||a.subtype||'Account'),chain:'Bank',plaidItemId:itemId,mask:a.mask||'',isCreditCard:isCreditCard};
         wallets.push(bankWallet);
         // Persist immediately - this was missing entirely before, meaning connected
         // bank accounts never survived a refresh or logout, the same class of gap
         // already found and fixed for crypto wallets earlier.
         if(currentUser){
           fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({address:a.id,name:bankWallet.name,chain:'bank',lookback:0,transactions:[]})
+            body:JSON.stringify({address:a.id,name:bankWallet.name,chain:isCreditCard?'credit_card':'bank',lookback:0,transactions:[],plaid_item_id:itemId})
           }).then(function(res){return res.json()}).then(function(saveData){
             if(saveData.success)bankWallet._dbId=saveData.wallet_id;
             else{console.error('[Persistence] Bank wallet save rejected:',saveData.error||saveData);showPersistenceWarning();}
@@ -3872,15 +3947,18 @@ async function onPlaidSuccess(public_token,metadata){
   }
 }
 
-async function syncPlaidTransactions(itemId){
+async function syncPlaidTransactions(itemId,btn){
+  if(btn){btn.disabled=true;btn.textContent='Syncing...';}
   try{
     var res=await fetch('/api/plaid/transactions',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({item_id:itemId})});
     var data=await res.json();
-    if(!data.success){console.log('Plaid transaction sync failed:',data.message);return;}
-
-    var item=plaidItems.find(function(p){return p.item_id===itemId});
-    if(!item)return;
+    if(!data.success){
+      console.log('Plaid transaction sync failed:',data.message);
+      alert('Bank sync failed: '+(data.message||'unknown error'));
+      if(btn){btn.disabled=false;btn.textContent='Sync';}
+      return;
+    }
 
     var newlyAddedByAccount={};
     data.added.forEach(function(t){
@@ -3913,6 +3991,8 @@ async function syncPlaidTransactions(itemId){
       if(store.cpMappings[cp]){store.mappings[hash]=store.cpMappings[cp];}
     });
 
+    var addedCount=Object.values(newlyAddedByAccount).reduce(function(s,arr){return s+arr.length},0);
+
     // Persist newly found transactions per account - same gap as the wallet save above,
     // bank transactions were never reaching the database at all before this.
     if(currentUser){
@@ -3929,7 +4009,20 @@ async function syncPlaidTransactions(itemId){
     }
 
     store_setScanTime(itemId);
-  }catch(e){console.log('Sync error:',e);}
+    if(btn){btn.disabled=false;btn.textContent='Sync';}
+    if(document.getElementById('bankCards'))renderBankCards();
+    showToast(addedCount>0?(addedCount+' new transaction'+(addedCount>1?'s':'')+' found'):'No new transactions since last sync');
+    // If the account just synced is part of the currently visible ledger,
+    // refresh it so the new activity actually shows up without a manual reload.
+    if(document.getElementById('screen-ledger').classList.contains('active')){
+      loadSelected();
+      renderLedger();
+    }
+  }catch(e){
+    console.log('Sync error:',e);
+    alert('Bank sync error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Sync';}
+  }
 }
 
 function store_setScanTime(itemId){
@@ -3973,8 +4066,7 @@ function renderBankCards(){
         :'<div style="font-size:11px;color:#94a3b8;margin-top:4px">Not synced yet</div>')
       +'</div>'
       +'<div style="display:flex;gap:6px;align-items:center">'
-      +(hasData?'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer" onclick="viewWalletLedger('+i+')">Open Ledger</button>':'')
-      +'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="syncPlaidTransactions(\''+w.plaidItemId+'\').then(function(){renderBankCards()})">Sync</button>'
+      +'<button style="font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer" onclick="syncPlaidTransactions(\''+w.plaidItemId+'\',this)">Sync</button>'
       +'<button style="font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;cursor:pointer" onclick="removeWallet('+i+',event)">&times;</button>'
       +'</div>'
       +'</div>';
