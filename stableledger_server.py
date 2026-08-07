@@ -2649,6 +2649,30 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404)
 
     def do_POST(self):
+        if self.path == "/admin/create-org":
+            body = self._read_json_body()
+            key = body.get("key", "")
+            if not ADMIN_SECRET or key != ADMIN_SECRET:
+                self._send_json(403, {"error": "Not authorized"})
+                return
+            if not DB_AVAILABLE:
+                self._send_json(503, {"error": "Persistence not configured"})
+                return
+            org_name = (body.get("org_name") or "").strip()
+            contact_email = (body.get("contact_email") or "").strip()
+            if not org_name or not contact_email:
+                self._send_json(400, {"error": "org_name and contact_email are required"})
+                return
+            result = create_organization(org_name, contact_email)
+            if result["success"]:
+                print(f"  [Admin] Provisioned API org: {org_name} (id={result['org_id']})")
+                # The API key is only ever returned in this one response - it's stored as a
+                # hash server-side, not the plaintext, so this is the only chance to see it.
+                self._send_json(200, {"success": True, "org_id": result["org_id"], "api_key": result["api_key"]})
+            else:
+                self._send_json(400, {"error": result["message"]})
+            return
+
         if self.path == "/admin/delete-org":
             body = self._read_json_body()
             key = body.get("key", "")
