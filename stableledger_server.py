@@ -2567,6 +2567,29 @@ class Handler(SimpleHTTPRequestHandler):
                     <div class="stat"><div class="num">{total_txs}</div><div class="label">Transactions ({total_classified} classified)</div></div>
                     <div class="stat"><div class="num">{total_beta}</div><div class="label">Beta Signups</div><div class="sublabel">People who filled out "Request Access" on the getshepherd.co landing page - not app accounts</div></div>
                 </div>
+
+                <h2>Provision API Customer</h2>
+                <div class="sub">Creates a new org and generates an API key for programmatic access. The key is shown exactly once, right here - copy it before doing anything else.</div>
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:32px;max-width:480px">
+                    <div style="margin-bottom:12px">
+                        <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:4px">Company Name</label>
+                        <input id="newOrgName" type="text" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box">
+                    </div>
+                    <div style="margin-bottom:14px">
+                        <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:4px">Contact Email</label>
+                        <input id="newOrgEmail" type="email" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box">
+                    </div>
+                    <button onclick="provisionOrg()" id="provisionBtn" style="font-size:13px;font-weight:600;padding:9px 18px;border-radius:6px;border:none;background:#0f172a;color:#fff;cursor:pointer">Create &amp; Generate Key</button>
+                    <div id="provisionResult" style="display:none;margin-top:16px;padding:14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px">
+                        <div style="font-size:12px;color:#166534;font-weight:600;margin-bottom:8px">⚠️ Copy this now - it will not be shown again</div>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <code id="provisionedKey" style="flex:1;font-size:12px;background:#fff;padding:8px 10px;border-radius:4px;border:1px solid #bbf7d0;word-break:break-all"></code>
+                            <button onclick="copyProvisionedKey()" style="font-size:12px;padding:8px 12px;border-radius:4px;border:1px solid #bbf7d0;background:#fff;cursor:pointer;white-space:nowrap">Copy</button>
+                        </div>
+                    </div>
+                    <div id="provisionError" style="display:none;margin-top:12px;font-size:12px;color:#991b1b;background:#fef2f2;padding:10px 12px;border-radius:6px"></div>
+                </div>
+
                 <h2>Organizations ({len(orgs)})</h2>
                 <div class="sub">Every signed-up account and what they've connected so far. Deleting an org removes its user, wallets, transactions, and everything else tied to it - permanently, no undo.</div>
                 <table><tr><th>Org</th><th>Owner</th><th>Wallets</th><th>Bank Accounts</th><th>Transactions</th><th>Signed Up</th><th></th></tr>{orgs_rows}</table>
@@ -2575,6 +2598,46 @@ class Handler(SimpleHTTPRequestHandler):
                 <table><tr><th>Name</th><th>Email</th><th>Firm</th><th>Message</th><th>Requested</th></tr>{beta_rows}</table>
                 <script>
                 const ADMIN_KEY={json.dumps(key)};
+                async function provisionOrg(){{
+                  const name=document.getElementById('newOrgName').value.trim();
+                  const email=document.getElementById('newOrgEmail').value.trim();
+                  const errEl=document.getElementById('provisionError');
+                  const resultEl=document.getElementById('provisionResult');
+                  errEl.style.display='none';
+                  if(!name||!email){{
+                    errEl.textContent='Company name and contact email are both required.';
+                    errEl.style.display='block';
+                    return;
+                  }}
+                  const btn=document.getElementById('provisionBtn');
+                  btn.disabled=true;btn.textContent='Creating...';
+                  try{{
+                    const res=await fetch('/admin/create-org',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+                      body:JSON.stringify({{key:ADMIN_KEY,org_name:name,contact_email:email}})}});
+                    const data=await res.json();
+                    if(!data.success){{
+                      errEl.textContent=data.error||'Something went wrong.';
+                      errEl.style.display='block';
+                    }} else {{
+                      document.getElementById('provisionedKey').textContent=data.api_key;
+                      resultEl.style.display='block';
+                      document.getElementById('newOrgName').value='';
+                      document.getElementById('newOrgEmail').value='';
+                    }}
+                  }}catch(e){{
+                    errEl.textContent='Could not reach the server: '+e.message;
+                    errEl.style.display='block';
+                  }}
+                  btn.disabled=false;btn.textContent='Create & Generate Key';
+                }}
+                function copyProvisionedKey(){{
+                  const key=document.getElementById('provisionedKey').textContent;
+                  navigator.clipboard.writeText(key);
+                  const btn=event.target;
+                  const original=btn.textContent;
+                  btn.textContent='Copied!';
+                  setTimeout(()=>{{btn.textContent=original;}},1500);
+                }}
                 async function deleteOrg(btn){{
                   const orgId=btn.dataset.orgId;
                   const orgName=btn.dataset.orgName;
