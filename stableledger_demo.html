@@ -1507,7 +1507,14 @@
         <div class="j-balanced" id="balCheck"></div>
       </div>
       <div class="fs-panel">
-        <div class="panel-title">Impact on Financial Statements</div>
+        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Impact on Financial Statements</span>
+          <select id="fsPeriodType" onchange="renderTx()" style="font-size:11px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:5px;color:#334155;text-transform:none;font-weight:400;letter-spacing:0">
+            <option value="month">By Month</option>
+            <option value="quarter">By Quarter</option>
+            <option value="year">By Year</option>
+          </select>
+        </div>
         <div class="fs-stack" id="fsStack"></div>
       </div>
       <svg id="arrowSvg"></svg>
@@ -3763,8 +3770,56 @@ function renderTx(){
     <div class="j-total"><div></div><div>Total</div><div class="mono">$${fmt(tDr)}</div><div class="mono">$${fmt(tCr)}</div></div>`;
   document.getElementById("balCheck").innerHTML=`<span style="color:#16a34a">&#10003;</span> Debits = Credits`;
 
-  // Financial statements — cumulative from zero, only classified transactions
-  // Compute cumulative totals across ALL classified transactions
+  // Financial statements — now broken into up to 6 period columns instead of
+  // one cumulative view. Income statement figures are period-scoped; balance
+  // sheet figures are cumulative through the end of each period (a balance
+  // sheet is a snapshot, not a flow - same distinction as the Period
+  // Comparison report). Uses txs (the currently loaded/selected wallets on
+  // this Ledger session), not the "all wallets" scope Reports use, since this
+  // is tied to the specific transaction being stepped through right now.
+  const fsPeriodType=document.getElementById('fsPeriodType').value;
+  const curTxPeriodKey=getPeriodKey(tx.date,fsPeriodType);
+  const allPeriodKeys=new Set();
+  txs.forEach(t=>{const k=getPeriodKey(t.date,fsPeriodType);if(k)allPeriodKeys.add(k);});
+  let periodKeys=Array.from(allPeriodKeys).sort().slice(-6);
+  if(curTxPeriodKey&&!periodKeys.includes(curTxPeriodKey)){
+    // The transaction being viewed must always be visible in its own column,
+    // even if it falls outside the 6 most recent periods in the data.
+    periodKeys=periodKeys.slice(1).concat([curTxPeriodKey]).sort();
+  }
+  const periods=periodKeys.map(key=>{
+    const end=getPeriodEndDate(key,fsPeriodType);
+    const periodTxs=txs.filter(t=>getPeriodKey(t.date,fsPeriodType)===key);
+    const cumTxs=txs.filter(t=>{if(!t.date)return false;const d=new Date(t.date+'T00:00:00Z');return !isNaN(d.getTime())&&d<=end;});
+    let revSvc=0,revProd=0,expPay=0,expSw=0,expCloud=0,expMkt=0,expProf=0,expOps=0,expGas=0;
+    const customRev={},customExp={};
+    periodTxs.forEach(t=>{
+      const g=glOf(t.hash);if(g==='Unclassified')return;const p=pfx(g),gType=GL_TYPE[p]||'expense';
+      if(p==='4100')revSvc+=t.amount;else if(p==='4200')revProd+=t.amount;
+      else if(p==='6110')expPay+=t.amount;else if(p==='6200')expSw+=t.amount;else if(p==='6300')expCloud+=t.amount;
+      else if(p==='6420')expMkt+=t.amount;else if(p==='6500')expProf+=t.amount;else if(p==='6600')expOps+=t.amount;
+      else if(p==='7100'||p==='1200'||p==='4300'){/* transfers excluded from P&L */}
+      else if(gType==='revenue'){customRev[g]=(customRev[g]||0)+t.amount;}
+      else if(gType==='expense'){customExp[g]=(customExp[g]||0)+t.amount;}
+      if(!isTxBank(t))expGas+=t.gas;
+    });
+    const totRev=revSvc+revProd+Object.values(customRev).reduce((s,v)=>s+v,0);
+    const totExp=expPay+expSw+expCloud+expMkt+expProf+expOps+expGas+Object.values(customExp).reduce((s,v)=>s+v,0);
+    let totalAssets=0,totalLiab=0;
+    cumTxs.forEach(t=>{
+      const g=glOf(t.hash);if(g==='Unclassified')return;
+      const isCC=isTxCreditCard(t);
+      if(isCC){totalLiab+=(t.dir==='outflow'?1:-1)*t.amount;}
+      else{let d=(t.dir==='inflow'?1:-1)*t.amount;if(!isTxBank(t)&&t.dir==='outflow')d-=t.gas;totalAssets+=d;}
+    });
+    return{key,label:getPeriodLabel(key,fsPeriodType),revSvc,revProd,customRev,totRev,expPay,expSw,expCloud,expMkt,expProf,expOps,expGas,customExp,totExp,
+      ni:totRev-totExp,totalAssets,totalLiab,totalEquity:totalAssets-totalLiab,isCurrent:key===curTxPeriodKey};
+  });
+  const curPeriod=periods.find(p=>p.isCurrent);
+
+  // Cash Flow (below) is intentionally left as a single cumulative view, not
+  // broken into periods in this pass - it still needs the original
+  // since-inception computation, kept exactly as it was before.
   const cum={revSvc:0,revProd:0,expPay:0,expSw:0,expCloud:0,expMkt:0,expProf:0,expOps:0,expGas:0,
     assetIn:{},assetOut:{},assetInCount:{},assetOutCount:{},bankIn:0,bankOut:0,gasSpent:0,bankInCount:0,bankOutCount:0,classified:0,xferNet:0,customRev:{},customExp:{},byAccount:{}};
   getPeriodFilteredTxs().forEach(t=>{const tg=glOf(t.hash);if(tg==="Unclassified")return;cum.classified++;const tp=pfx(tg);
@@ -3778,9 +3833,6 @@ function renderTx(){
     const isBank=isTxBank(t);
     const isCC=isTxCreditCard(t);
     const asset=t.asset||'USDC';
-    // Credit card transactions are deliberately excluded from bankIn/bankOut here -
-    // that aggregate feeds "Total Assets", and a credit card balance is a liability,
-    // not an asset. Its own balance is tracked separately via cum.byAccount below.
     if(t.dir==="inflow"){
       if(isBank&&!isCC){cum.bankIn+=t.amount;cum.bankInCount++;}
       else if(!isBank){cum.assetIn[asset]=(cum.assetIn[asset]||0)+t.amount;cum.assetInCount[asset]=(cum.assetInCount[asset]||0)+1;}
@@ -3791,22 +3843,16 @@ function renderTx(){
     if(!isCC)cum.expGas+=t.gas;
     const acctInfo=walletAcctInfo(t);
     if(!cum.byAccount[acctInfo.target])cum.byAccount[acctInfo.target]={label:acctInfo.label,isBank:acctInfo.isBank,isCC:acctInfo.isCC,net:0};
-    // A liability moves opposite an asset: a charge (outflow) INCREASES what's
-    // owed on a credit card, a payment (inflow) DECREASES it - backwards from
-    // how the same directions affect a checking account or wallet balance.
     cum.byAccount[acctInfo.target].net+=(acctInfo.isCC?(t.dir==="outflow"?1:-1):(t.dir==="inflow"?1:-1))*t.amount;
     if(!acctInfo.isBank&&t.dir==="outflow")cum.byAccount[acctInfo.target].net-=t.gas;
   });
-  const customRevTotal=Object.values(cum.customRev).reduce((s,v)=>s+v,0);
-  const customExpTotal=Object.values(cum.customExp).reduce((s,v)=>s+v,0);
-  const totRev=cum.revSvc+cum.revProd+customRevTotal;
-  const totExp=cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+customExpTotal;
-  const ni=totRev-totExp;
-  const allAssets=Array.from(new Set([...Object.keys(cum.assetIn),...Object.keys(cum.assetOut)])).sort();
-  const netByAsset={};allAssets.forEach(a=>{netByAsset[a]=(cum.assetIn[a]||0)-(cum.assetOut[a]||0);});
-  const netUsdc=allAssets.reduce((s,a)=>s+netByAsset[a],0);
-  const netBank=cum.bankIn-cum.bankOut;
-  const netAssets=netUsdc-cum.gasSpent+netBank;
+  const netUsdcAll=Array.from(new Set([...Object.keys(cum.assetIn),...Object.keys(cum.assetOut)]));
+  const netByAssetAll={};netUsdcAll.forEach(a=>{netByAssetAll[a]=(cum.assetIn[a]||0)-(cum.assetOut[a]||0);});
+  const cfNetUsdc=netUsdcAll.reduce((s,a)=>s+netByAssetAll[a],0);
+  const cfNetBank=cum.bankIn-cum.bankOut;
+  const cfNi=(cum.revSvc+cum.revProd+Object.values(cum.customRev).reduce((s,v)=>s+v,0))
+    -(cum.expPay+cum.expSw+cum.expCloud+cum.expMkt+cum.expProf+cum.expOps+cum.expGas+Object.values(cum.customExp).reduce((s,v)=>s+v,0));
+  const cfNetAssets=cfNetUsdc-cum.gasSpent+cfNetBank;
 
   const chg=(v,isExp)=>{if(Math.abs(v)<.001)return'';return`<span class="chg ${isExp?(v>0?'neg':'pos'):(v>0?'pos':'neg')}">$${fmt(Math.abs(v))}</span>`};
   const hc=id=>hitTargets.includes(id)?'hit':'';
@@ -3832,90 +3878,79 @@ function renderTx(){
     return;
   }
 
-  // Revenue rows
-  let revRows='';
-  if(cum.revSvc>.01)revRows+=row('pnl-revsvc','4100 Revenue - Services',cum.revSvc,false,'4100');
-  else revRows+='<div id="fs-pnl-revsvc"></div>';
-  if(cum.revProd>.01)revRows+=row('pnl-revprod','4200 Revenue - Product',cum.revProd,false,'4200');
-  else revRows+='<div id="fs-pnl-revprod"></div>';
-  const hasRev=totRev>.01;
+  // Multi-column row builder: N period-cells per row. Only the cell matching
+  // curPeriod (the transaction actually being viewed) gets the hc/hb/incLabel
+  // highlight treatment and a unique fs-{id} - other columns show the value
+  // only, since the current journal entry only ever posts to one period.
+  const fsCols=periods.length;
+  const colWidth=Math.max(90,Math.floor(560/Math.max(fsCols,1)));
+  const gridCols='1fr '+Array(fsCols).fill(colWidth+'px').join(' ');
+  const fsRow=(label,getVal,id,glCode,opts)=>{
+    opts=opts||{};
+    const cells=periods.map(p=>{
+      const val=getVal(p);
+      const isCur=p.isCurrent&&id;
+      const cellId=isCur?`id="fs-${id}"`:'';
+      const hitCls=isCur?hc(id):'';
+      const style=(isCur?hb(id):'border-left-color:transparent')+(opts.bold?';font-weight:700':'');
+      const inc=isCur?incLabel(id):'';
+      const shown=Math.abs(val)<.005?'<span style="color:#cbd5e1">—</span>':(opts.neg&&val>0?`($${fmt(val)})`:`$${fmt(val)}`);
+      const color=opts.color||(opts.neg?'#ea580c':(opts.pos?'#16a34a':'inherit'));
+      return `<div ${cellId} class="clickable ${hitCls}" style="text-align:right;padding:6px 8px;${style};color:${color}" onclick="openAudit('${glCode||''}','${label}')">${shown}${inc}</div>`;
+    }).join('');
+    return `<div class="fs-line indent" style="display:grid;grid-template-columns:${gridCols}"><div>${label}</div>${cells}</div>`;
+  };
+  const fsHeaderRow=`<div class="fs-hdr" style="display:grid;grid-template-columns:${gridCols}"><div>Account</div>${periods.map(p=>`<div style="text-align:right;font-weight:${p.isCurrent?700:500};color:${p.isCurrent?'#0f172a':'#94a3b8'}">${p.label}</div>`).join('')}</div>`;
 
-  // Expense rows
-  let expRows='';
-  const expItems=[
-    ['pnl-payroll','6110 Payroll',cum.expPay,'6110'],['pnl-software','6200 Software & SaaS',cum.expSw,'6200'],
-    ['pnl-cloud','6300 Cloud Infrastructure',cum.expCloud,'6300'],['pnl-marketing','6420 Marketing & Ads',cum.expMkt,'6420'],
-    ['pnl-profsvc','6500 Professional Services',cum.expProf,'6500'],['pnl-ops','6600 Operations',cum.expOps,'6600'],
-    ['pnl-gas','Network Fees',cum.expGas,'gas']
-  ];
-  expItems.forEach(([id,label,val,code])=>{if(val>0.0000001)expRows+=row(id,label,val,true,code);else expRows+=`<div id="fs-${id}"></div>`;});
-  // Custom expense rows
-  Object.entries(cum.customExp).forEach(([label,val])=>{
-    const code=pfx(label);
-    const jl=journal.find(l=>l.acct===label);
-    const inc=jl?(jl.dr>0?jl.dr:jl.cr):0;
-    const incTxt=inc>.001?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(inc)})</span>`:'';
-    expRows+=`<div class="fs-line indent clickable ${jl?'hit':''}" style="grid-template-columns:1fr 100px;cursor:pointer" onclick="openAudit('${code}','${label}')"><div>${label}</div><div style="text-align:right"><span class="chg neg">$${fmt(val)}</span>${incTxt}</div></div>`;
-  });
-  // Custom revenue rows
-  Object.entries(cum.customRev).forEach(([label,val])=>{
-    const code=pfx(label);
-    const jl=journal.find(l=>l.acct===label);
-    const inc=jl?(jl.dr>0?jl.dr:jl.cr):0;
-    const incTxt=inc>.001?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(inc)})</span>`:'';
-    revRows+=`<div class="fs-line indent clickable ${jl?'hit':''}" style="grid-template-columns:1fr 100px;cursor:pointer" onclick="openAudit('${code}','${label}')"><div>${label}</div><div style="text-align:right"><span class="chg pos">$${fmt(val)}</span>${incTxt}</div></div>`;
-  });
-  const hasExp=totExp>.01;
+  const allCustomRevLabels=new Set(),allCustomExpLabels=new Set();
+  periods.forEach(p=>{Object.keys(p.customRev).forEach(k=>allCustomRevLabels.add(k));Object.keys(p.customExp).forEach(k=>allCustomExpLabels.add(k));});
+  const hasRev=periods.some(p=>p.totRev>.01);
+  const hasExp=periods.some(p=>p.totExp>.01);
 
-  // Hidden targets for arrows
-  const hiddenTargets='<div id="fs-pnl-unclass-in"></div><div id="fs-pnl-unclass-out"></div>';
+  let revRows=fsRow('4100 Revenue - Services',p=>p.revSvc,'pnl-revsvc','4100')
+    +fsRow('4200 Revenue - Product',p=>p.revProd,'pnl-revprod','4200');
+  Array.from(allCustomRevLabels).forEach(label=>{revRows+=fsRow(label,p=>p.customRev[label]||0,null,pfx(label));});
+
+  let expRows=fsRow('6110 Payroll',p=>p.expPay,'pnl-payroll','6110')
+    +fsRow('6200 Software & SaaS',p=>p.expSw,'pnl-software','6200')
+    +fsRow('6300 Cloud Infrastructure',p=>p.expCloud,'pnl-cloud','6300')
+    +fsRow('6420 Marketing & Ads',p=>p.expMkt,'pnl-marketing','6420')
+    +fsRow('6500 Professional Services',p=>p.expProf,'pnl-profsvc','6500')
+    +fsRow('6600 Operations',p=>p.expOps,'pnl-ops','6600')
+    +fsRow('Network Fees',p=>p.expGas,'pnl-gas','gas');
+  Array.from(allCustomExpLabels).forEach(label=>{expRows+=fsRow(label,p=>p.customExp[label]||0,null,pfx(label));});
 
   document.getElementById("fsStack").innerHTML=`
-    <div class="fs-card">
-      <div class="fs-card-title">Income Statement<span class="sub">${cum.classified} transactions</span></div>
-      ${hasRev||hasExp?`<div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Amount</div></div>`:''}
-      ${hasRev?`<div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Revenue</div><div></div></div>${revRows}
-        <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Revenue</div><div style="text-align:right;color:#16a34a">$${fmt(totRev)}</div></div>`:''}
-      ${hasExp?`<div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Expenses</div><div></div></div>${expRows}
-        <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Expenses</div><div style="text-align:right;color:#ea580c">($${fmt(totExp)})</div></div>`:''}
-      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Income</div><div style="text-align:right;color:${ni>=0?'#16a34a':'#ea580c'}">$${fmt(ni)}</div></div>
+    <div class="fs-card" style="overflow-x:auto">
+      <div class="fs-card-title">Income Statement<span class="sub">by ${fsPeriodType}, ${fsCols} period${fsCols>1?'s':''}</span></div>
+      ${fsHeaderRow}
+      ${hasRev?`<div class="fs-line section" style="display:grid;grid-template-columns:${gridCols}"><div>Revenue</div>${periods.map(()=>'<div></div>').join('')}</div>${revRows}
+        ${fsRow('Total Revenue',p=>p.totRev,null,null,{bold:true,pos:true})}`:''}
+      ${hasExp?`<div class="fs-line section" style="display:grid;grid-template-columns:${gridCols}"><div>Expenses</div>${periods.map(()=>'<div></div>').join('')}</div>${expRows}
+        ${fsRow('Total Expenses',p=>p.totExp,null,null,{bold:true,neg:true})}`:''}
+      <div class="fs-line total" style="display:grid;grid-template-columns:${gridCols}"><div>Net Income</div>${periods.map(p=>`<div style="text-align:right;font-weight:700;color:${p.ni>=0?'#16a34a':'#ea580c'}">${p.ni<0?'($'+fmt(Math.abs(p.ni))+')':'$'+fmt(p.ni)}</div>`).join('')}</div>
     </div>
 
-    <div class="fs-card">
-      <div class="fs-card-title">Balance Sheet<span class="sub"></span></div>
-      <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Account</div><div style="text-align:right">Balance</div></div>
-      <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Assets</div><div></div></div>
-      ${cum.gasSpent>0.0000001?`<div class="fs-line indent clickable ${hc('bs-eth')}" id="fs-bs-eth" style="grid-template-columns:1fr 100px;${hb('bs-eth')}" onclick="openAudit('gas','Network Fees')"><div>ETH / SOL (gas)</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${incLabel('bs-eth')}</div></div>`:`<div id="fs-bs-eth"></div>`}
-      ${Object.entries(cum.byAccount).filter(([k,a])=>k.startsWith('bs-acct-')&&!a.isCC).map(([target,acct])=>{
-        const suffix=target.replace('bs-acct-','');
-        return `<div class="fs-line indent clickable ${hc(target)}" id="fs-${target}" style="grid-template-columns:1fr 100px;${hb(target)}" onclick="openAudit('acct-${suffix}')"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#16a34a':'#ea580c'}">$${fmt(acct.net)}${incLabel(target)}</div></div>`;
-      }).join('')}
-      ${(cum.bankIn>0||cum.bankOut>0)&&!Object.keys(cum.byAccount).some(k=>k.startsWith('bs-acct-')&&cum.byAccount[k].isBank)?`<div class="fs-line indent clickable ${hc('bs-bank')}" id="fs-bs-bank" style="grid-template-columns:1fr 100px;${hb('bs-bank')}" onclick="openAudit('bank','Bank Checking')"><div>Bank - Checking</div><div style="text-align:right;color:${netBank>=0?'#16a34a':'#ea580c'}">$${fmt(netBank)}${incLabel('bs-bank')}</div></div>`:`<div id="fs-bs-bank"></div>`}
-      <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Assets</div><div style="text-align:right;font-weight:700">$${fmt(netAssets)}</div></div>
-      ${(()=>{
-        const liabEntries=Object.entries(cum.byAccount).filter(([k,a])=>k.startsWith('bs-liab-'));
-        const totalLiab=liabEntries.reduce((s,[,a])=>s+a.net,0);
-        if(!liabEntries.length)return'';
-        return `<div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Liabilities</div><div></div></div>`
-          +liabEntries.map(([target,acct])=>`<div class="fs-line indent clickable ${hc(target)}" id="fs-${target}" style="grid-template-columns:1fr 100px;${hb(target)}" onclick="openAudit('acct-${target.replace('bs-liab-','')}')"><div>${escHtml(acct.label)}</div><div style="text-align:right;color:${acct.net>=0?'#ea580c':'#16a34a'}">$${fmt(acct.net)}${incLabel(target)}</div></div>`).join('')
-          +`<div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Total Liabilities</div><div style="text-align:right;font-weight:700">$${fmt(totalLiab)}</div></div>`;
-      })()}
-      <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Equity</div><div></div></div>
-      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Retained Earnings</div><div style="text-align:right">$${fmt(netAssets-Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-')).reduce((s,[,a])=>s+a.net,0))}</div></div>
-      ${Math.abs(cum.xferNet)>.01?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Intercompany / Transfers</div><div style="text-align:right">$${fmt(cum.xferNet)}</div></div>`:''}
-      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Total Equity</div><div style="text-align:right;font-weight:700">$${fmt(netAssets-Object.entries(cum.byAccount).filter(([k])=>k.startsWith('bs-liab-')).reduce((s,[,a])=>s+a.net,0))}</div></div>
-      <div class="fs-check pass">A = L + E: Balanced</div>
+    <div class="fs-card" style="overflow-x:auto">
+      <div class="fs-card-title">Balance Sheet<span class="sub">as of period end</span></div>
+      ${fsHeaderRow}
+      <div class="fs-line section" style="display:grid;grid-template-columns:${gridCols}"><div>Assets</div>${periods.map(()=>'<div></div>').join('')}</div>
+      ${fsRow('Total Assets',p=>p.totalAssets,null,null,{bold:true})}
+      ${periods.some(p=>p.totalLiab>.01)?`<div class="fs-line section" style="display:grid;grid-template-columns:${gridCols}"><div>Liabilities</div>${periods.map(()=>'<div></div>').join('')}</div>${fsRow('Total Liabilities',p=>p.totalLiab,null,null,{bold:true})}`:''}
+      <div class="fs-line section" style="display:grid;grid-template-columns:${gridCols}"><div>Equity</div>${periods.map(()=>'<div></div>').join('')}</div>
+      ${fsRow('Total Equity',p=>p.totalEquity,null,null,{bold:true})}
+      <div class="fs-check pass">A = L + E: Balanced, per period</div>
     </div>
 
     <div class="fs-card">
       <div class="fs-card-title">Cash Flow Statement<span class="sub"></span></div>
       <div class="fs-hdr" style="grid-template-columns:1fr 100px"><div>Item</div><div style="text-align:right">Amount</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Operating Activities</div><div></div></div>
-      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Net Income</div><div style="text-align:right">$${fmt(ni)}</div></div>
+      <div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Net Income</div><div style="text-align:right">$${fmt(cfNi)}</div></div>
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Add: Non-cash gas fees</div><div style="text-align:right">$${fmt(cum.gasSpent)}</div></div>`:''}
-      <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Cash from Operations</div><div style="text-align:right;font-weight:600">$${fmt(ni+cum.gasSpent)}</div></div>
+      <div class="fs-line subtotal" style="grid-template-columns:1fr 100px"><div>Cash from Operations</div><div style="text-align:right;font-weight:600">$${fmt(cfNi+cum.gasSpent)}</div></div>
       <div class="fs-line section" style="grid-template-columns:1fr 100px"><div>Digital Asset Flows</div><div></div></div>
-      ${allAssets.map(asset=>{
+      ${netUsdcAll.map(asset=>{
         const inCount=cum.assetInCount[asset]||0,outCount=cum.assetOutCount[asset]||0;
         const inAmt=cum.assetIn[asset]||0,outAmt=cum.assetOut[asset]||0;
         let rows='';
@@ -3926,7 +3961,7 @@ function renderTx(){
       ${cum.bankInCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Deposits (${cum.bankInCount})</div><div style="text-align:right;color:#16a34a">$${fmt(cum.bankIn)}${tx.dir==='inflow'&&isMapped&&isTxBank(tx)?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.bankOutCount>0?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Bank Withdrawals (${cum.bankOutCount})</div><div style="text-align:right;color:#ea580c">($${fmt(cum.bankOut)})${tx.dir==='outflow'&&isMapped&&isTxBank(tx)?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.amount)})</span>`:''}</div></div>`:''}
       ${cum.gasSpent>0.0000001?`<div class="fs-line indent" style="grid-template-columns:1fr 100px"><div>Gas Consumed</div><div style="text-align:right;color:#ea580c">($${fmt(cum.gasSpent)})${tx.gas>0&&isMapped?` <span style="font-size:11px;color:#7c3aed;font-weight:500">(+$${fmt(tx.gas)})</span>`:''}</div></div>`:''}
-      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Asset Change</div><div style="text-align:right;font-weight:700;color:${netAssets>=0?'#16a34a':'#ea580c'}">$${fmt(netAssets)}</div></div>
+      <div class="fs-line total" style="grid-template-columns:1fr 100px"><div>Net Asset Change</div><div style="text-align:right;font-weight:700;color:${cfNetAssets>=0?'#16a34a':'#ea580c'}">$${fmt(cfNetAssets)}</div></div>
     </div>
     ${hiddenTargets}`;
 
