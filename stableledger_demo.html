@@ -79,6 +79,8 @@
   .tx-amt{font-size:17px;font-weight:600}.tx-amt.in{color:#16a34a}.tx-amt.out{color:#ea580c}
   .tx-cp{font-size:12px;color:#64748b;flex:1}.tx-cp strong{color:#334155;font-weight:500}
   .tx-meta{font-size:11px;color:#94a3b8}
+  .tx-link{color:#3b82f6;text-decoration:none}
+  .tx-link:hover{text-decoration:underline}
 
   .main-grid{display:grid;grid-template-columns:360px 1fr;gap:0;position:relative}
   .panel-title{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
@@ -152,6 +154,8 @@
   .audit-table-hdr{display:grid;grid-template-columns:60px 1fr 120px 90px 90px;padding:8px 20px;font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;background:#fafbfc;border-bottom:1px solid #e2e8f0;position:sticky;top:0}
   .audit-table-hdr>div:nth-child(4),.audit-table-hdr>div:nth-child(5){text-align:right}
   .audit-row{display:grid;grid-template-columns:60px 1fr 120px 90px 90px;padding:9px 20px;font-size:12px;color:#475569;border-bottom:1px solid #f8fafc;align-items:center}
+  .audit-row>div{min-width:0;overflow-wrap:anywhere}
+  .audit-row.audit-row-clickable{cursor:pointer}
   .audit-row:hover{background:#f8fafc}
   .audit-row>div:nth-child(4),.audit-row>div:nth-child(5){text-align:right}
   .audit-row .tx-link{color:#3b82f6;text-decoration:none;font-size:11px}.audit-row .tx-link:hover{text-decoration:underline}
@@ -281,6 +285,7 @@
   .custom-modal .cm-row{display:grid;grid-template-columns:100px 1fr;gap:10px}
   .custom-modal .cm-actions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
   .custom-modal .cm-actions button{font-size:13px;font-weight:500;padding:8px 16px;border-radius:6px;border:none;cursor:pointer}
+  .custom-modal .cm-actions button:disabled{opacity:.5;cursor:not-allowed}
   .main-content{margin-left:220px;flex:1;min-height:100vh}
   .screen{display:none}.screen.active{display:block}
   .wc-center{max-width:640px;margin:80px auto 40px}
@@ -850,6 +855,16 @@
             <div style="font-size:13px;color:#64748b;margin-bottom:4px">Upload your chart of accounts</div>
             <div style="font-size:11px">CSV or Excel with columns: Code, Name, Type</div>
             <input type="file" id="obGLFile" accept=".csv,.xlsx" style="margin-top:12px;font-size:12px" onchange="obParseGLFile(this)">
+          </div>
+        </div>
+
+        <div class="ob-section" style="margin-top:4px;border-top:1px solid #f1f5f9;padding-top:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:#1e293b">Already have transactions ready?</div>
+              <div style="font-size:12px;color:#64748b">Bulk upload a CSV or Excel file of transactions now - no need to wait on a wallet or bank connection.</div>
+            </div>
+            <button style="font-size:12px;font-weight:600;padding:8px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;white-space:nowrap" onclick="openBulkTxUpload()">Bulk upload transactions</button>
           </div>
         </div>
 
@@ -1526,6 +1541,10 @@
         <div>
           <p style="color:#64748b;font-size:13px" id="txTableCount">All on-chain transactions across connected wallets.</p>
         </div>
+        <button style="font-size:12px;font-weight:600;padding:8px 14px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#334155;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px" onclick="openBulkTxUpload()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+          Bulk upload transactions
+        </button>
       </div>
       <div class="filter-bar" id="txFilterBar">
         <div class="filter-group">
@@ -2361,6 +2380,227 @@ function jumpToTxInLedgerFromRow(walletAddr,hash){
   ledgerBrowsing=true;
   const key=walletAddr.toLowerCase()+'::'+hash;
   navTo('ledger',{jumpToTxKey:key});
+}
+
+// ============ BULK TRANSACTION UPLOAD ============
+// Lets a user import a batch of transactions from a CSV/Excel export straight
+// into a (possibly brand-new) account, without needing a live wallet or Plaid
+// connection first. Available from the onboarding Chart of Accounts step and
+// from the Transactions page toolbar.
+let pendingBulkTx=null; // staged {rows, errors} between parse and commit - nothing touches wallets/walletStore until commitBulkTxUpload()
+function openBulkTxUpload(){
+  pendingBulkTx=null;
+  const nameEl=document.getElementById('bulkTxAccountName');if(nameEl)nameEl.value='';
+  const typeEl=document.getElementById('bulkTxAccountType');if(typeEl)typeEl.value='bank';
+  const fileEl=document.getElementById('bulkTxFile');if(fileEl)fileEl.value='';
+  const statusEl=document.getElementById('bulkTxStatus');if(statusEl)statusEl.innerHTML='';
+  const btn=document.getElementById('bulkTxImportBtn');if(btn)btn.disabled=true;
+  document.getElementById('bulkTxOverlay').classList.add('open');
+}
+function closeBulkTxUpload(){
+  document.getElementById('bulkTxOverlay').classList.remove('open');
+  pendingBulkTx=null;
+}
+function downloadBulkTxTemplate(){
+  const csv='Date,Direction,Amount,Counterparty,Asset,GL Code\n'+
+    '2026-01-15,in,4500.00,Acme Corp,,4100 - Revenue - Services\n'+
+    '2026-01-18,out,120.50,AWS,,6300 - Cloud Infrastructure\n';
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='shepherd-transaction-upload-template.csv';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+}
+function parseBulkTxFile(input){
+  if(!input.files||!input.files[0])return;
+  const file=input.files[0];
+  const isExcel=file.name.toLowerCase().endsWith('.xlsx')||file.name.toLowerCase().endsWith('.xls');
+  const statusEl=document.getElementById('bulkTxStatus');
+  statusEl.innerHTML='<div style="font-size:12px;color:#64748b">Reading file...</div>';
+  document.getElementById('bulkTxImportBtn').disabled=true;
+  if(isExcel){
+    if(typeof XLSX==='undefined'){statusEl.innerHTML='<div style="font-size:12px;color:#dc2626">Excel parser still loading - try again in a moment or use CSV.</div>';return;}
+    const reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        const data=new Uint8Array(e.target.result);
+        const wb=XLSX.read(data,{type:'array'});
+        const sheet=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+        processBulkTxRows(rows);
+      }catch(err){statusEl.innerHTML='<div style="font-size:12px;color:#dc2626">Could not read Excel file: '+escHtml(err.message)+'</div>';}
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader2=new FileReader();
+    reader2.onload=function(e){processBulkTxRows(parseCsvText(e.target.result));};
+    reader2.readAsText(file);
+  }
+}
+// Minimal CSV parser that handles quoted fields (embedded commas, escaped
+// quotes, CRLF line endings) - a plain split(',') breaks on real-world
+// bank/exchange exports, which is exactly the kind of file this is for.
+function parseCsvText(text){
+  const rows=[];let row=[],field='',inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQuotes){
+      if(c==='"'){if(text[i+1]==='"'){field+='"';i++;}else inQuotes=false;}
+      else field+=c;
+    } else {
+      if(c==='"')inQuotes=true;
+      else if(c===','){row.push(field);field='';}
+      else if(c==='\n'||c==='\r'){
+        if(field!==''||row.length){row.push(field);rows.push(row);row=[];field='';}
+        if(c==='\r'&&text[i+1]==='\n')i++;
+      } else field+=c;
+    }
+  }
+  if(field!==''||row.length){row.push(field);rows.push(row);}
+  return rows.filter(function(r){return r.some(function(c){return String(c||'').trim()!=='';});});
+}
+function normalizeBulkDate(v){
+  if(v==null||v==='')return null;
+  const s=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  const d=new Date(s);
+  if(isNaN(d.getTime()))return null;
+  return d.toISOString().slice(0,10);
+}
+function parseBulkAmount(v,keepSign){
+  if(v==null)return null;
+  let s=String(v).trim();
+  if(!s)return null;
+  let neg=false;
+  if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1);}
+  s=s.replace(/[$,\s]/g,'');
+  if(s.startsWith('-')){neg=true;s=s.slice(1);}
+  else if(s.startsWith('+'))s=s.slice(1);
+  const n=parseFloat(s);
+  if(isNaN(n))return null;
+  return keepSign?(neg?-n:n):Math.abs(n);
+}
+function normalizeBulkDirection(v,amountRaw){
+  if(v!=null&&String(v).trim()!==''){
+    const s=String(v).trim().toLowerCase();
+    if(['in','inflow','credit','deposit','+','income'].includes(s))return'inflow';
+    if(['out','outflow','debit','withdrawal','-','expense'].includes(s))return'outflow';
+  }
+  // No usable direction column - fall back to the sign of the amount, which
+  // is how most bank/exchange CSV exports actually encode it.
+  const n=parseBulkAmount(amountRaw,true);
+  if(n!=null&&n!==0)return n<0?'outflow':'inflow';
+  return null;
+}
+function djb2Hash(str){
+  let h=5381;
+  for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))>>>0;
+  return h.toString(36);
+}
+function slugify(s){return String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'account';}
+function processBulkTxRows(rows){
+  const statusEl=document.getElementById('bulkTxStatus');
+  const importBtn=document.getElementById('bulkTxImportBtn');
+  if(!rows||rows.length<2){
+    statusEl.innerHTML='<div style="font-size:12px;color:#dc2626">File needs a header row plus at least one transaction.</div>';
+    importBtn.disabled=true;pendingBulkTx=null;return;
+  }
+  const header=rows[0].map(function(h){return String(h||'').trim().toLowerCase();});
+  function findCol(aliases){for(let i=0;i<header.length;i++){if(aliases.includes(header[i]))return i;}return -1;}
+  const cDate=findCol(['date','transaction date','txn date','posted date']);
+  const cDir=findCol(['direction','type','dir']);
+  const cAmt=findCol(['amount','amt','value']);
+  const cCp=findCol(['counterparty','description','memo','payee','merchant','name','vendor']);
+  const cAsset=findCol(['asset','currency','token']);
+  const cGl=findCol(['gl code','gl','category','classification','gl_code']);
+  if(cDate===-1||cAmt===-1||cCp===-1){
+    statusEl.innerHTML='<div style="font-size:12px;color:#dc2626">Could not find Date, Amount, and Counterparty/Description columns in the header row. Check the template for the expected format.</div>';
+    importBtn.disabled=true;pendingBulkTx=null;return;
+  }
+  const parsed=[],errors=[];
+  for(let i=1;i<rows.length;i++){
+    const cols=rows[i];if(!cols||!cols.some(function(c){return String(c||'').trim()!=='';}))continue;
+    const rowNum=i+1;
+    const date=normalizeBulkDate(cols[cDate]);
+    const amount=parseBulkAmount(cols[cAmt]);
+    const dir=normalizeBulkDirection(cDir!==-1?cols[cDir]:null,cols[cAmt]);
+    const cp=String(cols[cCp]||'').trim();
+    if(!date){errors.push('Row '+rowNum+': unrecognized date');continue;}
+    if(amount==null||amount===0){errors.push('Row '+rowNum+': unrecognized or zero amount');continue;}
+    if(!dir){errors.push('Row '+rowNum+': could not determine inflow/outflow');continue;}
+    if(!cp){errors.push('Row '+rowNum+': missing counterparty/description');continue;}
+    const asset=cAsset!==-1?String(cols[cAsset]||'').trim():'';
+    const glRaw=cGl!==-1?String(cols[cGl]||'').trim():'';
+    parsed.push({rowNum:rowNum,date:date,dir:dir,amount:amount,cp:cp,asset:asset||undefined,glRaw:glRaw||null});
+  }
+  pendingBulkTx={rows:parsed,errors:errors};
+  let html='<div style="font-size:12px;color:'+(parsed.length?'#16a34a':'#dc2626')+'">'+parsed.length+' transaction'+(parsed.length===1?'':'s')+' ready to import</div>';
+  if(errors.length){
+    html+='<div style="font-size:11px;color:#d97706;margin-top:4px">'+errors.length+' row'+(errors.length===1?'':'s')+' skipped:</div>'+
+      '<div style="max-height:100px;overflow-y:auto;font-size:11px;color:#94a3b8;margin-top:2px">'+errors.slice(0,20).map(function(e){return escHtml(e);}).join('<br>')+(errors.length>20?'<br>&hellip; and '+(errors.length-20)+' more':'')+'</div>';
+  }
+  statusEl.innerHTML=html;
+  importBtn.disabled=parsed.length===0;
+}
+function commitBulkTxUpload(){
+  if(!pendingBulkTx||!pendingBulkTx.rows.length)return;
+  const name=(document.getElementById('bulkTxAccountName').value||'Manual Upload').trim()||'Manual Upload';
+  const acctType=document.getElementById('bulkTxAccountType').value; // 'bank' or 'crypto'
+  const chainLabel=acctType==='bank'?'Bank':'Manual';
+  const addr='manual:'+slugify(name);
+
+  let w=wallets.find(function(x){return x.addr.toLowerCase()===addr.toLowerCase();});
+  if(!w){w={addr:addr,name:name,chain:chainLabel,chainKey:acctType==='bank'?'bank':'manual'};wallets.push(w);}
+
+  const store=getStore(addr);
+  const existingHashes=new Set(store.txs.map(function(t){return t.hash;}));
+  const justAdded=[];
+  pendingBulkTx.rows.forEach(function(r){
+    // Content-derived hash (not a random/timestamped one) so re-uploading the
+    // exact same file twice is a safe no-op instead of duplicating rows.
+    const hash='manual-'+djb2Hash(r.date+'|'+r.dir+'|'+r.amount+'|'+r.cp+'|'+r.rowNum);
+    if(existingHashes.has(hash))return;
+    const tx={hash:hash,date:r.date,dir:r.dir,amount:r.amount,cp:r.cp,gas:0,asset:acctType==='bank'?undefined:(r.asset||'USDC')};
+    store.txs.push(tx);justAdded.push(tx);
+    if(r.glRaw){
+      const match=GL_OPTIONS.find(function(o){const p=o.split(' - ')[0];return o===r.glRaw||p===r.glRaw||p===r.glRaw.split(' ')[0];});
+      if(match){store.mappings[hash]=match;store.cpMappings[r.cp]=match;}
+    }
+  });
+  store.scanTime=new Date().toLocaleString();
+
+  if(currentUser&&justAdded.length){
+    if(w._dbId){
+      fetch('/api/web/transactions/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({wallet_id:w._dbId,transactions:justAdded,last_block:null})
+      }).then(function(res){return res.json();}).then(function(data){
+        if(!data.success){console.error('[Persistence] Bulk upload sync rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Bulk upload sync failed:',e);showPersistenceWarning();});
+    } else {
+      fetch('/api/web/wallets/save',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({address:addr,name:name,chain:acctType==='bank'?'bank':'manual',lookback:0,transactions:store.txs})
+      }).then(function(res){return res.json();}).then(function(data){
+        if(data.success)w._dbId=data.wallet_id;
+        else{console.error('[Persistence] Bulk upload wallet save rejected:',data.error||data);showPersistenceWarning();}
+      }).catch(function(e){console.error('[Persistence] Bulk upload wallet save failed:',e);showPersistenceWarning();});
+    }
+  }
+
+  logAction('account','Bulk uploaded transactions',justAdded.length+' transaction'+(justAdded.length===1?'':'s')+' into '+name);
+
+  const importedCount=justAdded.length,dupCount=pendingBulkTx.rows.length-importedCount;
+  document.getElementById('bulkTxStatus').innerHTML='<div style="font-size:12px;color:#16a34a">Imported '+importedCount+' transaction'+(importedCount===1?'':'s')+' into "'+escHtml(name)+'"'+(dupCount?' ('+dupCount+' already existed and were skipped)':'')+'.</div>';
+  document.getElementById('bulkTxImportBtn').disabled=true;
+  pendingBulkTx=null;
+
+  renderWalletChips();
+  if(document.getElementById('screen-transactions').classList.contains('active'))renderTxTable();
+  if(document.getElementById('screen-dashboard').classList.contains('active'))renderDashboard();
+  const badge=document.getElementById('ledgerBadge');
+  if(badge&&txs.length){
+    const unc=txs.filter(function(t){return !mappings[t.hash]||mappings[t.hash]==='Unclassified';}).length;
+    badge.style.display=unc>0?'inline':'none';badge.textContent=unc;
+  }
 }
 // ============ CONFIG ============
 let GL_OPTIONS=["Unclassified","6110 - Payroll","6200 - Software & SaaS","6300 - Cloud Infrastructure","6420 - Marketing & Ads","6500 - Professional Services","6600 - Office & Operations","7100 - Intercompany Transfer","4100 - Revenue - Services","4200 - Revenue - Product","4300 - Customer Refund","1200 - Treasury Rebalance"];
@@ -3646,7 +3886,7 @@ function classify(v){
   mappings[tx.hash]=v;
   const walletAddrForSave=(tx.walletAddr||activeWalletAddr||'');
   if(v!=="Unclassified"){
-    logAction('classification','Classified transaction',`${addr(tx.hash)} as ${v} ($${fmt(tx.amount)} ${tx.dir})`);
+    logAction('classification','Classified transaction',`${addr(tx.origHash||tx.hash)} as ${v} ($${fmt(tx.amount)} ${tx.dir})`);
     cpMappings[tx.cp]=v;
     let autoCount=0;
     txs.forEach(t=>{if(t.cp===tx.cp&&t.hash!==tx.hash){mappings[t.hash]=v;autoCount++;}});
@@ -3823,7 +4063,7 @@ function renderTx(){
     <span class="tx-cp">Counterparty: <strong class="mono">${addr(tx.cp)}</strong></span>
     ${tx.walletName?`<span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#f1f5f9;color:#64748b">${tx.walletName}</span>`:''}
     ${!isTxBank(tx)?`<span class="mono" style="font-size:10px;padding:2px 6px;border-radius:3px;background:#eef2ff;color:#4338ca;font-weight:600">${tx.asset||'USDC'}</span>`:''}
-    <span class="tx-meta mono">${addr(tx.origHash||tx.hash)} &middot; ${isTxBank(tx)?(tx.date||'—'):'Block '+(tx.block||0).toLocaleString()}</span>`;
+    <span class="tx-meta mono">${isTxBank(tx)?addr(tx.origHash||tx.hash):`<a class="tx-link" href="${explorerUrl(tx)}" target="_blank" rel="noopener">${addr(tx.origHash||tx.hash)}</a>`} &middot; ${isTxBank(tx)?(tx.date||'—'):'Block '+(tx.block||0).toLocaleString()}</span>`;
 
   // Journal
   const tDr=journal.reduce((s,l)=>s+l.dr,0),tCr=journal.reduce((s,l)=>s+l.cr,0);
@@ -6099,10 +6339,10 @@ function openAudit(glCode,label){
   `;
   document.getElementById("auditBody").innerHTML=`
     <div class="audit-table-hdr"><div>Dir</div><div>Tx Hash / Counterparty</div><div>Block</div><div>Amount</div><div>Gas</div></div>
-    ${matching.map(t=>`<div class="audit-row">
+    ${matching.map(t=>`<div class="audit-row audit-row-clickable" data-wallet="${escHtml(t.walletAddr||'')}" data-hash="${escHtml(t.origHash||t.hash)}" onclick="handleAuditRowClick(this)">
       <div><span class="dir-badge ${t.dir==='inflow'?'in':'out'}">${t.dir==='inflow'?'IN':'OUT'}</span></div>
       <div>
-        ${isTxBank(t)?`<span class="mono">${addr(t.hash)}</span>`:`<a class="tx-link" href="${explorerUrl(t)}" target="_blank" rel="noopener">${addr(t.hash)}</a>`}
+        ${isTxBank(t)?`<span class="mono">${addr(t.origHash||t.hash)}</span>`:`<a class="tx-link" href="${explorerUrl(t)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${addr(t.origHash||t.hash)}</a>`}
         <div style="font-size:11px;color:#94a3b8;margin-top:2px">Counterparty: <span class="mono">${addr(t.cp)}</span></div>
       </div>
       <div style="font-size:11px;color:#94a3b8">${isTxBank(t)?(t.date||'—'):(t.block||0).toLocaleString()}</div>
@@ -6113,6 +6353,17 @@ function openAudit(glCode,label){
   document.getElementById("auditOverlay").classList.add("open");
 }
 function closeAudit(){document.getElementById("auditOverlay").classList.remove("open");}
+function handleAuditRowClick(rowEl){
+  // Clicking a line item in the financial-statement drill-down (Audit Trail
+  // modal) jumps straight into the Ledger's single-transaction view for that
+  // exact transaction so it can be reclassified - reads wallet/hash from
+  // data-* attributes rather than a string-interpolated onclick, consistent
+  // with the Transactions-table row click and the earlier XSS fix.
+  const walletAddr=rowEl.dataset.wallet,hash=rowEl.dataset.hash;
+  if(!walletAddr||!hash)return;
+  closeAudit();
+  jumpToTxInLedgerFromRow(walletAddr,hash);
+}
 
 function highlightFinancialLine(target,index){
   const tgt=document.getElementById("fs-"+target);
@@ -6284,6 +6535,40 @@ checkAuthOnLoad();
     <div class="cm-actions">
       <button style="background:#f1f5f9;color:#475569" onclick="closeObRuleBuilder()">Cancel</button>
       <button style="background:#16a34a;color:#fff" onclick="addObRule()">Add Rule</button>
+    </div>
+  </div>
+</div>
+<!-- BULK TRANSACTION UPLOAD MODAL -->
+<div class="custom-overlay" id="bulkTxOverlay" onclick="if(event.target===this)closeBulkTxUpload()" style="z-index:70">
+  <div class="custom-modal" style="width:460px">
+    <h3>Bulk Upload Transactions</h3>
+    <div class="cm-sub">Import a CSV or Excel file of transactions into a new or existing account - no wallet or bank connection needed.</div>
+    <div class="cm-row" style="grid-template-columns:1fr 140px">
+      <div class="cm-field">
+        <label>Account name</label>
+        <input id="bulkTxAccountName" placeholder="e.g. Coinbase Statement">
+      </div>
+      <div class="cm-field">
+        <label>Type</label>
+        <select id="bulkTxAccountType">
+          <option value="bank">Bank / Fiat</option>
+          <option value="crypto">Crypto</option>
+        </select>
+      </div>
+    </div>
+    <div style="border:2px dashed #e2e8f0;border-radius:8px;padding:20px;text-align:center;color:#94a3b8;margin-bottom:6px">
+      <svg width="26" height="26" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 6px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+      <div style="font-size:12px;color:#64748b;margin-bottom:2px">CSV or Excel with columns: Date, Direction, Amount, Counterparty</div>
+      <div style="font-size:11px">Asset and GL Code columns are optional</div>
+      <input type="file" id="bulkTxFile" accept=".csv,.xlsx" style="margin-top:10px;font-size:12px" onchange="parseBulkTxFile(this)">
+    </div>
+    <div style="text-align:right;margin-bottom:10px">
+      <a href="#" onclick="downloadBulkTxTemplate();return false" style="font-size:11px;color:#3b82f6;text-decoration:none">Download template &rarr;</a>
+    </div>
+    <div id="bulkTxStatus" style="min-height:16px;margin-bottom:6px"></div>
+    <div class="cm-actions">
+      <button style="background:#f1f5f9;color:#475569" onclick="closeBulkTxUpload()">Cancel</button>
+      <button id="bulkTxImportBtn" style="background:#3b82f6;color:#fff" disabled onclick="commitBulkTxUpload()">Import Transactions</button>
     </div>
   </div>
 </div>
